@@ -36,14 +36,6 @@ return new class extends Migration
 
                 ->nullOnDelete();
 
-            $table->foreignId('technician_id')
-
-                ->nullable()
-
-                ->constrained()
-
-                ->nullOnDelete();
-
             $table->string(
                 'ticket_number'
             );

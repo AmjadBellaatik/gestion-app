@@ -13,11 +13,13 @@ return new class extends Migration
     {
         Schema::table('payments', function (Blueprint $table) {
 
-            $table->foreignId('company_id')
-                ->nullable()
-                ->after('id')
-                ->constrained()
-                ->cascadeOnDelete();
+            if (! Schema::hasColumn('payments', 'company_id')) {
+                $table->foreignId('company_id')
+                    ->nullable()
+                    ->after('id')
+                    ->constrained()
+                    ->cascadeOnDelete();
+            }
 
         });
     }
@@ -29,9 +31,9 @@ return new class extends Migration
     {
         Schema::table('payments', function (Blueprint $table) {
 
-            $table->dropForeign(['company_id']);
-
-            $table->dropColumn('company_id');
+            if (Schema::hasColumn('payments', 'company_id')) {
+                $table->dropConstrainedForeignId('company_id');
+            }
 
         });
     }

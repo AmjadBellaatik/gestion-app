@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('document_types')) {
+            return;
+        }
+
         Schema::create('document_types', function (
             Blueprint $table
         ) {
@@ -49,8 +53,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists(
-            'document_types'
-        );
+        //
     }
 };

@@ -12,45 +12,15 @@ return new class extends Migration
             Blueprint $table
         ) {
 
-            $table->string(
-                'first_name'
-            )
+            foreach (['first_name', 'last_name', 'cin', 'nationality'] as $column) {
+                if (Schema::hasColumn('clients', $column)) {
+                    $table->string($column)->nullable()->change();
+                }
+            }
 
-                ->nullable()
-
-                ->change();
-
-            $table->string(
-                'last_name'
-            )
-
-                ->nullable()
-
-                ->change();
-
-            $table->string(
-                'cin'
-            )
-
-                ->nullable()
-
-                ->change();
-
-            $table->date(
-                'birth_date'
-            )
-
-                ->nullable()
-
-                ->change();
-
-            $table->string(
-                'nationality'
-            )
-
-                ->nullable()
-
-                ->change();
+            if (Schema::hasColumn('clients', 'birth_date')) {
+                $table->date('birth_date')->nullable()->change();
+            }
 
         });
     }
@@ -61,45 +31,15 @@ return new class extends Migration
             Blueprint $table
         ) {
 
-            $table->string(
-                'first_name'
-            )
+            foreach (['first_name', 'last_name', 'cin', 'nationality'] as $column) {
+                if (Schema::hasColumn('clients', $column)) {
+                    $table->string($column)->nullable(false)->change();
+                }
+            }
 
-                ->nullable(false)
-
-                ->change();
-
-            $table->string(
-                'last_name'
-            )
-
-                ->nullable(false)
-
-                ->change();
-
-            $table->string(
-                'cin'
-            )
-
-                ->nullable(false)
-
-                ->change();
-
-            $table->date(
-                'birth_date'
-            )
-
-                ->nullable(false)
-
-                ->change();
-
-            $table->string(
-                'nationality'
-            )
-
-                ->nullable(false)
-
-                ->change();
+            if (Schema::hasColumn('clients', 'birth_date')) {
+                $table->date('birth_date')->nullable(false)->change();
+            }
 
         });
     }

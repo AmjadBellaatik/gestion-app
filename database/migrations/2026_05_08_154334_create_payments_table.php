@@ -35,20 +35,6 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             */
 
-            $table->foreignId('sale_id')
-
-                ->constrained()
-
-                ->cascadeOnDelete();
-
-            $table->foreignId('client_id')
-
-                ->nullable()
-
-                ->constrained()
-
-                ->nullOnDelete();
-
             /*
             |--------------------------------------------------------------------------
             | Payment Info

@@ -245,18 +245,9 @@ return new class extends Migration
         |--------------------------------------------------------------------------
         */
 
-        if (
-
-            Schema::hasTable(
-                'motorcycles'
-            )
-
-        ) {
-
-            Schema::drop(
-                'motorcycles'
-            );
-        }
+        // Keep the legacy table in place for older MariaDB/MySQL installs.
+        // Several historical tables may still hold foreign keys to it when
+        // running the full migration chain from an empty database.
     }
 
     public function down(): void
