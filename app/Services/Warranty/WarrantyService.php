@@ -46,19 +46,19 @@ class WarrantyService
                 $item->warranty_duration_unit
             );
 
-            Warranty::firstOrCreate(
+            Warranty::updateOrCreate(
                 [
                     'sale_id'            => $sale->id,
                     'motorcycle_unit_id' => $item->motorcycle_unit_id ?? null,
                     'product_id'         => $item->motorcycle_unit_id ? null : ($item->product_id ?? null),
                 ],
                 [
-                    'client_id'          => $sale->client_id,
-                    'motorcycle_id'      => $item->motorcycle_id ?? null,
-                    'start_date'         => $startDate->toDateString(),
-                    'end_date'           => $endDate->toDateString(),
+                    'client_id'           => $sale->client_id,
+                    'motorcycle_id'       => $item->motorcycle_id ?? null,
+                    'start_date'          => $startDate->toDateString(),
+                    'end_date'            => $endDate->toDateString(),
                     'warranty_kilometers' => $item->warranty_kilometers ?? null,
-                    'notes'              => self::buildNotes($item),
+                    'notes'               => self::buildNotes($item),
                 ]
             );
         }

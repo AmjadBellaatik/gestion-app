@@ -285,7 +285,7 @@ class ReconciliationService
                 $item->warranty_duration_unit
             );
 
-            Warranty::withoutGlobalScopes()->firstOrCreate(
+            Warranty::withoutGlobalScopes()->updateOrCreate(
                 [
                     'sale_id'            => $sale->id,
                     'motorcycle_unit_id' => $item->motorcycle_unit_id ?? null,
