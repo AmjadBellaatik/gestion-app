@@ -155,6 +155,7 @@
     $warrantyKilometers = data_get($document->metadata, 'warranty_kilometers');
     $city = \Illuminate\Support\Str::title(\Illuminate\Support\Str::lower($company->city ?: 'Sale'));
     $brand = $model?->brand?->name ?: $model?->marque;
+    $isElectricOrScooter = !$unit && $product && in_array($product->type, ['trotinette', 'velo_electrique']);
 @endphp
 
     <div class="watermark">{{ strtoupper($brand ?? $companyName) }}</div>
@@ -225,18 +226,37 @@
     </div>
 
     <div class="terms">
-        <p>
-            Il a ete convenu et arrete ce qui suit : SOCIETE <strong>{{ $companyName }}</strong>
-            s'engage de donner <strong>{{ $warrantyDurationLabel }}</strong> de garantie pour
-            <strong>{{ $coveredItemName }}</strong>
-            ou <strong>{{ $warrantyKilometers }}</strong> KM a compter de la date de livraison
-            (par exemple : cylindre, vilebrequin...).
-        </p>
-        <p>
-            Cette garantie ne contient pas les frais de la main d'oeuvre, les cables et l'equipement electronique,
-            plaquettes de frein, pneumatique et les articles fournis sur demande speciale de l'acheteur, ni la tenue
-            de la peinture, du nickel ou du chrome.
-        </p>
+        @if($isElectricOrScooter)
+            <p>Il a été convenu et arrêté ce qui suit :</p>
+            <p>
+                SOCIETE <strong>{{ $companyName }}</strong> s'engage à accorder une garantie sur le moteur,
+                le contrôleur, la batterie ainsi que les composants électriques d'origine du véhicule
+                à compter de la date de livraison.
+            </p>
+            <p>Le chargeur bénéficie d'une garantie limitée à 48 heures après livraison.</p>
+            <p>
+                Sont exclus de la garantie les pièces d'usure et consommables tels que : pneus, chambres à air,
+                plaquettes de frein, poignées, câbles, ampoules et accessoires.
+            </p>
+            <p>
+                La garantie ne couvre pas les dommages résultant d'un accident, d'une chute, d'une mauvaise
+                utilisation, d'une modification non autorisée, d'une infiltration d'eau ou d'un vol du véhicule
+                ou de ses composants.
+            </p>
+        @else
+            <p>
+                Il a ete convenu et arrete ce qui suit : SOCIETE <strong>{{ $companyName }}</strong>
+                s'engage de donner <strong>{{ $warrantyDurationLabel }}</strong> de garantie pour
+                <strong>{{ $coveredItemName }}</strong>
+                ou <strong>{{ $warrantyKilometers }}</strong> KM a compter de la date de livraison
+                (par exemple : cylindre, vilebrequin...).
+            </p>
+            <p>
+                Cette garantie ne contient pas les frais de la main d'oeuvre, les cables et l'equipement electronique,
+                plaquettes de frein, pneumatique et les articles fournis sur demande speciale de l'acheteur, ni la tenue
+                de la peinture, du nickel ou du chrome.
+            </p>
+        @endif
     </div>
 
     <div class="date-place">{{ $city }} le : {{ $document->document_date?->format('d/m/Y') }}</div>

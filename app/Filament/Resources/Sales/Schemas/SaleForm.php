@@ -579,16 +579,34 @@ class SaleForm
                     ->schema([
                         CheckboxList::make('auto_document_codes')
                             ->label(__('messages.documents'))
-                            ->options([
-                                DocumentType::INVOICE => 'Facture',
-                                DocumentType::DELIVERY_NOTE => 'Bon de livraison',
-                                DocumentType::WARRANTY_CONTRACT => 'Contrat de garantie',
-                                DocumentType::CONFORMITY => 'Certificat de conformite',
-                            ])
+                            ->live()
+                            ->options(function (\Filament\Forms\Get $get): array {
+                                $options = [
+                                    DocumentType::INVOICE          => 'Facture',
+                                    DocumentType::DELIVERY_NOTE    => 'Bon de livraison',
+                                    DocumentType::CONFORMITY       => 'Certificat de conformite',
+                                ];
+
+                                $hasWarrantyItem = collect($get('saleItems') ?? [])
+                                    ->some(function (array $item): bool {
+                                        if (($item['item_type'] ?? null) === 'motorcycle') {
+                                            return true;
+                                        }
+                                        $productId = $item['product_id'] ?? null;
+                                        return $productId
+                                            && Product::whereKey($productId)
+                                                ->where('has_warranty', true)
+                                                ->exists();
+                                    });
+
+                                if ($hasWarrantyItem) {
+                                    $options[DocumentType::WARRANTY_CONTRACT] = 'Contrat de garantie';
+                                }
+
+                                return $options;
+                            })
                             ->columns(2)
-                            ->default([
-                                DocumentType::INVOICE,
-                            ]),
+                            ->default([DocumentType::INVOICE]),
                     ]),
 
             ]);
