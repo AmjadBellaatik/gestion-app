@@ -75,51 +75,38 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
 
                 NavigationGroup::make()
-
-                    ->label(
-                        __('messages.commercial')
-                    )
-
+                    ->label(fn () => __('messages.commercial'))
+                    ->sort(1)
                     ->collapsed(),
 
                 NavigationGroup::make()
-
-                    ->label(
-                        __('messages.motorcycles')
-                    )
-
+                    ->label(fn () => __('messages.motorcycles'))
+                    ->sort(2)
                     ->collapsed(),
 
                 NavigationGroup::make()
-
-                    ->label(
-                        __('messages.stock_management')
-                    )
-
+                    ->label(fn () => __('messages.stock_management'))
+                    ->sort(3)
                     ->collapsed(),
 
                 NavigationGroup::make()
-
-                    ->label(
-                        __('messages.workshop')
-                    )
-
+                    ->label(fn () => __('messages.workshop'))
+                    ->sort(4)
                     ->collapsed(),
 
                 NavigationGroup::make()
-
-                    ->label(
-                        __('messages.accounting')
-                    )
-
+                    ->label(fn () => __('messages.accounting'))
+                    ->sort(5)
                     ->collapsed(),
 
                 NavigationGroup::make()
+                    ->label(fn () => __('messages.reports'))
+                    ->sort(6)
+                    ->collapsed(),
 
-                    ->label(
-                        __('messages.settings')
-                    )
-
+                NavigationGroup::make()
+                    ->label(fn () => __('messages.settings'))
+                    ->sort(7)
                     ->collapsed(),
 
             ])

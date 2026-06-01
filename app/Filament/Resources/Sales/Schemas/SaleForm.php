@@ -580,7 +580,7 @@ class SaleForm
                         CheckboxList::make('auto_document_codes')
                             ->label(__('messages.documents'))
                             ->live()
-                            ->options(function (\Filament\Forms\Get $get): array {
+                            ->options(function (\Filament\Schemas\Components\Utilities\Get $get): array {
                                 $options = [
                                     DocumentType::INVOICE          => 'Facture',
                                     DocumentType::DELIVERY_NOTE    => 'Bon de livraison',
