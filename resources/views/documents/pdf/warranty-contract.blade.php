@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { margin: 8mm 10mm 4mm 10mm; }
+        @page { margin: 8mm 10mm 22mm 10mm; }
         body {
             font-family: DejaVu Sans, sans-serif;
             color: #111;
