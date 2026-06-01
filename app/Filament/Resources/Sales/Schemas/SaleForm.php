@@ -78,21 +78,52 @@ class SaleForm
                                             ->default('person')
                                             ->live()
                                             ->required(),
+
+                                        // Person fields
                                         TextInput::make('first_name')
                                             ->label(__('messages.first_name'))
                                             ->visible(fn ($get) => ($get('client_type') ?? 'person') === 'person')
                                             ->required(fn ($get) => ($get('client_type') ?? 'person') === 'person'),
                                         TextInput::make('last_name')
                                             ->label(__('messages.last_name'))
+                                            ->visible(fn ($get) => ($get('client_type') ?? 'person') === 'person')
+                                            ->required(fn ($get) => ($get('client_type') ?? 'person') === 'person'),
+                                        TextInput::make('cin')
+                                            ->label(__('messages.national_id'))
                                             ->visible(fn ($get) => ($get('client_type') ?? 'person') === 'person'),
+
+                                        // Company fields
                                         TextInput::make('company_name')
                                             ->label(__('messages.company_name'))
                                             ->visible(fn ($get) => $get('client_type') === 'company')
                                             ->required(fn ($get) => $get('client_type') === 'company'),
+                                        TextInput::make('ice')
+                                            ->label(__('messages.ice'))
+                                            ->visible(fn ($get) => $get('client_type') === 'company')
+                                            ->required(fn ($get) => $get('client_type') === 'company'),
+                                        TextInput::make('rc')
+                                            ->label(__('messages.rc'))
+                                            ->visible(fn ($get) => $get('client_type') === 'company'),
+                                        TextInput::make('if')
+                                            ->label(__('messages.if'))
+                                            ->visible(fn ($get) => $get('client_type') === 'company'),
+                                        TextInput::make('representative_name')
+                                            ->label(__('messages.representative_name'))
+                                            ->visible(fn ($get) => $get('client_type') === 'company'),
+
+                                        // Administration fields
                                         TextInput::make('administration_name')
                                             ->label(__('messages.administration_name'))
                                             ->visible(fn ($get) => $get('client_type') === 'administration')
                                             ->required(fn ($get) => $get('client_type') === 'administration'),
+                                        TextInput::make('department')
+                                            ->label(__('messages.department'))
+                                            ->visible(fn ($get) => $get('client_type') === 'administration'),
+                                        TextInput::make('responsible_person')
+                                            ->label(__('messages.responsible_person'))
+                                            ->visible(fn ($get) => $get('client_type') === 'administration'),
+
+                                        // Common fields
                                         TextInput::make('phone')->label(__('messages.phone'))->tel(),
                                         TextInput::make('email')->label(__('messages.email'))->email(),
                                     ])
