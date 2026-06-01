@@ -249,8 +249,8 @@
                 Il a ete convenu et arrete ce qui suit : SOCIETE <strong>{{ $companyName }}</strong>
                 s'engage de donner <strong>{{ $warrantyDurationLabel }}</strong> de garantie pour
                 <strong>{{ $coveredItemName }}</strong>
-                ou <strong>{{ $warrantyKilometers }}</strong> KM a compter de la date de livraison
-                (par exemple : cylindre, vilebrequin...).
+                @if($warrantyKilometers) ou <strong>{{ $warrantyKilometers }} KM</strong>@endif
+                a compter de la date de livraison (par exemple : cylindre, vilebrequin...).
             </p>
             <p>
                 Cette garantie ne contient pas les frais de la main d'oeuvre, les cables et l'equipement electronique,

@@ -619,6 +619,10 @@ class SaleForm
             return true;
         }
 
+        if (in_array($get('item_type'), self::warrantyProductTypes(), true)) {
+            return true;
+        }
+
         $productId = $get('product_id');
 
         return filled($productId)
