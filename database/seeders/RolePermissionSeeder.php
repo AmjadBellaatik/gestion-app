@@ -62,7 +62,6 @@ class RolePermissionSeeder extends Seeder
             'manage_stock',
             'manage_warehouses',
             'manage_stock_transfers',
-            'manage_purchases',
             'manage_motorcycles',
 
             /*

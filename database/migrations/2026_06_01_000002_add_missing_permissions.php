@@ -13,7 +13,6 @@ return new class extends Migration
         $missing = [
             'manage_warehouses',
             'manage_stock_transfers',
-            'manage_purchases',
             'manage_motorcycles',
             'manage_technicians',
             'manage_reimbursements',
@@ -32,7 +31,7 @@ return new class extends Migration
                 'manage_sales', 'create_sales', 'edit_sales', 'delete_sales', 'view_sales',
                 'manage_users', 'manage_roles', 'manage_permissions',
                 'manage_stock', 'manage_products', 'manage_warehouses',
-                'manage_stock_transfers', 'manage_purchases', 'manage_motorcycles',
+                'manage_stock_transfers', 'manage_motorcycles',
                 'manage_local_stock', 'create_stock_entries', 'create_stock_exits',
                 'transfer_stock', 'view_local_reports',
                 'manage_repairs', 'manage_technicians',
@@ -61,7 +60,7 @@ return new class extends Migration
 
             'Stock Manager' => [
                 'manage_stock', 'manage_products', 'manage_warehouses',
-                'manage_stock_transfers', 'manage_purchases', 'manage_motorcycles',
+                'manage_stock_transfers', 'manage_motorcycles',
                 'manage_local_stock', 'create_stock_entries', 'create_stock_exits',
                 'transfer_stock', 'view_local_reports',
             ],

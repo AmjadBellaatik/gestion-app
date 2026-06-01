@@ -67,8 +67,6 @@ class PermissionSeeder extends Seeder
 
             'manage_stock_transfers',
 
-            'manage_purchases',
-
             'manage_motorcycles',
 
             /*
@@ -249,7 +247,6 @@ class PermissionSeeder extends Seeder
                     'manage_products',
                     'manage_warehouses',
                     'manage_stock_transfers',
-                    'manage_purchases',
                     'manage_motorcycles',
 
                     'manage_local_stock',
@@ -299,7 +296,6 @@ class PermissionSeeder extends Seeder
                     'manage_stock',
                     'manage_warehouses',
                     'manage_stock_transfers',
-                    'manage_purchases',
                     'manage_motorcycles',
 
                     'manage_local_stock',
@@ -349,7 +345,6 @@ class PermissionSeeder extends Seeder
                     'manage_products',
                     'manage_warehouses',
                     'manage_stock_transfers',
-                    'manage_purchases',
                     'manage_motorcycles',
 
                     'manage_local_stock',
