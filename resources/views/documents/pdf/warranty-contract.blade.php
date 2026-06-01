@@ -229,9 +229,10 @@
         @if($isElectricOrScooter)
             <p>Il a été convenu et arrêté ce qui suit :</p>
             <p>
-                SOCIETE <strong>{{ $companyName }}</strong> s'engage à accorder une garantie sur le moteur,
-                le contrôleur, la batterie ainsi que les composants électriques d'origine du véhicule
-                à compter de la date de livraison.
+                SOCIETE <strong>{{ $companyName }}</strong> s'engage à accorder une garantie de
+                <strong>{{ $warrantyDurationLabel }}</strong>@if($warrantyKilometers) ou <strong>{{ $warrantyKilometers }} KM</strong>@endif
+                sur le moteur, le contrôleur, la batterie ainsi que les composants électriques d'origine
+                du véhicule à compter de la date de livraison.
             </p>
             <p>Le chargeur bénéficie d'une garantie limitée à 48 heures après livraison.</p>
             <p>
