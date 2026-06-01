@@ -60,6 +60,7 @@ return [
     'stock' => 'Stock',
     'warehouse' => 'Warehouse',
     'warehouses' => 'Warehouses',
+    'manage_warehouses_permission' => 'Can Manage Warehouses',
     'stock_alert' => 'Stock Alert',
     'quantity' => 'Quantity',
     'price' => 'Price (DH)',

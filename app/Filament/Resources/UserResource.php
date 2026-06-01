@@ -279,6 +279,36 @@ class UserResource extends Resource
                                     ->all()
                             ),
 
+                        Toggle::make('manage_warehouses_permission')
+
+                            ->label(
+                                __('messages.manage_warehouses_permission')
+                            )
+
+                            ->live()
+
+                            ->afterStateHydrated(function ($component, ?User $record): void {
+                                $component->state(
+                                    $record?->permissions->pluck('name')->contains('manage_warehouses') ?? false
+                                );
+                            })
+
+                            ->afterStateUpdated(function (bool $state, callable $get, callable $set): void {
+                                $permissions = $get('permissions') ?? [];
+
+                                if ($state) {
+                                    if (! in_array('manage_warehouses', $permissions)) {
+                                        $permissions[] = 'manage_warehouses';
+                                    }
+                                } else {
+                                    $permissions = array_values(
+                                        array_filter($permissions, fn ($p) => $p !== 'manage_warehouses')
+                                    );
+                                }
+
+                                $set('permissions', $permissions);
+                            }),
+
                     ]),
 
             ]);

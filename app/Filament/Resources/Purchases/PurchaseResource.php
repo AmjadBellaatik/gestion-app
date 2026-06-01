@@ -32,7 +32,7 @@ class PurchaseResource extends Resource
         70;
 
     protected static ?string $recordTitleAttribute =
-        'reference';
+        'order_number';
 
     public static function getNavigationLabel(): string
     {

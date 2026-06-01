@@ -60,6 +60,7 @@ return [
     'stock' => 'المخزون',
     'warehouse' => 'المستودع',
     'warehouses' => 'المستودعات',
+    'manage_warehouses_permission' => 'يمكنه إدارة المستودعات',
     'stock_alert' => 'تنبيه المخزون',
     'quantity' => 'الكمية',
     'price' => 'السعر (DH)',
