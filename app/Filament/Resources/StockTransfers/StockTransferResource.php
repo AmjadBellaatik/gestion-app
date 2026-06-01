@@ -30,7 +30,7 @@ class StockTransferResource extends Resource
         'heroicon-o-arrow-path';
 
     protected static ?int $navigationSort =
-        24;
+        50;
 
     protected static ?string $recordTitleAttribute =
         'reference';
@@ -57,14 +57,18 @@ class StockTransferResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return auth()->user()?->can('manage_stock_transfers')
+            || auth()->user()?->can('transfer_stock')
+            || auth()->user()?->can('manage_stock')
+            || false;
     }
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->can(
-            'manage_stock_transfers'
-        ) ?? false;
+        return auth()->user()?->can('manage_stock_transfers')
+            || auth()->user()?->can('transfer_stock')
+            || auth()->user()?->can('manage_stock')
+            || false;
     }
 
     public static function form(

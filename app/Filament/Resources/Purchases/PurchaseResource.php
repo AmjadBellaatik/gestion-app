@@ -29,7 +29,7 @@ class PurchaseResource extends Resource
         'heroicon-o-clipboard-document';
 
     protected static ?int $navigationSort =
-        5;
+        70;
 
     protected static ?string $recordTitleAttribute =
         'reference';
@@ -56,12 +56,18 @@ class PurchaseResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return auth()->user()?->can('manage_purchases')
+            || auth()->user()?->can('manage_suppliers')
+            || auth()->user()?->can('manage_stock')
+            || false;
     }
 
     public static function canViewAny(): bool
     {
-        return false;
+        return auth()->user()?->can('manage_purchases')
+            || auth()->user()?->can('manage_suppliers')
+            || auth()->user()?->can('manage_stock')
+            || false;
     }
 
     public static function form(

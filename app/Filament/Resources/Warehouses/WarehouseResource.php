@@ -31,7 +31,7 @@ class WarehouseResource extends Resource
         'heroicon-o-building-storefront';
 
     protected static ?int $navigationSort =
-        4;
+        20;
 
     protected static ?string $recordTitleAttribute =
         'name';
@@ -58,16 +58,16 @@ class WarehouseResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()?->can(
-            'manage_warehouses'
-        ) ?? false;
+        return auth()->user()?->can('manage_warehouses')
+            || auth()->user()?->can('manage_stock')
+            || false;
     }
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->can(
-            'manage_warehouses'
-        ) ?? false;
+        return auth()->user()?->can('manage_warehouses')
+            || auth()->user()?->can('manage_stock')
+            || false;
     }
 
     public static function form(

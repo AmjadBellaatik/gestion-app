@@ -14,13 +14,47 @@ class Reimbursement extends Model
 
         'repair_ticket_id',
 
+        'warranty_claim_id',
+
         'supplier_id',
 
+        'reference_number',
+
+        'request_date',
+
+        'expected_payment_date',
+
+        'paid_date',
+
         'amount',
+
+        'requested_amount',
+
+        'approved_amount',
+
+        'paid_amount',
 
         'status',
 
         'notes',
+
+    ];
+
+    protected $casts = [
+
+        'request_date' => 'date',
+
+        'expected_payment_date' => 'date',
+
+        'paid_date' => 'date',
+
+        'amount' => 'decimal:2',
+
+        'requested_amount' => 'decimal:2',
+
+        'approved_amount' => 'decimal:2',
+
+        'paid_amount' => 'decimal:2',
 
     ];
 
@@ -55,6 +89,13 @@ class Reimbursement extends Model
     {
         return $this->belongsTo(
             RepairTicket::class
+        );
+    }
+
+    public function warrantyClaim()
+    {
+        return $this->belongsTo(
+            WarrantyClaim::class
         );
     }
 

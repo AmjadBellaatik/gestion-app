@@ -60,6 +60,26 @@ class RolePermissionSeeder extends Seeder
             */
 
             'manage_stock',
+            'manage_warehouses',
+            'manage_stock_transfers',
+            'manage_purchases',
+            'manage_motorcycles',
+
+            /*
+            |--------------------------------------------------------------------------
+            | LOCAL WAREHOUSE STOCK
+            |--------------------------------------------------------------------------
+            */
+
+            'manage_local_stock',
+
+            'create_stock_entries',
+
+            'create_stock_exits',
+
+            'transfer_stock',
+
+            'view_local_reports',
 
             /*
             |--------------------------------------------------------------------------
@@ -68,6 +88,8 @@ class RolePermissionSeeder extends Seeder
             */
 
             'manage_repairs',
+
+            'manage_technicians',
 
             /*
             |--------------------------------------------------------------------------
@@ -109,13 +131,19 @@ class RolePermissionSeeder extends Seeder
 
             'manage_warranty',
 
+            'manage_reimbursements',
+
             /*
             |--------------------------------------------------------------------------
-            | TRANSACTIONS
+            | ACCOUNTING
             |--------------------------------------------------------------------------
             */
 
             'manage_transactions',
+
+            'manage_payments',
+
+            'manage_funds',
 
             /*
             |--------------------------------------------------------------------------
@@ -234,12 +262,27 @@ class RolePermissionSeeder extends Seeder
                     'manage_permissions',
 
                     'manage_stock',
+                    'manage_warehouses',
+                    'manage_stock_transfers',
+                    'manage_purchases',
+                    'manage_motorcycles',
+
+                    'manage_local_stock',
+                    'create_stock_entries',
+                    'create_stock_exits',
+                    'transfer_stock',
+                    'view_local_reports',
+
                     'manage_repairs',
+                    'manage_technicians',
 
                     'manage_products',
                     'manage_documents',
                     'manage_warranty',
+                    'manage_reimbursements',
                     'manage_transactions',
+                    'manage_payments',
+                    'manage_funds',
                     'manage_expenses',
                     'manage_clients',
                     'manage_suppliers',
@@ -276,7 +319,20 @@ class RolePermissionSeeder extends Seeder
                     'view_sales',
 
                     'manage_stock',
+                    'manage_warehouses',
+                    'manage_stock_transfers',
+                    'manage_purchases',
+                    'manage_motorcycles',
+
+                    'manage_local_stock',
+                    'create_stock_entries',
+                    'create_stock_exits',
+                    'transfer_stock',
+                    'view_local_reports',
+
                     'manage_repairs',
+                    'manage_technicians',
+                    'manage_reimbursements',
 
                     'manage_clients',
                     'manage_resellers',
@@ -298,6 +354,8 @@ class RolePermissionSeeder extends Seeder
                 $role->syncPermissions([
 
                     'manage_transactions',
+                    'manage_payments',
+                    'manage_funds',
                     'manage_expenses',
                     'manage_documents',
 
@@ -320,6 +378,16 @@ class RolePermissionSeeder extends Seeder
                     'manage_stock',
 
                     'manage_products',
+                    'manage_warehouses',
+                    'manage_stock_transfers',
+                    'manage_purchases',
+                    'manage_motorcycles',
+
+                    'manage_local_stock',
+                    'create_stock_entries',
+                    'create_stock_exits',
+                    'transfer_stock',
+                    'view_local_reports',
 
                 ]);
 
@@ -358,7 +426,9 @@ class RolePermissionSeeder extends Seeder
                 $role->syncPermissions([
 
                     'manage_repairs',
+                    'manage_technicians',
                     'manage_warranty',
+                    'manage_reimbursements',
 
                 ]);
 
@@ -376,6 +446,8 @@ class RolePermissionSeeder extends Seeder
 
                     'view_sales',
                     'manage_transactions',
+                    'manage_payments',
+                    'manage_funds',
 
                 ]);
 

@@ -204,7 +204,7 @@ class UserResource extends Resource
 
                             ->preload(),
 
-                                        Select::make('roles')
+                        Select::make('roles')
 
                             ->label(
                                 __('messages.roles')
@@ -213,6 +213,12 @@ class UserResource extends Resource
                             ->multiple()
 
                             ->live()
+
+                            ->afterStateHydrated(function ($component, ?User $record): void {
+                                $component->state(
+                                    $record?->roles->pluck('name')->all() ?? []
+                                );
+                            })
 
                             ->afterStateUpdated(function (?array $state, callable $set): void {
                                 if (empty($state)) {
@@ -253,11 +259,24 @@ class UserResource extends Resource
 
                             ->multiple()
 
-                            ->options(
-                                Permission::pluck(
+                            ->searchable()
+
+                            ->preload()
+
+                            ->afterStateHydrated(function ($component, ?User $record): void {
+                                $component->state(
+                                    $record?->permissions->pluck('name')->all() ?? []
+                                );
+                            })
+
+                            ->options(fn () =>
+                                Permission::query()
+                                    ->orderBy('name')
+                                    ->pluck(
                                     'name',
                                     'name'
-                                )
+                                    )
+                                    ->all()
                             ),
 
                     ]),
