@@ -257,6 +257,16 @@ class AdminPanelProvider extends PanelProvider
 
             )
 
+            ->renderHook(
+
+                PanelsRenderHook::FOOTER,
+
+                fn (): string => view(
+                    'filament.components.developer-footer'
+                )->render()
+
+            )
+
             /*
             |--------------------------------------------------------------------------
             | Middleware

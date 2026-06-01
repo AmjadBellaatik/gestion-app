@@ -919,5 +919,6 @@ return [
     'warranty_information'      => 'Warranty Information',
     'warranty_status'           => 'Warranty Status',
     'discount_validated_by'     => 'Discount Validated By',
+    'developed_by'              => 'Developed by',
 ];
 

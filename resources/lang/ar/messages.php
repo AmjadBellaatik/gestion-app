@@ -921,4 +921,5 @@ return [
     'stock_direction'           => 'اتجاه المخزون',
     'stock_entry'               => 'إدخال المخزون',
     'transfer_movement'         => 'حركة النقل',
+    'developed_by'              => 'طُوِّر بواسطة',
 ];

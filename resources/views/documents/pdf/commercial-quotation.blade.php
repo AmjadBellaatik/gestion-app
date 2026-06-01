@@ -304,7 +304,7 @@
     </table>
 
     <div class="total-words">
-        {{ __('messages.total_in_letters') }} : <strong>{{ \App\Services\Amounts\AmountInWordsService::convert($totalTtc, 'fr') }}</strong>
+        Arrêté le présent Devis à la somme TTC de : <strong>{{ \App\Services\Amounts\AmountInWordsService::convert($totalTtc, 'fr') }}</strong>
     </div>
 
     {{-- Motorcycle technical specs --}}

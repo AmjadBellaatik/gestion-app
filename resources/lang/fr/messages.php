@@ -919,4 +919,5 @@ return [
     'warranty_claim'            => 'Réclamation de garantie',
     'warranty_information'      => 'Informations de garantie',
     'warranty_status'           => 'Statut de la garantie',
+    'developed_by'              => 'Développé par',
 ];

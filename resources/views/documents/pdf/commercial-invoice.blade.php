@@ -318,7 +318,7 @@
     </table>
 
     <div class="total-words">
-        {{ __('messages.total_in_letters') }} : <strong>{{ \App\Services\Amounts\AmountInWordsService::convert($totalTtc, 'fr') }}</strong>
+        Arrêté la présente Facture à la somme TTC de : <strong>{{ \App\Services\Amounts\AmountInWordsService::convert($totalTtc, 'fr') }}</strong>
     </div>
 
     <table class="signatures">
