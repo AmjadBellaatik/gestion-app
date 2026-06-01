@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\Sales\Pages;
 
 use App\Filament\Resources\Sales\SaleResource;
+use App\Models\Document;
+use App\Models\DocumentType;
 use App\Models\SaleItem;
 use App\Services\Warranty\WarrantyService;
 use Filament\Actions\DeleteAction;
@@ -42,6 +44,7 @@ class EditSale extends EditRecord
             }
 
             return [
+                '_sale_item_id'           => $item->id,
                 'item_type'               => $itemType,
                 'product_id'              => $item->product_id,
                 'motorcycle_unit_id'      => $item->motorcycle_unit_id,
@@ -58,6 +61,21 @@ class EditSale extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        foreach ($data['saleItems'] ?? [] as $row) {
+            $itemId = $row['_sale_item_id'] ?? null;
+            if (! $itemId) {
+                continue;
+            }
+
+            SaleItem::whereKey($itemId)
+                ->where('sale_id', $this->getRecord()->id)
+                ->update([
+                    'warranty_duration_value' => $row['warranty_duration_value'] ?? null,
+                    'warranty_duration_unit'  => $row['warranty_duration_unit'] ?? null,
+                    'warranty_kilometers'     => filled($row['warranty_kilometers']) ? (int) $row['warranty_kilometers'] : null,
+                ]);
+        }
+
         unset($data['saleItems']);
 
         return $data;
@@ -65,6 +83,44 @@ class EditSale extends EditRecord
 
     protected function afterSave(): void
     {
-        WarrantyService::activateFromSale($this->getRecord());
+        $sale = $this->getRecord();
+
+        // Re-sync warranties from updated SaleItem warranty fields
+        WarrantyService::activateFromSale($sale);
+
+        // Sync warranty document metadata so PDFs reflect the updated values
+        $warrantyType = DocumentType::query()
+            ->where('code', DocumentType::WARRANTY_CONTRACT)
+            ->first();
+
+        if (! $warrantyType) {
+            return;
+        }
+
+        $sale->loadMissing('saleItems.product');
+
+        Document::query()
+            ->where('sale_id', $sale->id)
+            ->where('document_type_id', $warrantyType->id)
+            ->each(function (Document $document) use ($sale): void {
+                $warrantySaleItem = $sale->saleItems->first(function (SaleItem $item): bool {
+                    if ($item->motorcycle_unit_id) {
+                        return true;
+                    }
+                    return in_array($item->product?->type, ['trotinette', 'velo_electrique', 'velo_normal'], true)
+                        || (bool) $item->product?->has_warranty;
+                });
+
+                if (! $warrantySaleItem) {
+                    return;
+                }
+
+                $metadata = $document->metadata ?? [];
+                $metadata['warranty_duration_value'] = $warrantySaleItem->warranty_duration_value;
+                $metadata['warranty_duration_unit']  = $warrantySaleItem->warranty_duration_unit;
+                $metadata['warranty_kilometers']     = $warrantySaleItem->warranty_kilometers;
+
+                $document->update(['metadata' => $metadata]);
+            });
     }
 }

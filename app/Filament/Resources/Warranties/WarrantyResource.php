@@ -7,6 +7,9 @@ use App\Filament\Resources\Warranties\Pages\EditWarranty;
 use App\Filament\Resources\Warranties\Pages\ListWarranties;
 use App\Filament\Resources\Warranties\Pages\ViewWarranty;
 
+use App\Models\Client;
+use App\Models\MotorcycleUnit;
+use App\Models\Product;
 use App\Models\Warranty;
 
 use BackedEnum;
@@ -19,6 +22,7 @@ use Filament\Resources\Resource;
 
 use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Grid;
 
 use Filament\Tables\Table;
 
@@ -34,7 +38,7 @@ class WarrantyResource extends Resource
         3;
 
     protected static ?string $recordTitleAttribute =
-        'status';
+        'notes';
 
     public static function getNavigationLabel(): string
     {
@@ -58,153 +62,124 @@ class WarrantyResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()?->can(
-            'manage_warranty'
-        ) ?? false;
+        return auth()->user()?->can('manage_warranty') ?? false;
     }
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->can(
-            'manage_warranty'
-        ) ?? false;
+        return auth()->user()?->can('manage_warranty') ?? false;
     }
 
-    public static function form(
-        Schema $schema
-    ): Schema {
+    public static function canCreate(): bool
+    {
+        return static::isAdminUser();
+    }
 
-        return $schema
+    public static function canEdit($record): bool
+    {
+        return static::isAdminUser();
+    }
 
-            ->components([
+    public static function canDelete($record): bool
+    {
+        return static::isAdminUser();
+    }
 
-                Section::make(
-                    __('messages.general_information')
-                )
+    public static function isAdminUser(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Admin', 'Super Admin']) ?? false;
+    }
 
-                    ->schema([
+    public static function form(Schema $schema): Schema
+    {
+        return $schema->components([
 
-                        Forms\Components\Select::make(
-                            'client_id'
-                        )
+            Section::make(__('messages.general_information'))
+                ->schema([
 
-                            ->label(
-                                __('messages.client')
-                            )
+                    Grid::make(2)->schema([
 
-                            ->relationship(
-                                'client',
-                                'first_name'
-                            )
-
+                        Forms\Components\Select::make('client_id')
+                            ->label(__('messages.client'))
+                            ->options(fn () => Client::query()
+                                ->orderBy('last_name')
+                                ->get()
+                                ->mapWithKeys(fn (Client $c) => [$c->id => $c->display_name])
+                                ->toArray())
                             ->searchable()
-
                             ->preload(),
 
-                        Forms\Components\Select::make(
-                            'motorcycle_id'
-                        )
-
-                            ->label(
-                                __('messages.motorcycle_unit')
-                            )
-
-                            ->relationship(
-                                'motorcycle',
-                                'name'
-                            )
-
+                        Forms\Components\Select::make('sale_id')
+                            ->label(__('messages.sale'))
+                            ->relationship('sale', 'sale_number')
                             ->searchable()
-
                             ->preload(),
-
-                        Forms\Components\Select::make(
-                            'sale_id'
-                        )
-
-                            ->label(
-                                __('messages.sale')
-                            )
-
-                            ->relationship(
-                                'sale',
-                                'sale_number'
-                            )
-
-                            ->searchable()
-
-                            ->preload(),
-
-                        Forms\Components\DatePicker::make(
-                            'start_date'
-                        )
-
-                            ->label(
-                                __('messages.start_date')
-                            )
-
-                            ->required(),
-
-                        Forms\Components\DatePicker::make(
-                            'end_date'
-                        )
-
-                            ->label(
-                                __('messages.end_date')
-                            )
-
-                            ->required(),
-
-                        Forms\Components\Select::make(
-                            'status'
-                        )
-
-                            ->label(
-                                __('messages.status')
-                            )
-
-                            ->options([
-
-                                'active' =>
-                                    __('messages.active'),
-
-                                'expired' =>
-                                    __('messages.expired'),
-
-                                'cancelled' =>
-                                    __('messages.cancelled'),
-
-                            ])
-
-                            ->required(),
-
-                    ])
-
-                    ->columns(2),
-
-                Section::make(
-                    __('messages.notes')
-                )
-
-                    ->schema([
-
-                        Forms\Components\Textarea::make(
-                            'notes'
-                        )
-
-                            ->label(
-                                __('messages.notes')
-                            ),
 
                     ]),
 
-            ]);
+                    Grid::make(2)->schema([
+
+                        Forms\Components\Select::make('motorcycle_unit_id')
+                            ->label(__('messages.motorcycle_unit'))
+                            ->options(fn () => MotorcycleUnit::query()
+                                ->with('motorcycleModel')
+                                ->orderByDesc('id')
+                                ->get()
+                                ->mapWithKeys(fn (MotorcycleUnit $u) => [
+                                    $u->id => trim(($u->motorcycleModel?->modele ?? __('messages.motorcycle')) . ' — ' . $u->chassis_number),
+                                ])
+                                ->toArray())
+                            ->searchable()
+                            ->preload()
+                            ->placeholder(__('messages.none')),
+
+                        Forms\Components\Select::make('product_id')
+                            ->label(__('messages.product'))
+                            ->options(fn () => Product::query()
+                                ->whereNotNull('name')
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->toArray())
+                            ->searchable()
+                            ->preload()
+                            ->placeholder(__('messages.none')),
+
+                    ]),
+
+                    Grid::make(2)->schema([
+
+                        Forms\Components\DatePicker::make('start_date')
+                            ->label(__('messages.start_date'))
+                            ->required(),
+
+                        Forms\Components\DatePicker::make('end_date')
+                            ->label(__('messages.end_date'))
+                            ->required()
+                            ->afterOrEqual('start_date'),
+
+                    ]),
+
+                    Forms\Components\TextInput::make('warranty_kilometers')
+                        ->label(__('messages.warranty_distance'))
+                        ->numeric()
+                        ->minValue(1)
+                        ->suffix('KM'),
+
+                ]),
+
+            Section::make(__('messages.notes'))
+                ->schema([
+                    Forms\Components\Textarea::make('notes')
+                        ->label(__('messages.notes'))
+                        ->rows(3),
+                ]),
+
+        ]);
     }
 
     public static function table(Table $table): Table
     {
-        return WarrantiesTable::configure($table)
-            ->recordUrl(fn ($record) => static::getUrl('view', ['record' => $record]));
+        return WarrantiesTable::configure($table);
     }
 
     public static function getPages(): array

@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources\Warranties\Tables;
 
+use App\Filament\Resources\Warranties\WarrantyResource;
 use App\Models\Warranty;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -95,11 +98,16 @@ class WarrantiesTable
 
             ])
 
-            ->actions([])
+            ->actions([
+                ViewAction::make(),
+                EditAction::make()
+                    ->visible(fn () => WarrantyResource::isAdminUser()),
+            ])
 
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => WarrantyResource::isAdminUser()),
                 ]),
             ]);
     }
