@@ -4,6 +4,8 @@ namespace App\Filament\Resources\StockMovements\Tables;
 
 use Filament\Tables\Table;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -177,6 +179,16 @@ class StockMovementsTable
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
+            ])
+
+            ->toolbarActions([
+
+                BulkActionGroup::make([
+
+                    DeleteBulkAction::make(),
+
+                ]),
+
             ]);
     }
 }
