@@ -100,6 +100,8 @@ return [
     'credit_balance' => 'Credit Balance',
     'total_orders' => 'Total Orders',
     'total_paid' => 'Total Paid',
+    'current_debt' => 'Current Debt',
+    'auto_calculated' => 'Auto-calculated from linked sales and payments',
     'total_purchases' => 'Total Purchases',
     'name' => 'Name',
     'code' => 'Code',

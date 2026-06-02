@@ -81,6 +81,18 @@ class Sale extends Model
             });
         });
 
+        static::saved(function (Sale $model) {
+            if ($model->reseller_id) {
+                $model->reseller?->recalculate();
+            }
+        });
+
+        static::deleted(function (Sale $model) {
+            if ($model->reseller_id) {
+                $model->reseller?->recalculate();
+            }
+        });
+
         // NOTE: Auto-payment creation removed.
         // Payment status is managed exclusively by PaymentService::applyPayment()
         // which is called from the Payment model observer. Creating payments

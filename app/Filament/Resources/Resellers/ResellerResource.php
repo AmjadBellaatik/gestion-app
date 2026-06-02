@@ -7,6 +7,10 @@ use App\Filament\Resources\Resellers\Pages\EditReseller;
 use App\Filament\Resources\Resellers\Pages\ListResellers;
 use App\Filament\Resources\Resellers\Pages\ViewReseller;
 
+use App\Filament\Resources\Resellers\RelationManagers\DocumentsRelationManager;
+use App\Filament\Resources\Resellers\RelationManagers\PaymentsRelationManager;
+use App\Filament\Resources\Resellers\RelationManagers\SalesRelationManager;
+
 use App\Filament\Resources\Resellers\Schemas\ResellerForm;
 use App\Filament\Resources\Resellers\Schemas\ResellerInfolist;
 
@@ -246,7 +250,12 @@ class ResellerResource extends Resource
     {
         return [
 
-            //
+            SalesRelationManager::class,
+
+            PaymentsRelationManager::class,
+
+            DocumentsRelationManager::class,
+
         ];
     }
 

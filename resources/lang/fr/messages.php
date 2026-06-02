@@ -100,6 +100,8 @@ return [
     'credit_balance' => 'Solde crédit',
     'total_orders' => 'Total commandes',
     'total_paid' => 'Total payé',
+    'current_debt' => 'Dette actuelle',
+    'auto_calculated' => 'Calculé automatiquement à partir des ventes et paiements liés',
     'total_purchases' => 'Total achats',
     'name' => 'Nom',
     'code' => 'Code',

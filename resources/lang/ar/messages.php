@@ -100,6 +100,8 @@ return [
     'credit_balance' => 'رصيد الائتمان',
     'total_orders' => 'إجمالي الطلبات',
     'total_paid' => 'إجمالي المدفوع',
+    'current_debt' => 'الدين الحالي',
+    'auto_calculated' => 'يُحسب تلقائياً من المبيعات والمدفوعات المرتبطة',
     'total_purchases' => 'إجمالي المشتريات',
     'name' => 'الاسم',
     'code' => 'الرمز',

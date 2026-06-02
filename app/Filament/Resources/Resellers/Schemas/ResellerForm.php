@@ -82,7 +82,13 @@ class ResellerForm
 
                     ->numeric()
 
-                    ->default(0),
+                    ->suffix('MAD')
+
+                    ->readOnly()
+
+                    ->dehydrated(false)
+
+                    ->helperText(__('messages.auto_calculated')),
 
                 TextInput::make('total_paid')
 
@@ -92,7 +98,29 @@ class ResellerForm
 
                     ->numeric()
 
-                    ->default(0),
+                    ->suffix('MAD')
+
+                    ->readOnly()
+
+                    ->dehydrated(false)
+
+                    ->helperText(__('messages.auto_calculated')),
+
+                TextInput::make('current_debt')
+
+                    ->label(
+                        __('messages.current_debt')
+                    )
+
+                    ->numeric()
+
+                    ->suffix('MAD')
+
+                    ->readOnly()
+
+                    ->dehydrated(false)
+
+                    ->helperText(__('messages.auto_calculated')),
 
                 /*
                 |--------------------------------------------------------------------------

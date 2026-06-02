@@ -87,7 +87,9 @@ class ResellerInfolist
 
                                     ->label(
                                         __('messages.total_orders')
-                                    ),
+                                    )
+
+                                    ->money('MAD'),
 
                                 TextEntry::make(
                                     'total_paid'
@@ -98,6 +100,18 @@ class ResellerInfolist
                                     )
 
                                     ->money('MAD'),
+
+                                TextEntry::make(
+                                    'current_debt'
+                                )
+
+                                    ->label(
+                                        __('messages.current_debt')
+                                    )
+
+                                    ->money('MAD')
+
+                                    ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
 
                                 TextEntry::make(
                                     'created_at'

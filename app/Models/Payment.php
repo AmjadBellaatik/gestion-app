@@ -96,6 +96,16 @@ class Payment extends Model
                 $service->handleBouncedCheque($model);
             }
         });
+
+        static::saved(function (Payment $model) {
+            $reseller = $model->sale?->reseller;
+            $reseller?->recalculate();
+        });
+
+        static::deleted(function (Payment $model) {
+            $reseller = $model->sale?->reseller;
+            $reseller?->recalculate();
+        });
     }
 
     /*
