@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { margin: 8mm 10mm 22mm 10mm; }
+        @page { margin: 8mm 10mm 28mm 10mm; }
         body {
             font-family: DejaVu Sans, sans-serif;
             color: #111;
@@ -118,10 +118,12 @@
             position: fixed;
             left: 10mm;
             right: 10mm;
-            bottom: 1mm;
+            bottom: 5mm;
+            height: 16mm;
             border-top: 1px solid #777;
-            padding-top: 3px;
+            padding-top: 5px;
             font-size: 9px;
+            line-height: 1.3;
             color: #444;
         }
     </style>

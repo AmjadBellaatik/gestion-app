@@ -10,6 +10,7 @@ use App\Models\DocumentType;
 use App\Models\GeneratedPdf;
 use App\Models\Product;
 use App\Models\MotorcycleUnit;
+use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -26,15 +27,22 @@ class DocumentService
         return DB::transaction(function () use ($data) {
             $type = DocumentType::findOrFail($data['document_type_id']);
             $template = $this->resolveTemplate($type, 'fr');
+            $sale = filled($data['sale_id'] ?? null)
+                ? Sale::query()->select(['id', 'client_id', 'reseller_id'])->find($data['sale_id'])
+                : null;
+            $resellerId = $data['reseller_id'] ?? $sale?->reseller_id;
+            $clientId = filled($resellerId)
+                ? null
+                : ($data['client_id'] ?? $sale?->client_id);
 
             $document = Document::create([
                 'company_id' => $data['company_id'] ?? session('company_id'),
                 'document_type_id' => $type->id,
                 'document_template_id' => $template?->id,
                 'template_version' => $template?->version ?? 1,
-                'client_id' => $data['client_id'] ?? null,
+                'client_id' => $clientId,
                 'supplier_id' => $data['supplier_id'] ?? null,
-                'reseller_id' => $data['reseller_id'] ?? null,
+                'reseller_id' => $resellerId,
                 'sale_id' => $data['sale_id'] ?? null,
                 'repair_ticket_id' => $data['repair_ticket_id'] ?? null,
                 'document_number' => $data['document_number'] ?? null,
@@ -258,7 +266,7 @@ class DocumentService
                 'client',
                 'supplier',
                 'reseller',
-                'sale',
+                'sale.reseller',
                 'items.product',
                 'items.motorcycleUnit.motorcycleModel.brand',
                 'items.motorcycleUnit.motorcycleModel.homologation',
@@ -272,6 +280,7 @@ class DocumentService
             'client',
             'supplier',
             'reseller',
+            'sale.reseller',
             'sale.items',
             'items.product',
             'items.motorcycleUnit.motorcycleModel.brand',
@@ -397,7 +406,8 @@ class DocumentService
                 'documentTemplate',
                 'client',
                 'supplier',
-                'sale',
+                'reseller',
+                'sale.reseller',
                 'items.product',
                 'items.motorcycleUnit.motorcycleModel.brand',
                 'items.motorcycleUnit.motorcycleModel.homologation',

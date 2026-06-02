@@ -531,6 +531,7 @@ class SaleService
 
         $motorcycleUnit = self::resolveSaleMotorcycleUnit($sale, $saleItems);
         $warrantySaleItem = self::resolveWarrantySaleItem($saleItems);
+        $hasReseller = filled($sale->reseller_id);
 
         foreach ($selectedCodes as $code) {
             $type = $documentTypes->get($code);
@@ -541,6 +542,10 @@ class SaleService
 
             $isConformity = $code === DocumentType::CONFORMITY;
             $isWarranty = $code === DocumentType::WARRANTY_CONTRACT;
+
+            if ($hasReseller && $isWarranty) {
+                continue;
+            }
 
             if ($isConformity && ! $motorcycleUnit) {
                 continue;
@@ -597,7 +602,8 @@ class SaleService
 
                 DocumentService::generate([
                     'document_type_id' => $type->id,
-                    'client_id' => $sale->reseller_id && $isConformity ? null : $sale->client_id,
+                    'client_id' => $sale->reseller_id ? null : $sale->client_id,
+                    'reseller_id' => $sale->reseller_id,
                     'sale_id' => $sale->id,
                     'document_number' => $previousNumber,
                     'document_date' => now()->toDateString(),

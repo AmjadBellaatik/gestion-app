@@ -682,7 +682,7 @@ class SaleForm
                                                 ->exists();
                                     });
 
-                                if ($hasWarrantyItem) {
+                                if ($hasWarrantyItem && blank($get('reseller_id'))) {
                                     $options[DocumentType::WARRANTY_CONTRACT] = 'Contrat de garantie';
                                 }
 

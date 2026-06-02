@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { margin: 8mm 10mm 4mm 10mm; }
+        @page { margin: 8mm 10mm 24mm 10mm; }
         body {
             font-family: DejaVu Sans, sans-serif;
             color: #111;
@@ -145,10 +145,12 @@
             position: fixed;
             left: 10mm;
             right: 10mm;
-            bottom: 1mm;
+            bottom: 5mm;
+            height: 16mm;
             border-top: 1px solid #777;
-            padding-top: 3px;
+            padding-top: 5px;
             font-size: 9px;
+            line-height: 1.3;
             color: #444;
         }
         .doc-footer table {
@@ -160,12 +162,17 @@
 <body>
 @php
     $companyName = $company->name;
+    $buyer = $document->reseller ?: $document->sale?->reseller ?: $client;
+    $isResellerBuyer = $buyer instanceof \App\Models\Reseller;
     $clientType  = $client?->client_type ?: 'person';
     $clientName  = match ($clientType) {
         'company'        => $client?->company_name,
         'administration' => $client?->administration_name,
         default          => $client?->display_name,
     };
+    $buyerName = $isResellerBuyer
+        ? $buyer?->name
+        : $clientName;
     $purchaseOrderNumber = data_get($document->metadata, 'purchase_order_number')
         ?: $document->sale?->purchase_order_number;
 
@@ -229,13 +236,17 @@
         <tr>
             <td style="width: 50%;">
                 <div class="box">
-                    <div class="box-title">{{ __('messages.client') }}</div>
-                    <strong>{{ $clientName }}</strong><br>
-                    @if($client?->address){{ $client->address }}<br>@endif
-                    @if($client?->phone){{ __('messages.phone') }}: {{ $client->phone }}<br>@endif
-                    @if($clientType === 'company')
-                        @if($client?->ice){{ __('messages.ice') }}: {{ $client->ice }}<br>@endif
-                        @if($client?->rc){{ __('messages.rc') }}: {{ $client->rc }}<br>@endif
+                    <div class="box-title">{{ $isResellerBuyer ? __('messages.reseller') : __('messages.client') }}</div>
+                    <strong>{{ $buyerName }}</strong><br>
+                    @if($buyer?->address){{ $buyer->address }}<br>@endif
+                    @if($buyer?->city){{ $buyer->city }}<br>@endif
+                    @if($buyer?->phone){{ __('messages.phone') }}: {{ $buyer->phone }}<br>@endif
+                    @if($buyer?->email)Email: {{ $buyer->email }}<br>@endif
+                    @if($isResellerBuyer || $clientType === 'company')
+                        @if($buyer?->ice){{ __('messages.ice') }}: {{ $buyer->ice }}<br>@endif
+                        @if($buyer?->rc){{ __('messages.rc') }}: {{ $buyer->rc }}<br>@endif
+                        @if($buyer?->if)IF: {{ $buyer->if }}<br>@endif
+                        @if($buyer?->patente)Patente: {{ $buyer->patente }}<br>@endif
                     @endif
                 </div>
             </td>

@@ -59,7 +59,8 @@ class ViewSale extends ViewRecord
         return Action::make('regenerate_' . strtolower($code))
             ->label($label)
             ->icon('heroicon-o-arrow-path')
-            ->visible(fn () => DocumentType::query()->where('code', $code)->where('is_active', true)->exists())
+            ->visible(fn () => DocumentType::query()->where('code', $code)->where('is_active', true)->exists()
+                && ! ($code === DocumentType::WARRANTY_CONTRACT && filled($this->record->reseller_id)))
             ->requiresConfirmation()
             ->action(function () use ($code): void {
                 // Force-reload all sale relations so regeneration uses current DB data,
