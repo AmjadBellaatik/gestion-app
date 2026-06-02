@@ -56,6 +56,8 @@ class AdminPanelProvider extends PanelProvider
 
             ->databaseNotificationsPolling('30s')
 
+            ->sidebarCollapsibleOnDesktop()
+
             ->brandName('')
 
             ->favicon(

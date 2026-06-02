@@ -82,8 +82,6 @@ class ResellerForm
 
                     ->numeric()
 
-                    ->suffix('MAD')
-
                     ->readOnly()
 
                     ->dehydrated(false)

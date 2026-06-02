@@ -87,9 +87,7 @@ class ResellerInfolist
 
                                     ->label(
                                         __('messages.total_orders')
-                                    )
-
-                                    ->money('MAD'),
+                                    ),
 
                                 TextEntry::make(
                                     'total_paid'

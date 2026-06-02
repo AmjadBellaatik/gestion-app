@@ -138,7 +138,7 @@ class Reseller extends Model
     {
         $saleIds = $this->sales()->pluck('id');
 
-        $totalOrders = $this->sales()->sum('total');
+        $totalOrders = $this->sales()->count();
 
         $totalPaid = Payment::withoutGlobalScopes()
             ->whereIn('sale_id', $saleIds)
