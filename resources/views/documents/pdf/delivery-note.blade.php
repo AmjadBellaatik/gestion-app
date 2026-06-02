@@ -223,17 +223,21 @@
     @endif
 
     <div class="client-box" style="margin-top: 12px;">
-        <div class="box-title">{{ $isResellerBuyer ? __('messages.reseller') : __('messages.client') }}</div>
+        <div class="box-title">{{ __('messages.client') }}</div>
         <div><strong>{{ $buyerName }}</strong></div>
-        @if($buyer?->address)<div>{{ $buyer->address }}</div>@endif
-        @if($buyer?->city)<div>{{ $buyer->city }}</div>@endif
         @if($buyer?->phone)<div>{{ __('messages.phone') }}: {{ $buyer->phone }}</div>@endif
-        @if($buyer?->email)<div>Email: {{ $buyer->email }}</div>@endif
-        @if($isResellerBuyer || $clientType === 'company')
+        @if($isResellerBuyer)
+            @if($buyer?->ice)<div>{{ __('messages.ice') }}: {{ $buyer->ice }}</div>@endif
+        @elseif($clientType === 'company')
+            @if($buyer?->address)<div>{{ $buyer->address }}</div>@endif
+            @if($buyer?->city)<div>{{ $buyer->city }}</div>@endif
+            @if($buyer?->email)<div>Email: {{ $buyer->email }}</div>@endif
             @if($buyer?->ice)<div>{{ __('messages.ice') }}: {{ $buyer->ice }}</div>@endif
             @if($buyer?->rc)<div>{{ __('messages.rc') }}: {{ $buyer->rc }}</div>@endif
             @if($buyer?->if)<div>IF: {{ $buyer->if }}</div>@endif
             @if($buyer?->patente)<div>Patente: {{ $buyer->patente }}</div>@endif
+        @else
+            @if($buyer?->address)<div>{{ $buyer->address }}</div>@endif
         @endif
     </div>
 

@@ -236,17 +236,21 @@
         <tr>
             <td style="width: 50%;">
                 <div class="box">
-                    <div class="box-title">{{ $isResellerBuyer ? __('messages.reseller') : __('messages.client') }}</div>
+                    <div class="box-title">{{ __('messages.client') }}</div>
                     <strong>{{ $buyerName }}</strong><br>
-                    @if($buyer?->address){{ $buyer->address }}<br>@endif
-                    @if($buyer?->city){{ $buyer->city }}<br>@endif
                     @if($buyer?->phone){{ __('messages.phone') }}: {{ $buyer->phone }}<br>@endif
-                    @if($buyer?->email)Email: {{ $buyer->email }}<br>@endif
-                    @if($isResellerBuyer || $clientType === 'company')
+                    @if($isResellerBuyer)
+                        @if($buyer?->ice){{ __('messages.ice') }}: {{ $buyer->ice }}<br>@endif
+                    @elseif($clientType === 'company')
+                        @if($buyer?->address){{ $buyer->address }}<br>@endif
+                        @if($buyer?->city){{ $buyer->city }}<br>@endif
+                        @if($buyer?->email)Email: {{ $buyer->email }}<br>@endif
                         @if($buyer?->ice){{ __('messages.ice') }}: {{ $buyer->ice }}<br>@endif
                         @if($buyer?->rc){{ __('messages.rc') }}: {{ $buyer->rc }}<br>@endif
                         @if($buyer?->if)IF: {{ $buyer->if }}<br>@endif
                         @if($buyer?->patente)Patente: {{ $buyer->patente }}<br>@endif
+                    @else
+                        @if($buyer?->address){{ $buyer->address }}<br>@endif
                     @endif
                 </div>
             </td>
