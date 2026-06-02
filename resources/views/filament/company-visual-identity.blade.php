@@ -153,12 +153,11 @@
     /* ── SIDEBAR ────────────────────────────────────────────────────────── */
     @media (min-width: 1024px) {
         .fi-main-sidebar {
-            position: fixed !important;
-            inset-block: 0 !important;
-            inset-inline-start: 0 !important;
-            height: 100dvh !important;
+            position: sticky !important;
+            top: 0 !important;
+            height: 100dvh;
+            max-height: 100dvh;
             overflow-y: auto;
-            z-index: 30;
         }
 
         .fi-main-sidebar .fi-sidebar-nav {
