@@ -19,7 +19,8 @@
 .db-kpi-grid { display:grid; gap:1rem;
                grid-template-columns: repeat(1, 1fr); }
 @media (min-width:640px)  { .db-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width:1024px) { .db-kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width:1024px) { .db-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width:1440px) { .db-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 /* 2-col grid for charts */
 .db-chart-grid { display:grid; gap:1.25rem;
@@ -45,7 +46,8 @@
 .db-kpi {
     display: flex;
     align-items: flex-start;
-    gap: 1rem;
+    gap: .875rem;
+    min-width: 0;
 }
 .db-kpi-icon {
     flex-shrink: 0;
@@ -65,9 +67,16 @@
 
 .db-kpi-val   { font-size: 1.5rem; font-weight: 700; line-height: 1.2;
                  margin-top: .25rem; font-variant-numeric: tabular-nums;
-                 color: rgb(17,24,39); white-space: nowrap;
-                 overflow: hidden; text-overflow: ellipsis; }
+                 color: rgb(17,24,39); max-width: 100%;
+                 white-space: normal; overflow: visible;
+                 text-overflow: clip; word-break: normal;
+                 overflow-wrap: anywhere; }
 .dark .db-kpi-val { color: rgb(248,250,252); }
+
+/* Shrink value font on 4-col desktop where cards are narrowest */
+@media (min-width:1024px) { .db-kpi-val { font-size: 1.35rem; } }
+@media (min-width:1440px) { .db-kpi-val { font-size: 1.3rem; } }
+@media (min-width:1536px) { .db-kpi-val { font-size: 1.5rem; } }
 
 .db-kpi-sub   { display: flex; align-items: center; gap: .25rem;
                  font-size: .75rem; margin-top: .375rem; flex-wrap: wrap; }

@@ -115,22 +115,27 @@
         .company-switcher .text-xs { display: none !important; }
         .company-switcher .fi-topbar-item { padding: 0.375rem 0.5rem; }
 
-        /* Hide language label, show only locale code (2 chars + chevron hidden) */
-        .lang-switcher-chevron { display: none !important; }
+        .lang-switcher-wrap {
+            display: inline-flex !important;
+            flex-shrink: 0;
+        }
 
         /* Shrink notification bell & avatar */
         .fi-topbar-item { padding: 0.375rem 0.5rem; }
 
         /* Search bar shorter */
-        .fi-global-search-field { max-width: 7rem; }
+        .fi-global-search-field { max-width: 6rem; }
     }
 
     @media (max-width: 479px) {
-        /* On very small screens: hide language switcher entirely */
-        .lang-switcher-wrap { display: none !important; }
+        .lang-switcher-wrap .fi-topbar-item {
+            min-width: 2.5rem;
+            padding-inline: 0.375rem;
+            justify-content: center;
+        }
 
         /* Even tighter search */
-        .fi-global-search-field { max-width: 5.5rem; }
+        .fi-global-search-field { max-width: 4.75rem; }
     }
 
     /* ── PAGE HEADER ────────────────────────────────────────────────────── */
@@ -146,6 +151,21 @@
     }
 
     /* ── SIDEBAR ────────────────────────────────────────────────────────── */
+    @media (min-width: 1024px) {
+        .fi-main-sidebar {
+            position: fixed !important;
+            inset-block: 0 !important;
+            inset-inline-start: 0 !important;
+            height: 100dvh !important;
+            overflow-y: auto;
+            z-index: 30;
+        }
+
+        .fi-main-sidebar .fi-sidebar-nav {
+            overflow-y: auto;
+        }
+    }
+
     @media (max-width: 1023px) {
         /* Ensure sidebar overlay doesn't cause horizontal scroll */
         .fi-sidebar { max-width: 17rem; }

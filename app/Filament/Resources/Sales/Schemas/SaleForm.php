@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Reseller;
 
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -161,7 +162,8 @@ class SaleForm
 
                             ]),
 
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -195,11 +197,15 @@ class SaleForm
                                             ])
                                             ->default('product')
                                             ->live()
-                                            ->afterStateUpdated(function ($state, callable $set): void {
+                                            ->afterStateUpdated(function ($state, callable $get, callable $set): void {
                                                 $set('product_id', null);
                                                 $set('motorcycle_unit_id', null);
+                                                $set('quantity', 1);
+                                                $set('unit_price', 0);
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
                                             })
-                                            ->required(),
+                                            ->required()
+                                            ->columnSpan(1),
 
                                         Select::make(
                                             'product_id'
@@ -238,6 +244,7 @@ class SaleForm
                                             ->afterStateUpdated(function ($state, callable $get, callable $set): void {
                                                 if (! $state) {
                                                     $set('unit_price', 0);
+                                                    self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
 
                                                     return;
                                                 }
@@ -255,7 +262,9 @@ class SaleForm
                                                         filled($get('../../reseller_id'))
                                                     )
                                                 );
-                                            }),
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
+                                            })
+                                            ->columnSpan(2),
 
                                         Select::make('motorcycle_unit_id')
                                             ->label(__('messages.motorcycle_unit'))
@@ -291,9 +300,12 @@ class SaleForm
                                                         filled($get('../../reseller_id'))
                                                     )
                                                 );
+                                                $set('quantity', 1);
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
                                             })
                                             ->searchable()
-                                            ->preload(),
+                                            ->preload()
+                                            ->columnSpan(2),
 
                                         TextInput::make(
                                             'quantity'
@@ -303,6 +315,8 @@ class SaleForm
 
                                             ->default(1)
                                             ->minValue(1)
+                                            ->live()
+                                            ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount'))
                                             ->disabled(fn ($get) => $get('item_type') === 'motorcycle')
                                             ->helperText(function ($get) {
                                                 $productId = $get('product_id');
@@ -335,7 +349,8 @@ class SaleForm
                                                     }
                                                 },
                                             ])
-                                            ->required(),
+                                            ->required()
+                                            ->columnSpan(1),
 
                                     ]),
 
@@ -348,14 +363,16 @@ class SaleForm
                                             ->numeric()
                                             ->default(0)
                                             ->readOnly()
-                                            ->suffix('MAD'),
+                                            ->suffix('MAD')
+                                            ->columnSpan(1),
 
                                         TextInput::make('warranty_duration_value')
                                             ->label(__('messages.warranty_duration'))
                                             ->numeric()
                                             ->minValue(1)
                                             ->visible(fn ($get) => self::requiresWarranty($get))
-                                            ->required(fn ($get) => self::requiresWarranty($get)),
+                                            ->required(fn ($get) => self::requiresWarranty($get))
+                                            ->columnSpan(1),
 
                                         Select::make('warranty_duration_unit')
                                             ->label(__('messages.warranty_duration_unit'))
@@ -366,7 +383,8 @@ class SaleForm
                                             ])
                                             ->default('years')
                                             ->visible(fn ($get) => self::requiresWarranty($get))
-                                            ->required(fn ($get) => self::requiresWarranty($get)),
+                                            ->required(fn ($get) => self::requiresWarranty($get))
+                                            ->columnSpan(1),
 
                                         TextInput::make('warranty_kilometers')
                                             ->label(__('messages.warranty_distance'))
@@ -374,15 +392,58 @@ class SaleForm
                                             ->minValue(1)
                                             ->suffix('KM')
                                             ->visible(fn ($get) => self::requiresWarranty($get))
-                                            ->required(fn ($get) => self::requiresWarranty($get)),
+                                            ->required(fn ($get) => self::requiresWarranty($get))
+                                            ->columnSpan(1),
 
                                     ]),
 
                             ])
 
-                            ->defaultItems(1),
+                            ->defaultItems(1)
+                            ->live()
+                            ->columns(1)
+                            ->columnSpanFull(),
 
-                    ]),
+                    ])
+                    ->columnSpanFull(),
+
+                Section::make('Live total')
+                    ->icon('heroicon-o-calculator')
+                    ->schema([
+
+                        Grid::make(4)
+                            ->schema([
+
+                                Placeholder::make('items_total_preview')
+                                    ->label('Total before reduction (TTC)')
+                                    ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['gross']))
+                                    ->columnSpan(1),
+
+                                Placeholder::make('discount_preview')
+                                    ->label(__('messages.discount_amount'))
+                                    ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['discount']))
+                                    ->columnSpan(1),
+
+                                Placeholder::make('tax_preview')
+                                    ->label('TVA included')
+                                    ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['tax']))
+                                    ->helperText('Product prices already include TVA.')
+                                    ->columnSpan(1),
+
+                                Placeholder::make('final_total_preview')
+                                    ->label('Final price (TTC)')
+                                    ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['net']))
+                                    ->columnSpan(1),
+
+                                Placeholder::make('remaining_preview')
+                                    ->label(__('messages.remaining_amount'))
+                                    ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['remaining']))
+                                    ->columnSpan(1),
+
+                            ]),
+
+                    ])
+                    ->columnSpanFull(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -405,6 +466,7 @@ class SaleForm
                                     ->numeric()
                                     ->default(0)
                                     ->minValue(0)
+                                    ->live()
                                     ->suffix('MAD'),
 
                                 Select::make('payment_method')
@@ -530,6 +592,7 @@ class SaleForm
                                     ->minValue(0)
                                     ->suffix('MAD')
                                     ->live()
+                                    ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set))
                                     ->helperText(__('messages.discount_reduces_total')),
 
                                 TextInput::make('discount_note')
@@ -584,8 +647,11 @@ class SaleForm
                                 $options = [
                                     DocumentType::INVOICE          => 'Facture',
                                     DocumentType::DELIVERY_NOTE    => 'Bon de livraison',
-                                    DocumentType::CONFORMITY       => 'Certificat de conformite',
                                 ];
+
+                                if (self::hasMotorcycleItem($get)) {
+                                    $options[DocumentType::CONFORMITY] = 'Certificat de conformite';
+                                }
 
                                 $hasWarrantyItem = collect($get('saleItems') ?? [])
                                     ->some(function (array $item): bool {
@@ -627,6 +693,60 @@ class SaleForm
 
         return filled($productId)
             && Product::query()->whereKey($productId)->where('has_warranty', true)->exists();
+    }
+
+    private static function calculateSaleTotals(
+        callable $get,
+        string $saleItemsPath = 'saleItems',
+        string $discountPath = 'discount',
+        string $paidAmountPath = 'paid_amount'
+    ): array
+    {
+        $gross = collect($get($saleItemsPath) ?? [])
+            ->sum(function (array $item): float {
+                $quantity = ($item['item_type'] ?? null) === 'motorcycle'
+                    ? 1.0
+                    : max(0.0, (float) ($item['quantity'] ?? 0));
+
+                return $quantity * max(0.0, (float) ($item['unit_price'] ?? 0));
+            });
+
+        $discount = max(0.0, min((float) ($get($discountPath) ?? 0), $gross));
+        $net = max(0.0, $gross - $discount);
+        $tax = round($net * (20 / 120), 2);
+        $paid = max(0.0, (float) ($get($paidAmountPath) ?? 0));
+
+        return [
+            'gross' => round($gross, 2),
+            'discount' => round($discount, 2),
+            'net' => round($net, 2),
+            'tax' => $tax,
+            'remaining' => round(max(0.0, $net - $paid), 2),
+        ];
+    }
+
+    private static function syncPaidAmount(
+        callable $get,
+        callable $set,
+        string $paidAmountPath = 'paid_amount',
+        string $saleItemsPath = 'saleItems',
+        string $discountPath = 'discount',
+        string $currentPaidAmountPath = 'paid_amount'
+    ): void
+    {
+        $totals = self::calculateSaleTotals($get, $saleItemsPath, $discountPath, $currentPaidAmountPath);
+        $set($paidAmountPath, $totals['net']);
+    }
+
+    private static function formatMoney(float $amount): string
+    {
+        return number_format($amount, 2) . ' MAD';
+    }
+
+    private static function hasMotorcycleItem(callable $get): bool
+    {
+        return collect($get('saleItems') ?? [])
+            ->some(fn (array $item): bool => ($item['item_type'] ?? null) === 'motorcycle');
     }
 
     private static function warrantyProductTypes(): array
