@@ -11,18 +11,165 @@ use App\Models\Product;
 use App\Models\MotorcycleUnit;
 use App\Models\StockMovement;
 use App\Models\Transaction;
+use App\Models\TreasuryTransaction;
 use App\Models\Warranty;
 use App\Models\Document;
 use App\Models\DocumentType;
+use App\Models\GeneratedPdf;
 use App\Models\ChequePayment;
 use App\Models\BankTransferPayment;
 
 use App\Services\Documents\DocumentService;
 use App\Services\Warranty\WarrantyService;
 use App\Services\Accounting\AccountingService;
+use Illuminate\Support\Facades\Schema;
 
 class SaleService
 {
+    public static function cleanupRelatedRecordsForDeletion(Sale $sale): void
+    {
+        DB::transaction(function () use ($sale): void {
+            $saleId = $sale->getKey();
+
+            $saleItems = SaleItem::query()
+                ->where('sale_id', $saleId)
+                ->get(['id', 'product_id', 'motorcycle_unit_id']);
+
+            $productIds = $saleItems
+                ->pluck('product_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $motorcycleUnitIds = $saleItems
+                ->pluck('motorcycle_unit_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $documentIds = Document::withTrashed()
+                ->withoutGlobalScopes()
+                ->where('sale_id', $saleId)
+                ->pluck('id');
+
+            $paymentIds = Payment::withTrashed()
+                ->withoutGlobalScopes()
+                ->where(function ($query) use ($saleId, $documentIds): void {
+                    $query->where('sale_id', $saleId);
+
+                    if ($documentIds->isNotEmpty()) {
+                        $query->orWhereIn('document_id', $documentIds);
+                    }
+                })
+                ->pluck('id');
+
+            if ($paymentIds->isNotEmpty()) {
+                ChequePayment::query()
+                    ->whereIn('payment_id', $paymentIds)
+                    ->delete();
+
+                BankTransferPayment::query()
+                    ->whereIn('payment_id', $paymentIds)
+                    ->delete();
+
+                TreasuryTransaction::withoutGlobalScopes()
+                    ->whereIn('payment_id', $paymentIds)
+                    ->delete();
+
+                Transaction::withoutGlobalScopes()
+                    ->where('reference_type', Payment::class)
+                    ->whereIn('reference_id', $paymentIds)
+                    ->delete();
+
+                Payment::withTrashed()
+                    ->withoutGlobalScopes()
+                    ->whereIn('id', $paymentIds)
+                    ->get()
+                    ->each(fn (Payment $payment) => $payment->trashed() ? null : $payment->delete());
+            }
+
+            if ($documentIds->isNotEmpty()) {
+                StockMovement::withoutGlobalScopes()
+                    ->where('reference_type', Document::class)
+                    ->whereIn('reference_id', $documentIds)
+                    ->delete();
+
+                GeneratedPdf::query()
+                    ->whereIn('document_id', $documentIds)
+                    ->delete();
+
+                Document::withTrashed()
+                    ->withoutGlobalScopes()
+                    ->whereIn('id', $documentIds)
+                    ->get()
+                    ->each(function (Document $document): void {
+                        $document->items()->delete();
+
+                        if (! $document->trashed()) {
+                            $document->delete();
+                        }
+                    });
+            }
+
+            StockMovement::withoutGlobalScopes()
+                ->where(function ($query) use ($sale, $saleId): void {
+                    $query
+                        ->where(function ($subQuery) use ($saleId): void {
+                            $subQuery
+                                ->where('reference_type', Sale::class)
+                                ->where('reference_id', $saleId);
+                        })
+                        ->orWhere(function ($subQuery) use ($sale): void {
+                            $subQuery
+                                ->where('movement_type', 'sale')
+                                ->where('reference', $sale->sale_number);
+                        });
+                })
+                ->delete();
+
+            Transaction::withoutGlobalScopes()
+                ->where('reference_type', Sale::class)
+                ->where('reference_id', $saleId)
+                ->delete();
+
+            Warranty::withoutGlobalScopes()
+                ->where('sale_id', $saleId)
+                ->delete();
+
+            SaleItem::query()
+                ->where('sale_id', $saleId)
+                ->delete();
+
+            if ($motorcycleUnitIds->isNotEmpty()) {
+                if ($documentIds->isNotEmpty()) {
+                    MotorcycleUnit::withoutGlobalScopes()
+                        ->whereIn('id', $motorcycleUnitIds)
+                        ->whereIn('document_id', $documentIds)
+                        ->update(['document_id' => null]);
+                }
+
+                MotorcycleUnit::withoutGlobalScopes()
+                    ->whereIn('id', $motorcycleUnitIds)
+                    ->update([
+                        'client_id' => null,
+                        'sale_date' => null,
+                        'status' => 'in_stock',
+                    ]);
+            }
+
+            if ($productIds->isNotEmpty() && Schema::hasColumn('products', 'status')) {
+                Product::withoutGlobalScopes()
+                    ->whereIn('id', $productIds)
+                    ->get()
+                    ->each(function (Product $product): void {
+                        if ((float) $product->current_stock > 0) {
+                            $product->update(['status' => 'in_stock']);
+                        }
+                    });
+            }
+        });
+    }
+
     public static function create(
         array $data
     ): Sale {

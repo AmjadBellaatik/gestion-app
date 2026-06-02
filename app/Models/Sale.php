@@ -12,6 +12,7 @@ use App\Models\Warranty;
 use App\Models\Scopes\CompanyScope;
 use App\Notifications\SaleCreatedNotification;
 use App\Services\Payments\PaymentService;
+use App\Services\Sales\SaleService;
 
 class Sale extends Model
 {
@@ -85,6 +86,10 @@ class Sale extends Model
             if ($model->reseller_id) {
                 $model->reseller?->recalculate();
             }
+        });
+
+        static::deleting(function (Sale $model) {
+            SaleService::cleanupRelatedRecordsForDeletion($model);
         });
 
         static::deleted(function (Sale $model) {
