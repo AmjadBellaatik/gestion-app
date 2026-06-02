@@ -225,10 +225,11 @@
     <div class="client-box" style="margin-top: 12px;">
         <div class="box-title">{{ __('messages.client') }}</div>
         <div><strong>{{ $buyerName }}</strong></div>
-        @if($buyer?->phone)<div>{{ __('messages.phone') }}: {{ $buyer->phone }}</div>@endif
         @if($isResellerBuyer)
             @if($buyer?->ice)<div>{{ __('messages.ice') }}: {{ $buyer->ice }}</div>@endif
+            @if($buyer?->phone)<div>{{ __('messages.phone') }}: {{ $buyer->phone }}</div>@endif
         @elseif($clientType === 'company')
+            @if($buyer?->phone)<div>{{ __('messages.phone') }}: {{ $buyer->phone }}</div>@endif
             @if($buyer?->address)<div>{{ $buyer->address }}</div>@endif
             @if($buyer?->city)<div>{{ $buyer->city }}</div>@endif
             @if($buyer?->email)<div>Email: {{ $buyer->email }}</div>@endif

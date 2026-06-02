@@ -238,10 +238,11 @@
                 <div class="box">
                     <div class="box-title">{{ __('messages.client') }}</div>
                     <strong>{{ $buyerName }}</strong><br>
-                    @if($buyer?->phone){{ __('messages.phone') }}: {{ $buyer->phone }}<br>@endif
                     @if($isResellerBuyer)
                         @if($buyer?->ice){{ __('messages.ice') }}: {{ $buyer->ice }}<br>@endif
+                        @if($buyer?->phone){{ __('messages.phone') }}: {{ $buyer->phone }}<br>@endif
                     @elseif($clientType === 'company')
+                        @if($buyer?->phone){{ __('messages.phone') }}: {{ $buyer->phone }}<br>@endif
                         @if($buyer?->address){{ $buyer->address }}<br>@endif
                         @if($buyer?->city){{ $buyer->city }}<br>@endif
                         @if($buyer?->email)Email: {{ $buyer->email }}<br>@endif
