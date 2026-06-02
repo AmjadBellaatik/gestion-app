@@ -24,7 +24,7 @@
 
 @if(auth()->check() && $companies->count())
 
-    <div class="company-switcher me-3">
+    <div class="company-switcher" style="margin-inline-end:.75rem;">
 
         <x-filament::dropdown
             placement="bottom-start"

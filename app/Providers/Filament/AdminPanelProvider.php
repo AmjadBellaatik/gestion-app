@@ -148,25 +148,7 @@ class AdminPanelProvider extends PanelProvider
             |--------------------------------------------------------------------------
             */
 
-            ->widgets([
-
-                // Row 1 — Financial KPIs (full width, 4 cols)
-                \App\Filament\Widgets\DashboardKpiWidget::class,
-
-                // Row 2 — Alerts (full width, 4 cols)
-                \App\Filament\Widgets\DashboardAlertWidget::class,
-
-                // Row 3 — Charts side by side (2 cols each)
-                \App\Filament\Widgets\RevenueChartWidget::class,
-                \App\Filament\Widgets\ExpenseChartWidget::class,
-
-                // Row 4 — Repair status doughnut (full width)
-                \App\Filament\Widgets\RepairChartWidget::class,
-
-                // Row 5 — Workshop KPIs (full width, 4 cols)
-                \App\Filament\Widgets\DashboardWorkshopWidget::class,
-
-            ])
+            ->widgets([])
 
             /*
             |--------------------------------------------------------------------------
