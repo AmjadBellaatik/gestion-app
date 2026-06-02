@@ -486,11 +486,13 @@ class SaleForm
                                     ->label(__('messages.reference'))
                                     ->visible(fn ($get) => ! \in_array($get('payment_method'), ['cash', 'cheque'], true))
                                     ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
-                                    ->maxLength(100),
+                                    ->maxLength(100)
+                                    ->columnSpan(1),
 
                             ]),
 
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -508,7 +510,8 @@ class SaleForm
                                 TextInput::make('cheque_number')
                                     ->label(__('messages.cheque_number'))
                                     ->required()
-                                    ->maxLength(100),
+                                    ->maxLength(100)
+                                    ->columnSpan(1),
 
                                 Select::make('bank_name')
                                     ->label(__('messages.bank_name'))
@@ -530,16 +533,20 @@ class SaleForm
                                         'Bank Al-Tamweel wal-Inma'       => 'Bank Al-Tamweel wal-Inma',
                                     ])
                                     ->searchable()
-                                    ->required(),
+                                    ->preload()
+                                    ->required()
+                                    ->columnSpan(1),
 
                                 \Filament\Forms\Components\DatePicker::make('cheque_due_date')
                                     ->label(__('messages.due_date'))
                                     ->required()
-                                    ->minDate(today()),
+                                    ->minDate(today())
+                                    ->columnSpan(1),
 
                             ]),
 
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -556,19 +563,23 @@ class SaleForm
 
                                 TextInput::make('bank_name')
                                     ->label(__('messages.bank_name'))
-                                    ->maxLength(150),
+                                    ->maxLength(150)
+                                    ->columnSpan(1),
 
                                 TextInput::make('transfer_reference')
                                     ->label(__('messages.reference_number'))
-                                    ->maxLength(100),
+                                    ->maxLength(100)
+                                    ->columnSpan(1),
 
                                 \Filament\Forms\Components\DatePicker::make('transfer_date')
                                     ->label(__('messages.transfer_date'))
-                                    ->default(today()),
+                                    ->default(today())
+                                    ->columnSpan(1),
 
                             ]),
 
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -582,7 +593,7 @@ class SaleForm
                     ->visible(fn () => auth()->user()?->hasAnyRole(['Admin', 'Super Admin']))
                     ->schema([
 
-                        Grid::make(2)
+                        Grid::make(3)
                             ->schema([
 
                                 TextInput::make('discount')
@@ -593,17 +604,20 @@ class SaleForm
                                     ->suffix('MAD')
                                     ->live()
                                     ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set))
-                                    ->helperText(__('messages.discount_reduces_total')),
+                                    ->helperText(__('messages.discount_reduces_total'))
+                                    ->columnSpan(1),
 
                                 TextInput::make('discount_note')
                                     ->label(__('messages.discount_note'))
                                     ->placeholder(__('messages.discount_note_placeholder'))
                                     ->maxLength(255)
-                                    ->visible(fn ($get) => (float) ($get('discount') ?? 0) > 0),
+                                    ->visible(fn ($get) => (float) ($get('discount') ?? 0) > 0)
+                                    ->columnSpan(2),
 
                             ]),
 
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -621,9 +635,11 @@ class SaleForm
                             'notes'
                         )
 
-                            ->rows(4),
+                            ->rows(5)
+                            ->columnSpanFull(),
 
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 Section::make(__('messages.purchase_order'))
                     ->visible(fn ($get) => \App\Models\Client::query()
@@ -636,7 +652,8 @@ class SaleForm
                             ->label(__('messages.purchase_order'))
                             ->maxLength(100)
                             ->placeholder('BC-2026-XXXX'),
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
                 Section::make(__('messages.documents'))
                     ->schema([
@@ -671,9 +688,10 @@ class SaleForm
 
                                 return $options;
                             })
-                            ->columns(2)
+                            ->columns(3)
                             ->default([DocumentType::INVOICE]),
-                    ]),
+                    ])
+                    ->columnSpanFull(),
 
             ]);
 
