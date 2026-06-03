@@ -20,7 +20,7 @@ class MotorcycleModelsTable
 
             ->columns([
 
-                TextColumn::make('brand.name')
+                TextColumn::make('marque')
 
                     ->label(
                         __('messages.brand')
@@ -28,7 +28,9 @@ class MotorcycleModelsTable
 
                     ->searchable()
 
-                    ->sortable(),
+                    ->sortable()
+
+                    ->placeholder('—'),
 
                 TextColumn::make('modele')
 

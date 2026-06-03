@@ -67,10 +67,10 @@ class MotorcycleModelForm
                 Section::make(__('messages.vehicle_identification'))
                     ->schema([
                         Forms\Components\TextInput::make('marque')
-                            ->label(__('messages.marque'))
-                            ->disabled(fn ($get) => filled($get('brand_id')))
+                            ->label(__('messages.brand'))
+                            ->hidden(fn ($get) => filled($get('brand_id')))
                             ->dehydrated()
-                            ->required(),
+                            ->required(fn ($get) => !filled($get('brand_id'))),
                         Forms\Components\TextInput::make('genre')
                             ->label(__('messages.genre')),
                         Forms\Components\TextInput::make('type')
