@@ -278,7 +278,7 @@ class SaleService
 
                     'unit_price' => $unitPrice,
 
-                    'discount' => 0,
+                    'discount' => (float) ($item['discount'] ?? 0),
 
                     'tax' => $lineTax,
 
@@ -402,8 +402,11 @@ class SaleService
                 }
             }
 
-            // Apply admin discount (clamp to gross total so it can't go negative)
-            $discount     = max(0.0, min((float) ($data['discount'] ?? 0), $totalIncludingTax));
+            // Sum per-item discounts (clamp to gross total so it can't go negative)
+            $discount = max(0.0, min(
+                collect($saleInputItems)->sum(fn ($item) => max(0.0, (float) ($item['discount'] ?? 0))),
+                $totalIncludingTax
+            ));
             $netTotal     = max(0.0, $totalIncludingTax - $discount);
             $saleTax      = round($netTotal * (20 / 120), 2);
             $saleSubtotal = round($netTotal - $saleTax, 2);

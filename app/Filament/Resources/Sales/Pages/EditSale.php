@@ -50,6 +50,7 @@ class EditSale extends EditRecord
                 'motorcycle_unit_id'      => $item->motorcycle_unit_id,
                 'quantity'                => $item->quantity,
                 'unit_price'              => $item->unit_price,
+                'discount'                => $item->discount,
                 'warranty_duration_value' => $item->warranty_duration_value,
                 'warranty_duration_unit'  => $item->warranty_duration_unit ?? 'years',
                 'warranty_kilometers'     => $item->warranty_kilometers,
@@ -70,6 +71,7 @@ class EditSale extends EditRecord
             SaleItem::whereKey($itemId)
                 ->where('sale_id', $this->getRecord()->id)
                 ->update([
+                    'discount'                => (float) ($row['discount'] ?? 0),
                     'warranty_duration_value' => $row['warranty_duration_value'] ?? null,
                     'warranty_duration_unit'  => $row['warranty_duration_unit'] ?? null,
                     'warranty_kilometers'     => filled($row['warranty_kilometers']) ? (int) $row['warranty_kilometers'] : null,

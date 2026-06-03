@@ -140,7 +140,7 @@ class SaleForm
                                                 $set('motorcycle_unit_id', null);
                                                 $set('quantity', 1);
                                                 $set('unit_price', 0);
-                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
                                             })
                                             ->required()
                                             ->columnSpan(1),
@@ -182,7 +182,7 @@ class SaleForm
                                             ->afterStateUpdated(function ($state, callable $get, callable $set): void {
                                                 if (! $state) {
                                                     $set('unit_price', 0);
-                                                    self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
+                                                    self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
 
                                                     return;
                                                 }
@@ -200,7 +200,7 @@ class SaleForm
                                                         filled($get('../../reseller_id'))
                                                     )
                                                 );
-                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
                                             })
                                             ->columnSpan(2),
 
@@ -239,7 +239,7 @@ class SaleForm
                                                     )
                                                 );
                                                 $set('quantity', 1);
-                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount');
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
                                             })
                                             ->searchable()
                                             ->preload()
@@ -254,7 +254,7 @@ class SaleForm
                                             ->default(1)
                                             ->minValue(1)
                                             ->live()
-                                            ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', '../../discount', '../../paid_amount'))
+                                            ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems'))
                                             ->disabled(fn ($get) => $get('item_type') === 'motorcycle')
                                             ->helperText(function ($get) {
                                                 $productId = $get('product_id');
@@ -292,7 +292,7 @@ class SaleForm
 
                                     ]),
 
-                                Grid::make(4)
+                                Grid::make(5)
 
                                     ->schema([
 
@@ -302,6 +302,17 @@ class SaleForm
                                             ->default(0)
                                             ->readOnly()
                                             ->suffix('MAD')
+                                            ->columnSpan(1),
+
+                                        TextInput::make('discount')
+                                            ->label(__('messages.discount_amount'))
+                                            ->numeric()
+                                            ->default(0)
+                                            ->minValue(0)
+                                            ->suffix('MAD')
+                                            ->live()
+                                            ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems'))
+                                            ->visible(fn () => auth()->user()?->hasAnyRole(['Admin', 'Super Admin']))
                                             ->columnSpan(1),
 
                                         TextInput::make('warranty_duration_value')
@@ -349,11 +360,11 @@ class SaleForm
                     ->icon('heroicon-o-calculator')
                     ->schema([
 
-                        Grid::make(4)
+                        Grid::make(5)
                             ->schema([
 
                                 Placeholder::make('items_total_preview')
-                                    ->label('Total before reduction (TTC)')
+                                    ->label(__('messages.total_before_reduction'))
                                     ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['gross']))
                                     ->columnSpan(1),
 
@@ -362,14 +373,20 @@ class SaleForm
                                     ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['discount']))
                                     ->columnSpan(1),
 
+                                Placeholder::make('ht_preview')
+                                    ->label(__('messages.price_ht'))
+                                    ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['ht']))
+                                    ->helperText(__('messages.price_excl_vat'))
+                                    ->columnSpan(1),
+
                                 Placeholder::make('tax_preview')
-                                    ->label('TVA included')
+                                    ->label(__('messages.vat_amount'))
                                     ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['tax']))
-                                    ->helperText('Product prices already include TVA.')
+                                    ->helperText(__('messages.vat_20'))
                                     ->columnSpan(1),
 
                                 Placeholder::make('final_total_preview')
-                                    ->label('Final price (TTC)')
+                                    ->label(__('messages.final_price_ttc'))
                                     ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['net']))
                                     ->columnSpan(1),
 
@@ -521,44 +538,6 @@ class SaleForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | DISCOUNT — Admin / Super Admin only
-                |--------------------------------------------------------------------------
-                */
-
-                Section::make(__('messages.discount'))
-                    ->icon('heroicon-o-tag')
-                    ->iconColor('warning')
-                    ->visible(fn () => auth()->user()?->hasAnyRole(['Admin', 'Super Admin']))
-                    ->schema([
-
-                        Grid::make(3)
-                            ->schema([
-
-                                TextInput::make('discount')
-                                    ->label(__('messages.discount_amount'))
-                                    ->numeric()
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->suffix('MAD')
-                                    ->live()
-                                    ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set))
-                                    ->helperText(__('messages.discount_reduces_total'))
-                                    ->columnSpan(1),
-
-                                TextInput::make('discount_note')
-                                    ->label(__('messages.discount_note'))
-                                    ->placeholder(__('messages.discount_note_placeholder'))
-                                    ->maxLength(255)
-                                    ->visible(fn ($get) => (float) ($get('discount') ?? 0) > 0)
-                                    ->columnSpan(2),
-
-                            ]),
-
-                    ])
-                    ->columnSpanFull(),
-
-                /*
-                |--------------------------------------------------------------------------
                 | NOTES
                 |--------------------------------------------------------------------------
                 */
@@ -654,11 +633,12 @@ class SaleForm
     private static function calculateSaleTotals(
         callable $get,
         string $saleItemsPath = 'saleItems',
-        string $discountPath = 'discount',
         string $paidAmountPath = 'paid_amount'
     ): array
     {
-        $gross = collect($get($saleItemsPath) ?? [])
+        $items = $get($saleItemsPath) ?? [];
+
+        $gross = collect($items)
             ->sum(function (array $item): float {
                 $quantity = ($item['item_type'] ?? null) === 'motorcycle'
                     ? 1.0
@@ -667,16 +647,21 @@ class SaleForm
                 return $quantity * max(0.0, (float) ($item['unit_price'] ?? 0));
             });
 
-        $discount = max(0.0, min((float) ($get($discountPath) ?? 0), $gross));
-        $net = max(0.0, $gross - $discount);
-        $tax = round($net * (20 / 120), 2);
+        $discount = min(
+            collect($items)->sum(fn (array $item) => max(0.0, (float) ($item['discount'] ?? 0))),
+            $gross
+        );
+        $net  = max(0.0, $gross - $discount);
+        $tax  = round($net * (20 / 120), 2);
+        $ht   = round($net - $tax, 2);
         $paid = max(0.0, (float) ($get($paidAmountPath) ?? 0));
 
         return [
-            'gross' => round($gross, 2),
-            'discount' => round($discount, 2),
-            'net' => round($net, 2),
-            'tax' => $tax,
+            'gross'     => round($gross, 2),
+            'discount'  => round($discount, 2),
+            'ht'        => $ht,
+            'tax'       => $tax,
+            'net'       => round($net, 2),
             'remaining' => round(max(0.0, $net - $paid), 2),
         ];
     }
@@ -685,12 +670,10 @@ class SaleForm
         callable $get,
         callable $set,
         string $paidAmountPath = 'paid_amount',
-        string $saleItemsPath = 'saleItems',
-        string $discountPath = 'discount',
-        string $currentPaidAmountPath = 'paid_amount'
+        string $saleItemsPath = 'saleItems'
     ): void
     {
-        $totals = self::calculateSaleTotals($get, $saleItemsPath, $discountPath, $currentPaidAmountPath);
+        $totals = self::calculateSaleTotals($get, $saleItemsPath, $paidAmountPath);
         $set($paidAmountPath, $totals['net']);
     }
 
