@@ -933,6 +933,7 @@ return [
     'developed_by'              => 'Developed by',
 
     // Reports module — new keys only (existing ones kept where they are in this file)
+    'select_report_type'        => 'Select Report Type',
     'payments_report'           => 'Payments Report',
     'clients_report'            => 'Clients Report',
     'resellers_report'          => 'Resellers Report',

@@ -934,9 +934,8 @@ return [
     'transfer_movement'         => 'حركة النقل',
     'developed_by'              => 'طُوِّر بواسطة',
 
-    // وحدة التقارير
-    'reports'                   => 'التقارير',
-    'sales_report'              => 'تقرير المبيعات',
+    // وحدة التقارير — مفاتيح جديدة فقط
+    'select_report_type'        => 'اختر نوع التقرير',
     'payments_report'           => 'تقرير المدفوعات',
     'clients_report'            => 'تقرير العملاء',
     'resellers_report'          => 'تقرير الموزعين',
@@ -963,81 +962,39 @@ return [
     'to_date'                   => 'إلى',
     'vs_prev_period'            => 'مقارنة بالفترة السابقة',
 
-    // تقرير المبيعات
+    // مفاتيح جديدة خاصة بالتقارير
     'sales_list'                => 'قائمة المبيعات',
     'total_revenue'             => 'إجمالي الإيرادات',
     'total_unpaid'              => 'إجمالي غير المدفوع',
     'average_order'             => 'متوسط الطلب',
-    'discount_amount'           => 'مبلغ الخصم',
-    'paid_amount'               => 'المبلغ المدفوع',
-    'remaining_amount'          => 'المبلغ المتبقي',
-
-    // تقرير المدفوعات
     'payments_list'             => 'قائمة المدفوعات',
     'total_collected'           => 'إجمالي المحصَّل',
     'pending_cheques'           => 'شيكات قيد الانتظار',
-    'payment_method'            => 'طريقة الدفع',
-
-    // تقرير العملاء
     'clients_list'              => 'قائمة العملاء',
     'total_clients'             => 'إجمالي العملاء',
     'new_in_period'             => 'جدد في الفترة',
     'total_sales'               => 'إجمالي المبيعات',
-
-    // تقرير الموزعين
     'resellers_list'            => 'قائمة الموزعين',
     'total_resellers'           => 'إجمالي الموزعين',
-    'total_orders'              => 'إجمالي الطلبات',
-    'total_paid'                => 'إجمالي المدفوع',
     'total_debt'                => 'إجمالي الديون',
     'with_outstanding_debt'     => 'بدين قائم',
-    'current_debt'              => 'الدين الحالي',
     'settled'                   => 'مُسوَّى',
-
-    // تقرير المخزون
     'products_inventory'        => 'جرد المنتجات',
-    'stock_movements'           => 'حركات المخزون',
     'total_products'            => 'إجمالي المنتجات',
-    'low_stock'                 => 'مخزون منخفض',
-    'stock_valuation'           => 'تقييم المخزون',
     'movements_in_period'       => 'الحركات في الفترة',
-    'current_stock'             => 'المخزون الحالي',
     'alert_threshold'           => 'عتبة التنبيه',
-    'purchase_price'            => 'سعر الشراء',
-    'selling_price'             => 'سعر البيع',
     'stock_value'               => 'قيمة المخزون',
-    'out_of_stock'              => 'نفاد المخزون',
-    'in_stock'                  => 'في المخزون',
-    'unit_cost'                 => 'التكلفة الوحدوية',
-    'in'                        => 'وارد',
-    'out'                       => 'صادر',
-
-    // تقرير الدراجات
     'motorcycles_list'          => 'قائمة الدراجات',
     'total_units'               => 'إجمالي الوحدات',
-    'chassis_number'            => 'رقم الهيكل',
-    'engine_number'             => 'رقم المحرك',
-
-    // تقرير الإصلاحات
     'repairs_list'              => 'قائمة الإصلاحات',
     'total_repairs'             => 'إجمالي الإصلاحات',
     'under_warranty'            => 'تحت الضمان',
     'avg_repair_time'           => 'متوسط وقت الإصلاح',
     'ticket'                    => 'تذكرة',
-    'motorcycle'                => 'دراجة',
-    'total_cost'                => 'التكلفة الإجمالية',
-    'technician'                => 'فني',
-
-    // تقرير الضمانات
     'warranties_list'           => 'قائمة الضمانات',
     'total_warranties'          => 'إجمالي الضمانات',
     'expiring_soon'             => 'تنتهي قريباً',
-    'start_date'                => 'تاريخ البدء',
-    'end_date'                  => 'تاريخ الانتهاء',
     'km_limit'                  => 'حد الكيلومترات',
-    'item'                      => 'عنصر',
-
-    // تقرير النشاط
     'activity_log'              => 'سجل النشاط',
     'login_log'                 => 'سجل الدخول',
     'total_activities'          => 'إجمالي الأنشطة',
@@ -1047,7 +1004,6 @@ return [
     'activity_by_module'        => 'النشاط حسب الوحدة',
     'module'                    => 'وحدة',
     'action'                    => 'إجراء',
-    'description'               => 'الوصف',
     'ip_address'                => 'عنوان IP',
     'success'                   => 'نجاح',
     'unknown'                   => 'غير معروف',
