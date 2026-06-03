@@ -150,24 +150,40 @@
         .fi-header-actions .fi-btn { flex-shrink: 0; }
     }
 
-    /* ── SIDEBAR — fixed, never scrolls with page ──────────────────────── */
+    /* ── SIDEBAR — truly fixed, never scrolls with the page ────────────── */
+    /* Both open and closed states must stay fixed to viewport */
+    .fi-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        height: 100dvh !important;
+        /* Sidebar nav handles its own internal scroll; no double scrollbar */
+        overflow: hidden !important;
+    }
+
+    /* Undo any sticky Filament applies via @apply on desktop */
     @media (min-width: 1024px) {
-        /* Force fixed so the sidebar stays put no matter how far the user scrolls */
-        .fi-sidebar {
+        .fi-sidebar,
+        .fi-body-has-sidebar-fully-collapsible-on-desktop .fi-sidebar,
+        .fi-body-has-sidebar-collapsible-on-desktop .fi-sidebar {
             position: fixed !important;
             top: 0 !important;
+        }
+
+        /* Remove the Filament topbar height offset so sidebar starts at very top */
+        .fi-body-has-topbar .fi-sidebar {
+            top: 0 !important;
             height: 100dvh !important;
+        }
+
+        /* The inner nav section handles its own scroll */
+        .fi-sidebar .fi-sidebar-nav {
             overflow-y: auto;
             overflow-x: hidden;
+            flex: 1 1 0%;
+            min-height: 0;
         }
 
-        /* Filament renders the sidebar inside .fi-main-sidebar which is sticky by
-           our old rule — clear it so we don't fight ourselves */
-        .fi-main-sidebar {
-            position: unset !important;
-        }
-
-        /* The main content gets its left offset managed by JS (ResizeObserver) */
+        /* Main content left offset is managed by JS (ResizeObserver + class watch) */
         .fi-main-ctn {
             transition: margin-left 0.25s ease;
         }
@@ -177,9 +193,11 @@
         .fi-sidebar { max-width: 17rem; }
     }
 
-    /* ── Hide the default topbar collapse/expand arrow buttons ──────────── */
-    /* These appear next to the company switcher — replaced by our floating tab */
-    .fi-topbar-collapse-sidebar-btn-ctn {
+    /* ── Hide all default topbar sidebar toggle buttons ─────────────────── */
+    /* Replaced entirely by our floating tab on the sidebar edge */
+    .fi-topbar-collapse-sidebar-btn-ctn,
+    .fi-topbar-open-sidebar-btn,
+    .fi-topbar-close-sidebar-btn {
         display: none !important;
     }
 
@@ -335,14 +353,19 @@
 
     function isDesktop() { return window.innerWidth >= 1024; }
 
-    /* Sync main content left-margin to sidebar's current rendered width */
+    /* Sync main content left-margin based on sidebar open/closed state */
     function syncMargin() {
-        if (!isDesktop()) return;
+        if (!isDesktop()) {
+            var m = getMainCtn();
+            if (m) m.style.marginLeft = '';
+            return;
+        }
         var sidebar = getSidebar();
         var main    = getMainCtn();
         if (!sidebar || !main) return;
-        var w = sidebar.offsetWidth;
-        main.style.marginLeft = w + 'px';
+        var isOpen = sidebar.classList.contains('fi-sidebar-open');
+        /* When closed, sidebar is translated off-screen; content takes full width */
+        main.style.marginLeft = isOpen ? (sidebar.offsetWidth + 'px') : '0px';
     }
 
     /* Set sidebar explicit width (for resize handle) */
@@ -374,9 +397,18 @@
     function positionToggleTab() {
         var tab     = getToggleTab();
         var sidebar = getSidebar();
-        if (!tab || !sidebar || !isDesktop()) return;
-        tab.style.left = sidebar.offsetWidth + 'px';
-        updateToggleIcon(sidebar.classList.contains('fi-sidebar-open'));
+        if (!tab) return;
+        if (!isDesktop()) { tab.style.display = 'none'; return; }
+        tab.style.display = 'flex';
+        var isOpen = sidebar ? sidebar.classList.contains('fi-sidebar-open') : false;
+        /* When closed: tab sits at left:0 (peeks from viewport edge)
+           When open:   tab sits at sidebar right edge */
+        tab.style.left = isOpen ? (sidebar.offsetWidth + 'px') : '0px';
+        updateToggleIcon(isOpen);
+
+        /* Also show/hide the resize handle with the sidebar */
+        var handle = getHandle();
+        if (handle) handle.style.display = isOpen ? '' : 'none';
     }
 
     /* ── toggle button click ─────────────────────────────────────────── */
@@ -403,7 +435,7 @@
             }
             /* Fallback: click Filament's hidden topbar button */
             var btn = document.querySelector(
-                '.fi-topbar-close-collapse-sidebar-btn, .fi-topbar-open-collapse-sidebar-btn'
+                '.fi-topbar-close-sidebar-btn, .fi-topbar-open-sidebar-btn'
             );
             if (btn) btn.click();
         };
@@ -454,26 +486,35 @@
         });
     }
 
-    /* ── observe sidebar width changes (for collapse/expand) ────────────── */
+    /* ── observe sidebar width + class changes ───────────────────────────── */
 
     var sidebarObserver = null;
+    var sidebarClassObserver = null;
 
     function observeSidebar() {
         var sidebar = getSidebar();
         if (!sidebar) return;
-        if (sidebarObserver) sidebarObserver.disconnect();
+
+        /* Disconnect old observers */
+        if (sidebarObserver)      { sidebarObserver.disconnect();      sidebarObserver = null; }
+        if (sidebarClassObserver) { sidebarClassObserver.disconnect(); sidebarClassObserver = null; }
+
+        /* Width changes (resize handle drag) */
         sidebarObserver = new ResizeObserver(function () {
             syncMargin();
             positionToggleTab();
         });
         sidebarObserver.observe(sidebar);
 
-        /* Also watch class changes to detect open/closed state */
-        var classObserver = new MutationObserver(function () {
-            positionToggleTab();
-            syncMargin();
+        /* Class changes: fi-sidebar-open added/removed (open/close toggle) */
+        sidebarClassObserver = new MutationObserver(function () {
+            /* Wait one frame for Filament's own transition to start */
+            requestAnimationFrame(function () {
+                syncMargin();
+                positionToggleTab();
+            });
         });
-        classObserver.observe(sidebar, { attributes: true, attributeFilter: ['class'] });
+        sidebarClassObserver.observe(sidebar, { attributes: true, attributeFilter: ['class'] });
     }
 
     /* ── init ─────────────────────────────────────────────────────────── */
