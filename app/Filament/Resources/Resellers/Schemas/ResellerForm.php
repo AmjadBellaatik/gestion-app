@@ -17,8 +17,12 @@ class ResellerForm
         Schema $schema
     ): Schema {
 
-        return $schema
-            ->components([
+        return $schema->components(static::components());
+    }
+
+    public static function components(): array
+    {
+        return [
 
                 /*
                 |--------------------------------------------------------------------------
@@ -383,6 +387,6 @@ class ResellerForm
                         $get('type') === 'administration'
                     ),
 
-            ]);
+        ];
     }
 }

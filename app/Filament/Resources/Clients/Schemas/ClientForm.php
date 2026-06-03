@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Clients\Schemas;
 
+use App\Filament\Resources\Resellers\Schemas\ResellerForm;
 use App\Models\Reseller;
 
 use Filament\Forms\Components\DatePicker;
@@ -20,9 +21,12 @@ class ClientForm
         Schema $schema
     ): Schema {
 
-        return $schema
+        return $schema->components(static::components());
+    }
 
-            ->components([
+    public static function components(): array
+    {
+        return [
 
                 /*
                 |--------------------------------------------------------------------------
@@ -68,12 +72,7 @@ class ClientForm
 
                                 ->preload()
 
-                                ->createOptionForm([
-                                    TextInput::make('name')->label(__('messages.name'))->required(),
-                                    TextInput::make('phone')->label(__('messages.phone'))->tel(),
-                                    TextInput::make('email')->label(__('messages.email'))->email(),
-                                    TextInput::make('address')->label(__('messages.address')),
-                                ])
+                                ->createOptionForm(ResellerForm::components())
 
                                 ->createOptionUsing(fn (array $data) => Reseller::create($data)->id),
 
@@ -264,6 +263,6 @@ class ClientForm
 
                     ]),
 
-            ]);
+        ];
     }
 }
