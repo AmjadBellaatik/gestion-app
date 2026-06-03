@@ -71,7 +71,8 @@ class ResellerInfolist
 
                                     ->placeholder('-')
 
-                                    ->url(),
+                                    ->url(fn ($state) => $state ? (str_starts_with($state, 'http') ? $state : 'https://'.$state) : null)
+                                    ->openUrlInNewTab(),
 
                                 TextEntry::make(
                                     'address'
