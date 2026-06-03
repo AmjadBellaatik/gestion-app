@@ -15,13 +15,21 @@ use Illuminate\Validation\Rule;
 
 class MotorcycleModelForm
 {
-    public static function configure(
-        Schema $schema
-    ): Schema {
+    public static function configure(Schema $schema): Schema
+    {
         return $schema
+            ->columns(2)
             ->components([
+
+                /*
+                |--------------------------------------------------------------
+                | Homologation — left column
+                |--------------------------------------------------------------
+                */
                 Section::make(__('messages.homologation'))
+                    ->columnSpan(1)
                     ->schema([
+
                         Forms\Components\Select::make('brand_id')
                             ->label(__('messages.brand'))
                             ->options(fn () => Brand::withoutGlobalScope(CompanyScope::class)
@@ -43,38 +51,39 @@ class MotorcycleModelForm
                                 TextInput::make('name')->label(__('messages.name'))->required()->maxLength(255),
                                 TextInput::make('accreditation_reference')->label(__('messages.accreditation_reference'))->maxLength(255),
                             ])
-                            ->createOptionUsing(fn (array $data) => Brand::create($data)->id),
+                            ->createOptionUsing(fn (array $data) => Brand::create($data)->id)
+                            ->columnSpanFull(),
+
                         Forms\Components\TextInput::make('titre_homologation')
                             ->label(__('messages.homologation_title')),
+
                         Forms\Components\DatePicker::make('date_homologation')
                             ->label(__('messages.homologation_date')),
-                        Forms\Components\TextInput::make('price_ttc')
-                            ->label(__('messages.price_ttc'))
-                            ->numeric()
-                            ->default(0)
-                            ->required(),
-                        Forms\Components\TextInput::make('reseller_price')
-                            ->label(__('messages.reseller_price'))
-                            ->numeric()
-                            ->default(0),
-                        Forms\Components\TextInput::make('stock_alert')
-                            ->label(__('messages.stock_alert'))
-                            ->numeric()
-                            ->default(0),
-                    ])
-                    ->columns(3),
 
+                    ])
+                    ->columns(2),
+
+                /*
+                |--------------------------------------------------------------
+                | Vehicle Identification — right column
+                |--------------------------------------------------------------
+                */
                 Section::make(__('messages.vehicle_identification'))
+                    ->columnSpan(1)
                     ->schema([
+
                         Forms\Components\TextInput::make('marque')
                             ->label(__('messages.brand'))
                             ->hidden(fn ($get) => filled($get('brand_id')))
                             ->dehydrated()
                             ->required(fn ($get) => !filled($get('brand_id'))),
+
                         Forms\Components\TextInput::make('genre')
                             ->label(__('messages.genre')),
+
                         Forms\Components\TextInput::make('type')
                             ->label(__('messages.type')),
+
                         Forms\Components\TextInput::make('variante')
                             ->label(__('messages.variante'))
                             ->rule(
@@ -85,13 +94,17 @@ class MotorcycleModelForm
                             ->validationMessages([
                                 'unique' => __('messages.type_variante_already_exists'),
                             ]),
+
                         Forms\Components\TextInput::make('version')
                             ->label(__('messages.version')),
+
                         Forms\Components\TextInput::make('modele')
                             ->label(__('messages.model'))
                             ->required(),
+
                         Forms\Components\TextInput::make('categorie')
                             ->label(__('messages.category')),
+
                         Forms\Components\Select::make('usine_fabrication')
                             ->label(__('messages.manufacturing_plant'))
                             ->options(fn () => Supplier::query()
@@ -100,41 +113,79 @@ class MotorcycleModelForm
                                 ->toArray())
                             ->searchable()
                             ->preload(),
+
                         Forms\Components\TextInput::make('digit_uf')
                             ->label(__('messages.uf_digit')),
+
                         Forms\Components\TextInput::make('presente_par')
                             ->label(__('messages.presented_by')),
+
                         Forms\Components\TextInput::make('pays_origine')
                             ->label(__('messages.country_origin')),
+
                         Forms\Components\Textarea::make('objet')
                             ->label(__('messages.object'))
                             ->columnSpanFull(),
+
                     ])
                     ->columns(2),
 
-                Section::make(__('messages.engine'))
+                /*
+                |--------------------------------------------------------------
+                | Pricing & Stock — full width
+                |--------------------------------------------------------------
+                */
+                Section::make(__('messages.pricing_stock'))
+                    ->columnSpan(2)
                     ->schema([
-                        Forms\Components\TextInput::make('alesage')
-                            ->label(__('messages.alesage_mm')),
-                        Forms\Components\TextInput::make('course')
-                            ->label(__('messages.course_mm')),
-                        Forms\Components\TextInput::make('nombre_cylindres')
-                            ->label(__('messages.cylinders'))
-                            ->numeric(),
-                        Forms\Components\TextInput::make('cylindree')
-                            ->label(__('messages.engine_capacity_cm3')),
-                        Forms\Components\TextInput::make('carburant')
-                            ->label(__('messages.fuel')),
-                        Forms\Components\TextInput::make('puissance_fiscale')
-                            ->label(__('messages.fiscal_power_cv')),
-                        Forms\Components\TextInput::make('puissance_effective')
-                            ->label(__('messages.effective_power_kw')),
-                        Forms\Components\TextInput::make('niveau_dep')
-                            ->label(__('messages.pollution_level')),
+
+                        Forms\Components\TextInput::make('price_ttc')
+                            ->label(__('messages.price_ttc'))
+                            ->numeric()
+                            ->default(0)
+                            ->required()
+                            ->prefix('MAD'),
+
+                        Forms\Components\TextInput::make('reseller_price')
+                            ->label(__('messages.reseller_price'))
+                            ->numeric()
+                            ->default(0)
+                            ->prefix('MAD'),
+
+                        Forms\Components\TextInput::make('stock_alert')
+                            ->label(__('messages.stock_alert'))
+                            ->numeric()
+                            ->default(0),
+
+                    ])
+                    ->columns(3),
+
+                /*
+                |--------------------------------------------------------------
+                | Engine — left column
+                |--------------------------------------------------------------
+                */
+                Section::make(__('messages.engine'))
+                    ->columnSpan(1)
+                    ->schema([
+                        Forms\Components\TextInput::make('alesage')->label(__('messages.alesage_mm')),
+                        Forms\Components\TextInput::make('course')->label(__('messages.course_mm')),
+                        Forms\Components\TextInput::make('nombre_cylindres')->label(__('messages.cylinders'))->numeric(),
+                        Forms\Components\TextInput::make('cylindree')->label(__('messages.engine_capacity_cm3')),
+                        Forms\Components\TextInput::make('carburant')->label(__('messages.fuel')),
+                        Forms\Components\TextInput::make('puissance_fiscale')->label(__('messages.fiscal_power_cv')),
+                        Forms\Components\TextInput::make('puissance_effective')->label(__('messages.effective_power_kw')),
+                        Forms\Components\TextInput::make('niveau_dep')->label(__('messages.pollution_level')),
                     ])
                     ->columns(2),
 
+                /*
+                |--------------------------------------------------------------
+                | Weight — right column
+                |--------------------------------------------------------------
+                */
                 Section::make(__('messages.weight_kg'))
+                    ->columnSpan(1)
                     ->schema([
                         Forms\Components\TextInput::make('pav_avant')->label(__('messages.pav_front')),
                         Forms\Components\TextInput::make('pav_arriere')->label(__('messages.pav_rear')),
@@ -147,7 +198,13 @@ class MotorcycleModelForm
                     ])
                     ->columns(2),
 
+                /*
+                |--------------------------------------------------------------
+                | Dimensions — left column
+                |--------------------------------------------------------------
+                */
                 Section::make(__('messages.dimensions_mm'))
+                    ->columnSpan(1)
                     ->schema([
                         Forms\Components\TextInput::make('longueur_hors_tout')->label(__('messages.overall_length')),
                         Forms\Components\TextInput::make('largeur_hors_tout')->label(__('messages.overall_width')),
@@ -159,7 +216,13 @@ class MotorcycleModelForm
                     ])
                     ->columns(2),
 
+                /*
+                |--------------------------------------------------------------
+                | Additional Characteristics — right column
+                |--------------------------------------------------------------
+                */
                 Section::make(__('messages.additional_characteristics'))
+                    ->columnSpan(1)
                     ->schema([
                         Forms\Components\TextInput::make('pneu_avant')->label(__('messages.front_tyre')),
                         Forms\Components\TextInput::make('pneu_arriere')->label(__('messages.rear_tyre')),
@@ -167,14 +230,12 @@ class MotorcycleModelForm
                         Forms\Components\TextInput::make('vitesse_max')->label(__('messages.max_speed_kmh')),
                         Forms\Components\TextInput::make('carrossage_int')->label(__('messages.bodywork_int')),
                         Forms\Components\TextInput::make('carrossage_ext')->label(__('messages.bodywork_ext')),
-                        Forms\Components\TextInput::make('nombre_places')
-                            ->label(__('messages.seats'))
-                            ->numeric(),
+                        Forms\Components\TextInput::make('nombre_places')->label(__('messages.seats'))->numeric(),
                         Forms\Components\TextInput::make('volume')->label(__('messages.volume')),
-                        Forms\Components\TextInput::make('utilisation_vehicule')
-                            ->label(__('messages.vehicle_usage')),
+                        Forms\Components\TextInput::make('utilisation_vehicule')->label(__('messages.vehicle_usage')),
                     ])
                     ->columns(2),
+
             ]);
     }
 }
