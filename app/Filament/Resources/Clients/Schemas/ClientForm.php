@@ -2,9 +2,6 @@
 
 namespace App\Filament\Resources\Clients\Schemas;
 
-use App\Filament\Resources\Resellers\Schemas\ResellerForm;
-use App\Models\Reseller;
-
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -38,45 +35,21 @@ class ClientForm
 
                     ->schema([
 
-                        Grid::make(2)->schema([
+                        Select::make('client_type')
 
-                            Select::make('client_type')
+                            ->label(__('messages.client_type'))
 
-                                ->label(__('messages.client_type'))
+                            ->options([
+                                'person'         => __('messages.person'),
+                                'company'        => __('messages.company'),
+                                'administration' => __('messages.administration'),
+                            ])
 
-                                ->options([
-                                    'person'         => __('messages.person'),
-                                    'company'        => __('messages.company'),
-                                    'administration' => __('messages.administration'),
-                                ])
+                            ->default('person')
 
-                                ->default('person')
+                            ->live()
 
-                                ->live()
-
-                                ->required(),
-
-                            Select::make('reseller_id')
-
-                                ->label(__('messages.reseller'))
-
-                                ->options(
-                                    fn () => Reseller::query()
-                                        ->where('is_active', true)
-                                        ->where('is_blocked', false)
-                                        ->pluck('name', 'id')
-                                        ->toArray()
-                                )
-
-                                ->searchable()
-
-                                ->preload()
-
-                                ->createOptionForm(ResellerForm::components())
-
-                                ->createOptionUsing(fn (array $data) => Reseller::create($data)->id),
-
-                        ]),
+                            ->required(),
 
                     ]),
 
