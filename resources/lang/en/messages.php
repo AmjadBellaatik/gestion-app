@@ -1006,5 +1006,7 @@ return [
     'success'                   => 'Success',
     'unknown'                   => 'Unknown',
     'orders'                    => 'Orders',
+    'supplier_information'      => 'Supplier Information',
+    'financial_summary'         => 'Financial Summary',
 ];
 

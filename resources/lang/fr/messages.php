@@ -1006,4 +1006,6 @@ return [
     'success'                   => 'Succès',
     'unknown'                   => 'Inconnu',
     'orders'                    => 'Commandes',
+    'supplier_information'      => 'Informations fournisseur',
+    'financial_summary'         => 'Résumé financier',
 ];
