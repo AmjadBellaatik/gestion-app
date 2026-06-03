@@ -1008,4 +1008,7 @@ return [
     'orders'                    => 'Commandes',
     'supplier_information'      => 'Informations fournisseur',
     'financial_summary'         => 'Résumé financier',
+    'product_details'           => 'Détails du produit',
+    'pricing_stock'             => 'Prix & Stock',
+    'has_warranty'              => 'Sous garantie',
 ];

@@ -1010,4 +1010,7 @@ return [
     'orders'                    => 'الطلبات',
     'supplier_information'      => 'معلومات المورد',
     'financial_summary'         => 'الملخص المالي',
+    'product_details'           => 'تفاصيل المنتج',
+    'pricing_stock'             => 'الأسعار والمخزون',
+    'has_warranty'              => 'يشمل ضمان',
 ];

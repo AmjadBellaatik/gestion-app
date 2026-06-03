@@ -1008,5 +1008,8 @@ return [
     'orders'                    => 'Orders',
     'supplier_information'      => 'Supplier Information',
     'financial_summary'         => 'Financial Summary',
+    'product_details'           => 'Product Details',
+    'pricing_stock'             => 'Pricing & Stock',
+    'has_warranty'              => 'Has Warranty',
 ];
 
