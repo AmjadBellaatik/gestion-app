@@ -57,10 +57,6 @@ class ProductInfolist
                             })
                             ->placeholder('-'),
 
-                        IconEntry::make('serial_required')
-                            ->label(__('messages.serial_required'))
-                            ->boolean(),
-
                         IconEntry::make('has_warranty')
                             ->label(__('messages.has_warranty'))
                             ->boolean(),

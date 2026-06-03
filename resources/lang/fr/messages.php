@@ -1011,4 +1011,9 @@ return [
     'product_details'           => 'Détails du produit',
     'pricing_stock'             => 'Prix & Stock',
     'has_warranty'              => 'Sous garantie',
+    'movement_details'          => 'Détails du mouvement',
+    'context_traceability'      => 'Contexte & Traçabilité',
+    'source_type'               => 'Type de source',
+    'reference_number'          => 'Numéro de référence',
+    'date'                      => 'Date',
 ];

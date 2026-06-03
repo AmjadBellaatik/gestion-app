@@ -1011,5 +1011,10 @@ return [
     'product_details'           => 'Product Details',
     'pricing_stock'             => 'Pricing & Stock',
     'has_warranty'              => 'Has Warranty',
+    'movement_details'          => 'Movement Details',
+    'context_traceability'      => 'Context & Traceability',
+    'source_type'               => 'Source Type',
+    'reference_number'          => 'Reference Number',
+    'date'                      => 'Date',
 ];
 
