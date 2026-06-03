@@ -933,4 +933,122 @@ return [
     'stock_entry'               => 'إدخال المخزون',
     'transfer_movement'         => 'حركة النقل',
     'developed_by'              => 'طُوِّر بواسطة',
+
+    // وحدة التقارير
+    'reports'                   => 'التقارير',
+    'sales_report'              => 'تقرير المبيعات',
+    'payments_report'           => 'تقرير المدفوعات',
+    'clients_report'            => 'تقرير العملاء',
+    'resellers_report'          => 'تقرير الموزعين',
+    'stock_report'              => 'تقرير المخزون',
+    'motorcycles_report'        => 'تقرير الدراجات',
+    'repairs_report'            => 'تقرير الإصلاحات',
+    'warranty_report'           => 'تقرير الضمانات',
+    'activity_report'           => 'تقرير النشاط',
+    'export_pdf'                => 'تصدير PDF',
+    'no_data_for_period'        => 'لا توجد بيانات للفترة المحددة.',
+    'no_movements_in_period'    => 'لا توجد حركات في هذه الفترة.',
+    'summary'                   => 'ملخص',
+
+    // تسميات الفترات
+    'period_today'              => 'اليوم',
+    'period_yesterday'          => 'أمس',
+    'period_this_week'          => 'هذا الأسبوع',
+    'period_this_month'         => 'هذا الشهر',
+    'period_last_month'         => 'الشهر الماضي',
+    'period_last_3_months'      => 'آخر 3 أشهر',
+    'period_this_year'          => 'هذه السنة',
+    'period_custom'             => 'مخصص',
+    'from_date'                 => 'من',
+    'to_date'                   => 'إلى',
+    'vs_prev_period'            => 'مقارنة بالفترة السابقة',
+
+    // تقرير المبيعات
+    'sales_list'                => 'قائمة المبيعات',
+    'total_revenue'             => 'إجمالي الإيرادات',
+    'total_unpaid'              => 'إجمالي غير المدفوع',
+    'average_order'             => 'متوسط الطلب',
+    'discount_amount'           => 'مبلغ الخصم',
+    'paid_amount'               => 'المبلغ المدفوع',
+    'remaining_amount'          => 'المبلغ المتبقي',
+
+    // تقرير المدفوعات
+    'payments_list'             => 'قائمة المدفوعات',
+    'total_collected'           => 'إجمالي المحصَّل',
+    'pending_cheques'           => 'شيكات قيد الانتظار',
+    'payment_method'            => 'طريقة الدفع',
+
+    // تقرير العملاء
+    'clients_list'              => 'قائمة العملاء',
+    'total_clients'             => 'إجمالي العملاء',
+    'new_in_period'             => 'جدد في الفترة',
+    'total_sales'               => 'إجمالي المبيعات',
+
+    // تقرير الموزعين
+    'resellers_list'            => 'قائمة الموزعين',
+    'total_resellers'           => 'إجمالي الموزعين',
+    'total_orders'              => 'إجمالي الطلبات',
+    'total_paid'                => 'إجمالي المدفوع',
+    'total_debt'                => 'إجمالي الديون',
+    'with_outstanding_debt'     => 'بدين قائم',
+    'current_debt'              => 'الدين الحالي',
+    'settled'                   => 'مُسوَّى',
+
+    // تقرير المخزون
+    'products_inventory'        => 'جرد المنتجات',
+    'stock_movements'           => 'حركات المخزون',
+    'total_products'            => 'إجمالي المنتجات',
+    'low_stock'                 => 'مخزون منخفض',
+    'stock_valuation'           => 'تقييم المخزون',
+    'movements_in_period'       => 'الحركات في الفترة',
+    'current_stock'             => 'المخزون الحالي',
+    'alert_threshold'           => 'عتبة التنبيه',
+    'purchase_price'            => 'سعر الشراء',
+    'selling_price'             => 'سعر البيع',
+    'stock_value'               => 'قيمة المخزون',
+    'out_of_stock'              => 'نفاد المخزون',
+    'in_stock'                  => 'في المخزون',
+    'unit_cost'                 => 'التكلفة الوحدوية',
+    'in'                        => 'وارد',
+    'out'                       => 'صادر',
+
+    // تقرير الدراجات
+    'motorcycles_list'          => 'قائمة الدراجات',
+    'total_units'               => 'إجمالي الوحدات',
+    'chassis_number'            => 'رقم الهيكل',
+    'engine_number'             => 'رقم المحرك',
+
+    // تقرير الإصلاحات
+    'repairs_list'              => 'قائمة الإصلاحات',
+    'total_repairs'             => 'إجمالي الإصلاحات',
+    'under_warranty'            => 'تحت الضمان',
+    'avg_repair_time'           => 'متوسط وقت الإصلاح',
+    'ticket'                    => 'تذكرة',
+    'motorcycle'                => 'دراجة',
+    'total_cost'                => 'التكلفة الإجمالية',
+    'technician'                => 'فني',
+
+    // تقرير الضمانات
+    'warranties_list'           => 'قائمة الضمانات',
+    'total_warranties'          => 'إجمالي الضمانات',
+    'expiring_soon'             => 'تنتهي قريباً',
+    'start_date'                => 'تاريخ البدء',
+    'end_date'                  => 'تاريخ الانتهاء',
+    'km_limit'                  => 'حد الكيلومترات',
+    'item'                      => 'عنصر',
+
+    // تقرير النشاط
+    'activity_log'              => 'سجل النشاط',
+    'login_log'                 => 'سجل الدخول',
+    'total_activities'          => 'إجمالي الأنشطة',
+    'unique_users'              => 'مستخدمون فريدون',
+    'successful_logins'         => 'عمليات دخول ناجحة',
+    'failed_logins'             => 'عمليات دخول فاشلة',
+    'activity_by_module'        => 'النشاط حسب الوحدة',
+    'module'                    => 'وحدة',
+    'action'                    => 'إجراء',
+    'description'               => 'الوصف',
+    'ip_address'                => 'عنوان IP',
+    'success'                   => 'نجاح',
+    'unknown'                   => 'غير معروف',
 ];

@@ -15,6 +15,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\RepairController;
 use App\Http\Controllers\RepairPrintController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReportPdfController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CompanySwitchController;
@@ -167,6 +168,8 @@ Route::middleware([
         [ReportController::class, 'index']
 
     )->name('reports.index');
+
+    Route::get('/reports/pdf', [ReportPdfController::class, 'generate'])->name('reports.pdf');
 
 });
 

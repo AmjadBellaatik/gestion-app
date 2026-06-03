@@ -931,4 +931,122 @@ return [
     'warranty_information'      => 'Informations de garantie',
     'warranty_status'           => 'Statut de la garantie',
     'developed_by'              => 'Développé par',
+
+    // Module Rapports
+    'reports'                   => 'Rapports',
+    'sales_report'              => 'Rapport des Ventes',
+    'payments_report'           => 'Rapport des Paiements',
+    'clients_report'            => 'Rapport Clients',
+    'resellers_report'          => 'Rapport Revendeurs',
+    'stock_report'              => 'Rapport de Stock',
+    'motorcycles_report'        => 'Rapport Motos',
+    'repairs_report'            => 'Rapport Réparations',
+    'warranty_report'           => 'Rapport Garanties',
+    'activity_report'           => 'Rapport d\'Activité',
+    'export_pdf'                => 'Exporter PDF',
+    'no_data_for_period'        => 'Aucune donnée pour la période sélectionnée.',
+    'no_movements_in_period'    => 'Aucun mouvement dans cette période.',
+    'summary'                   => 'Résumé',
+
+    // Labels de période
+    'period_today'              => 'Aujourd\'hui',
+    'period_yesterday'          => 'Hier',
+    'period_this_week'          => 'Cette Semaine',
+    'period_this_month'         => 'Ce Mois',
+    'period_last_month'         => 'Mois Dernier',
+    'period_last_3_months'      => '3 Derniers Mois',
+    'period_this_year'          => 'Cette Année',
+    'period_custom'             => 'Personnalisé',
+    'from_date'                 => 'Du',
+    'to_date'                   => 'Au',
+    'vs_prev_period'            => 'vs période précédente',
+
+    // Rapport ventes
+    'sales_list'                => 'Liste des Ventes',
+    'total_revenue'             => 'Chiffre d\'Affaires',
+    'total_unpaid'              => 'Total Impayé',
+    'average_order'             => 'Commande Moyenne',
+    'discount_amount'           => 'Montant Remise',
+    'paid_amount'               => 'Montant Payé',
+    'remaining_amount'          => 'Reste à Payer',
+
+    // Rapport paiements
+    'payments_list'             => 'Liste des Paiements',
+    'total_collected'           => 'Total Encaissé',
+    'pending_cheques'           => 'Chèques en Attente',
+    'payment_method'            => 'Mode de Paiement',
+
+    // Rapport clients
+    'clients_list'              => 'Liste des Clients',
+    'total_clients'             => 'Total Clients',
+    'new_in_period'             => 'Nouveaux dans la Période',
+    'total_sales'               => 'Total Ventes',
+
+    // Rapport revendeurs
+    'resellers_list'            => 'Liste des Revendeurs',
+    'total_resellers'           => 'Total Revendeurs',
+    'total_orders'              => 'Total Commandes',
+    'total_paid'                => 'Total Payé',
+    'total_debt'                => 'Total Dettes',
+    'with_outstanding_debt'     => 'Avec Dette en Cours',
+    'current_debt'              => 'Dette Actuelle',
+    'settled'                   => 'Soldé',
+
+    // Rapport stock
+    'products_inventory'        => 'Inventaire Produits',
+    'stock_movements'           => 'Mouvements de Stock',
+    'total_products'            => 'Total Produits',
+    'low_stock'                 => 'Stock Faible',
+    'stock_valuation'           => 'Valorisation du Stock',
+    'movements_in_period'       => 'Mouvements dans la Période',
+    'current_stock'             => 'Stock Actuel',
+    'alert_threshold'           => 'Seuil d\'Alerte',
+    'purchase_price'            => 'Prix d\'Achat',
+    'selling_price'             => 'Prix de Vente',
+    'stock_value'               => 'Valeur du Stock',
+    'out_of_stock'              => 'Rupture de Stock',
+    'in_stock'                  => 'En Stock',
+    'unit_cost'                 => 'Coût Unitaire',
+    'in'                        => 'Entrée',
+    'out'                       => 'Sortie',
+
+    // Rapport motos
+    'motorcycles_list'          => 'Liste des Motos',
+    'total_units'               => 'Total Unités',
+    'chassis_number'            => 'Numéro de Châssis',
+    'engine_number'             => 'Numéro de Moteur',
+
+    // Rapport réparations
+    'repairs_list'              => 'Liste des Réparations',
+    'total_repairs'             => 'Total Réparations',
+    'under_warranty'            => 'Sous Garantie',
+    'avg_repair_time'           => 'Temps Moyen de Réparation',
+    'ticket'                    => 'Ticket',
+    'motorcycle'                => 'Moto',
+    'total_cost'                => 'Coût Total',
+    'technician'                => 'Technicien',
+
+    // Rapport garanties
+    'warranties_list'           => 'Liste des Garanties',
+    'total_warranties'          => 'Total Garanties',
+    'expiring_soon'             => 'Expiration Proche',
+    'start_date'                => 'Date de Début',
+    'end_date'                  => 'Date de Fin',
+    'km_limit'                  => 'Limite KM',
+    'item'                      => 'Article',
+
+    // Rapport activité
+    'activity_log'              => 'Journal d\'Activité',
+    'login_log'                 => 'Journal de Connexion',
+    'total_activities'          => 'Total Activités',
+    'unique_users'              => 'Utilisateurs Uniques',
+    'successful_logins'         => 'Connexions Réussies',
+    'failed_logins'             => 'Connexions Échouées',
+    'activity_by_module'        => 'Activité par Module',
+    'module'                    => 'Module',
+    'action'                    => 'Action',
+    'description'               => 'Description',
+    'ip_address'                => 'Adresse IP',
+    'success'                   => 'Succès',
+    'unknown'                   => 'Inconnu',
 ];

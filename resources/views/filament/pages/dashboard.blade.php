@@ -112,6 +112,93 @@
 .dark .db-chart-head { color:rgb(248,250,252); }
 .db-chart-sub    { font-size:.75rem; color:rgb(156,163,175); margin-top:.125rem; }
 .db-chart-canvas { position:relative; margin-top:1rem; }
+
+/* ── Period Selector ──────────────────────────────────────── */
+.db-period-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    background: #fff;
+    border-radius: .875rem;
+    padding: .875rem 1.125rem;
+    border: 1px solid rgba(0,0,0,.06);
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+.dark .db-period-bar {
+    background: rgb(30,41,59);
+    border-color: rgba(255,255,255,.07);
+}
+.db-period-presets { display:flex; flex-wrap:wrap; gap:.375rem; flex:1; min-width:0; }
+.db-period-btn {
+    font-size: .75rem;
+    font-weight: 500;
+    padding: .3125rem .75rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(0,0,0,.12);
+    background: transparent;
+    color: rgb(75,85,99);
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+}
+.dark .db-period-btn {
+    border-color: rgba(255,255,255,.12);
+    color: rgb(156,163,175);
+}
+.db-period-btn:hover {
+    background: rgb(243,244,246);
+    border-color: rgba(0,0,0,.2);
+    color: rgb(17,24,39);
+}
+.dark .db-period-btn:hover {
+    background: rgba(255,255,255,.06);
+}
+.db-period-btn.active {
+    background: rgb(16,185,129);
+    border-color: rgb(16,185,129);
+    color: #fff;
+}
+.db-period-label {
+    font-size: .75rem;
+    color: rgb(107,114,128);
+    white-space: nowrap;
+    padding-left: .5rem;
+}
+.dark .db-period-label { color: rgb(156,163,175); }
+.db-custom-range {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .5rem;
+    width: 100%;
+}
+.db-custom-range label { font-size:.75rem; color:rgb(107,114,128); }
+.db-custom-range input[type="date"] {
+    font-size: .8125rem;
+    padding: .3125rem .625rem;
+    border: 1px solid rgba(0,0,0,.15);
+    border-radius: .5rem;
+    background: #fff;
+    color: rgb(17,24,39);
+}
+.dark .db-custom-range input[type="date"] {
+    background: rgb(51,65,85);
+    border-color: rgba(255,255,255,.12);
+    color: rgb(248,250,252);
+    color-scheme: dark;
+}
+.db-apply-btn {
+    font-size: .75rem;
+    font-weight: 600;
+    padding: .3125rem .875rem;
+    border-radius: .5rem;
+    background: rgb(16,185,129);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
 </style>
 
 @php
@@ -129,9 +216,47 @@
     ];
 
     $fmt = fn (float $v) => number_format($v, 0, '.', ' ');
+
+    $periods = [
+        'today'         => __('messages.period_today'),
+        'yesterday'     => __('messages.period_yesterday'),
+        'this_week'     => __('messages.period_this_week'),
+        'this_month'    => __('messages.period_this_month'),
+        'last_month'    => __('messages.period_last_month'),
+        'last_3_months' => __('messages.period_last_3_months'),
+        'this_year'     => __('messages.period_this_year'),
+        'custom'        => __('messages.period_custom'),
+    ];
 @endphp
 
 <div class="db-wrap">
+
+    {{-- ══════════════════════════════════════════════════════════
+         PERIOD SELECTOR
+    ══════════════════════════════════════════════════════════ --}}
+    <div class="db-period-bar">
+        <div class="db-period-presets">
+            @foreach ($periods as $key => $label)
+                <button
+                    class="db-period-btn {{ $this->period === $key ? 'active' : '' }}"
+                    wire:click="setPeriod('{{ $key }}')"
+                >{{ $label }}</button>
+            @endforeach
+        </div>
+        <span class="db-period-label">
+            <x-heroicon-m-calendar style="display:inline-block;width:.875rem;height:.875rem;vertical-align:-.15em;margin-right:.25rem;" />
+            {{ $periodLabel }}
+        </span>
+
+        @if ($this->period === 'custom')
+        <div class="db-custom-range">
+            <label>{{ __('messages.from_date') }}</label>
+            <input type="date" wire:model.live="dateFrom" value="{{ $this->dateFrom }}">
+            <label>{{ __('messages.to_date') }}</label>
+            <input type="date" wire:model.live="dateTo" value="{{ $this->dateTo }}">
+        </div>
+        @endif
+    </div>
 
     {{-- ══════════════════════════════════════════════════════════
          ROW 1 — COMMERCIAL KPIs
@@ -147,7 +272,7 @@
                         <x-heroicon-o-banknotes class="cl-em" />
                     </div>
                     <div class="db-kpi-body">
-                        <p class="db-kpi-lbl">{{ __('messages.monthly_revenue') }}</p>
+                        <p class="db-kpi-lbl">{{ __('messages.revenue') }}</p>
                         <p class="db-kpi-val">MAD {{ $fmt($revenueCurrent) }}</p>
                         @if ($revPct !== null)
                             <p class="db-kpi-sub {{ $revPct >= 0 ? 'cl-em' : 'cl-re' }}">
@@ -156,7 +281,7 @@
                                 @else
                                     <x-heroicon-m-arrow-trending-down />
                                 @endif
-                                {{ $revPct >= 0 ? '+' : '' }}{{ $revPct }}% {{ __('messages.vs_last_month') }}
+                                {{ $revPct >= 0 ? '+' : '' }}{{ $revPct }}% {{ __('messages.vs_prev_period') }}
                             </p>
                         @else
                             <p class="db-kpi-sub cl-gr">{{ __('messages.no_previous_data') }}</p>
@@ -251,7 +376,6 @@
         <p class="db-section-lbl">{{ __('messages.workshop') }}</p>
         <div class="db-kpi-grid">
 
-            {{-- Active Repair Tickets --}}
             @php $activeTickets = $repairCounts[0] + $repairCounts[1] + $repairCounts[2] + $repairCounts[3]; @endphp
             <div class="db-card db-card-accent db-card-am">
                 <div class="db-kpi">
@@ -269,7 +393,6 @@
                 </div>
             </div>
 
-            {{-- Completed Repairs --}}
             <div class="db-card db-card-accent db-card-em">
                 <div class="db-kpi">
                     <div class="db-kpi-icon bg-em">
@@ -286,7 +409,6 @@
                 </div>
             </div>
 
-            {{-- Avg Repair Time --}}
             <div class="db-card db-card-accent db-card-vi">
                 <div class="db-kpi">
                     <div class="db-kpi-icon bg-vi">
@@ -303,7 +425,6 @@
                 </div>
             </div>
 
-            {{-- Warranty Repairs --}}
             <div class="db-card db-card-accent {{ $warrantyOpen > 0 ? 'db-card-am' : 'db-card-em' }}">
                 <div class="db-kpi">
                     <div class="db-kpi-icon {{ $warrantyOpen > 0 ? 'bg-am' : 'bg-em' }}">
@@ -328,13 +449,12 @@
     </div>
 
     {{-- ══════════════════════════════════════════════════════════
-         ROW 3 — STOCK & TEAM (2 cards, fills first 2 cols)
+         ROW 3 — STOCK & TEAM
     ══════════════════════════════════════════════════════════ --}}
     <div class="db-section">
         <p class="db-section-lbl">{{ __('messages.stock_management') }} &amp; {{ __('messages.team') }}</p>
         <div class="db-kpi-grid">
 
-            {{-- Low Stock --}}
             <div class="db-card db-card-accent {{ $lowStockCount > 0 ? 'db-card-re' : 'db-card-em' }}">
                 <div class="db-kpi">
                     <div class="db-kpi-icon {{ $lowStockCount > 0 ? 'bg-re' : 'bg-em' }}">
@@ -355,7 +475,6 @@
                 </div>
             </div>
 
-            {{-- Technicians --}}
             <div class="db-card db-card-accent db-card-bl">
                 <div class="db-kpi">
                     <div class="db-kpi-icon bg-bl">
@@ -376,22 +495,20 @@
     </div>
 
     {{-- ══════════════════════════════════════════════════════════
-         ROW 4 — CHARTS
+         ROW 4 — CHARTS (always current-year overview)
     ══════════════════════════════════════════════════════════ --}}
     <div class="db-section">
         <p class="db-section-lbl">{{ __('messages.reports') }}</p>
         <div class="db-chart-grid">
 
-            {{-- Revenue Line Chart --}}
             <div class="db-card">
-                <p class="db-chart-head">{{ __('messages.monthly_revenue') }} — {{ $year }}</p>
+                <p class="db-chart-head">{{ __('messages.monthly_revenue') }} — {{ $chartYear }}</p>
                 <p class="db-chart-sub">{{ __('messages.revenue') }}</p>
                 <div class="db-chart-canvas" wire:ignore style="height:260px;">
                     <canvas id="db-rev-chart"></canvas>
                 </div>
             </div>
 
-            {{-- Repair Status Doughnut --}}
             <div class="db-card">
                 <p class="db-chart-head">{{ __('messages.repair_status_analytics') }}</p>
                 <p class="db-chart-sub">{{ __('messages.all_time') }}</p>
@@ -425,7 +542,6 @@
         var c = Chart.getChart(id); if(c) c.destroy();
     });
 
-    /* Revenue line */
     new Chart(document.getElementById('db-rev-chart'), {
         type: 'line',
         data: {
@@ -467,20 +583,13 @@
                 y: {
                     beginAtZero: true,
                     grid: { color: 'rgba(0,0,0,0.05)', drawBorder: false },
-                    ticks: {
-                        font: { size: 11 },
-                        callback: function(v){ return 'MAD '+v.toLocaleString(); }
-                    }
+                    ticks: { font: { size: 11 }, callback: function(v){ return 'MAD '+v.toLocaleString(); } }
                 },
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { size: 11 } }
-                },
+                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
             },
         },
     });
 
-    /* Repair doughnut */
     new Chart(document.getElementById('db-rep-chart'), {
         type: 'doughnut',
         data: {
@@ -500,17 +609,9 @@
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: {
-                        usePointStyle: true,
-                        pointStyleWidth: 10,
-                        padding: 14,
-                        font: { size: 11 },
-                    },
+                    labels: { usePointStyle: true, pointStyleWidth: 10, padding: 14, font: { size: 11 } },
                 },
-                tooltip: {
-                    backgroundColor: 'rgba(15,23,42,0.85)',
-                    padding: 10,
-                }
+                tooltip: { backgroundColor: 'rgba(15,23,42,0.85)', padding: 10 }
             },
         },
     });

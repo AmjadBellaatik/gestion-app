@@ -144,6 +144,16 @@ class AdminPanelProvider extends PanelProvider
 
             )
 
+            ->discoverPages(
+
+                in: app_path(
+                    'Filament/Resources/Reports/Pages'
+                ),
+
+                for: 'App\\Filament\\Resources\\Reports\\Pages'
+
+            )
+
             /*
             |--------------------------------------------------------------------------
             | Widgets
