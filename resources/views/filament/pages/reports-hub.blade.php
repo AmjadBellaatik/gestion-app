@@ -99,6 +99,29 @@
 }
 .rpt-back-btn:hover { opacity: .75; text-decoration: underline; }
 
+/* ── PDF button ───────────────────────────────────────────── */
+.rpt-pdf-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .8125rem;
+    font-weight: 600;
+    color: #fff;
+    background: rgb(var(--primary-500));
+    border-radius: .5rem;
+    padding: .375rem .875rem;
+    text-decoration: none;
+    transition: opacity .15s ease;
+}
+.rpt-pdf-btn:hover { opacity: .85; text-decoration: none; }
+/* ── Back + PDF row ───────────────────────────────────────── */
+.rpt-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
 /* ── Report title ─────────────────────────────────────────── */
 .rpt-report-title {
     font-size: 1.125rem;
@@ -168,9 +191,17 @@
 @else
 
     {{-- ── REPORT VIEW ── --}}
-    <button class="rpt-back-btn" wire:click="setReportType(null)">
-        ← {{ __('messages.select_report_type') }}
-    </button>
+    <div class="rpt-top-row">
+        <button class="rpt-back-btn" wire:click="setReportType(null)">
+            ← {{ __('messages.select_report_type') }}
+        </button>
+        <a href="{{ route('reports.pdf', ['type' => $reportType, 'from' => $dateFrom, 'to' => $dateTo]) }}"
+           target="_blank"
+           class="rpt-pdf-btn">
+            <x-heroicon-o-document-arrow-down style="width:1rem;height:1rem;"/>
+            {{ __('messages.export_pdf') }}
+        </a>
+    </div>
 
     @php
         $reportLabels = [

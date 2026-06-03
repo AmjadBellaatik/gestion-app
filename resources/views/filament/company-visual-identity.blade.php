@@ -150,24 +150,79 @@
         .fi-header-actions .fi-btn { flex-shrink: 0; }
     }
 
-    /* ── SIDEBAR ────────────────────────────────────────────────────────── */
+    /* ── SIDEBAR — fixed, never scrolls with page ──────────────────────── */
     @media (min-width: 1024px) {
-        .fi-main-sidebar {
-            position: sticky !important;
+        /* Force fixed so the sidebar stays put no matter how far the user scrolls */
+        .fi-sidebar {
+            position: fixed !important;
             top: 0 !important;
-            height: 100dvh;
-            max-height: 100dvh;
+            height: 100dvh !important;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
-        .fi-main-sidebar .fi-sidebar-nav {
-            overflow-y: auto;
+        /* Filament renders the sidebar inside .fi-main-sidebar which is sticky by
+           our old rule — clear it so we don't fight ourselves */
+        .fi-main-sidebar {
+            position: unset !important;
+        }
+
+        /* The main content gets its left offset managed by JS (ResizeObserver) */
+        .fi-main-ctn {
+            transition: margin-left 0.25s ease;
         }
     }
 
     @media (max-width: 1023px) {
-        /* Ensure sidebar overlay doesn't cause horizontal scroll */
         .fi-sidebar { max-width: 17rem; }
+    }
+
+    /* ── Hide the default topbar collapse/expand arrow buttons ──────────── */
+    /* These appear next to the company switcher — replaced by our floating tab */
+    .fi-topbar-collapse-sidebar-btn-ctn {
+        display: none !important;
+    }
+
+    /* ── Floating sidebar toggle tab ────────────────────────────────────── */
+    #sidebar-toggle-tab {
+        position: fixed;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 50;
+        width: 1.25rem;
+        height: 3.5rem;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-left: none;
+        border-radius: 0 0.5rem 0.5rem 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        transition: left 0.25s ease, background 0.15s ease;
+        padding: 0;
+        outline: none;
+    }
+    .dark #sidebar-toggle-tab {
+        background: rgb(30, 41, 59);
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.35);
+    }
+    #sidebar-toggle-tab:hover {
+        background: color-mix(in srgb, var(--company-primary) 10%, white);
+    }
+    .dark #sidebar-toggle-tab:hover {
+        background: color-mix(in srgb, var(--company-primary) 10%, rgb(30, 41, 59));
+    }
+    #sidebar-toggle-tab svg {
+        width: 0.75rem;
+        height: 0.75rem;
+        color: var(--company-primary);
+        flex-shrink: 0;
+    }
+    @media (max-width: 1023px) {
+        #sidebar-toggle-tab { display: none !important; }
     }
 
     /* ── TABLES ─────────────────────────────────────────────────────────── */
@@ -271,24 +326,98 @@
     var MAX = 420;
     var DEFAULT = 256;
 
+    /* ── helpers ──────────────────────────────────────────────────────── */
+
+    function getSidebar()  { return document.querySelector('.fi-sidebar'); }
+    function getMainCtn()  { return document.querySelector('.fi-main-ctn'); }
+    function getHandle()   { return document.getElementById('sidebar-resize-handle'); }
+    function getToggleTab(){ return document.getElementById('sidebar-toggle-tab'); }
+
+    function isDesktop() { return window.innerWidth >= 1024; }
+
+    /* Sync main content left-margin to sidebar's current rendered width */
+    function syncMargin() {
+        if (!isDesktop()) return;
+        var sidebar = getSidebar();
+        var main    = getMainCtn();
+        if (!sidebar || !main) return;
+        var w = sidebar.offsetWidth;
+        main.style.marginLeft = w + 'px';
+    }
+
+    /* Set sidebar explicit width (for resize handle) */
     function applyWidth(w) {
         w = Math.max(MIN, Math.min(MAX, w));
-        var sidebar = document.querySelector('.fi-sidebar');
+        var sidebar = getSidebar();
         if (sidebar) {
-            sidebar.style.width = w + 'px';
+            sidebar.style.width    = w + 'px';
             sidebar.style.minWidth = w + 'px';
             sidebar.style.maxWidth = w + 'px';
         }
-        var handle = document.getElementById('sidebar-resize-handle');
+        var handle = getHandle();
         if (handle) handle.style.left = w + 'px';
+        syncMargin();
         return w;
     }
 
-    function attachHandle() {
+    /* ── toggle tab icon (< or >) ─────────────────────────────────────── */
+
+    function updateToggleIcon(sidebarIsOpen) {
+        var tab = getToggleTab();
+        if (!tab) return;
+        /* chevron-left when open, chevron-right when closed */
+        tab.innerHTML = sidebarIsOpen
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+    }
+
+    function positionToggleTab() {
+        var tab     = getToggleTab();
+        var sidebar = getSidebar();
+        if (!tab || !sidebar || !isDesktop()) return;
+        tab.style.left = sidebar.offsetWidth + 'px';
+        updateToggleIcon(sidebar.classList.contains('fi-sidebar-open'));
+    }
+
+    /* ── toggle button click ─────────────────────────────────────────── */
+
+    function attachToggleTab() {
+        var tab = getToggleTab();
+        if (!tab) {
+            tab = document.createElement('button');
+            tab.id = 'sidebar-toggle-tab';
+            tab.type = 'button';
+            document.body.appendChild(tab);
+        }
+
+        tab.onclick = function () {
+            /* Use Alpine's sidebar store if available */
+            if (window.Alpine && window.Alpine.store) {
+                var store = window.Alpine.store('sidebar');
+                if (store) {
+                    if (store.isOpen) store.close(); else store.open();
+                    /* Let the transition finish then re-sync */
+                    setTimeout(function () { positionToggleTab(); syncMargin(); }, 300);
+                    return;
+                }
+            }
+            /* Fallback: click Filament's hidden topbar button */
+            var btn = document.querySelector(
+                '.fi-topbar-close-collapse-sidebar-btn, .fi-topbar-open-collapse-sidebar-btn'
+            );
+            if (btn) btn.click();
+        };
+
+        positionToggleTab();
+    }
+
+    /* ── resize handle ────────────────────────────────────────────────── */
+
+    function attachResizeHandle() {
         var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
         applyWidth(saved);
 
-        var handle = document.getElementById('sidebar-resize-handle');
+        var handle = getHandle();
         if (!handle) {
             handle = document.createElement('div');
             handle.id = 'sidebar-resize-handle';
@@ -302,7 +431,7 @@
             e.preventDefault();
             dragging = true;
             startX = e.clientX;
-            var sidebar = document.querySelector('.fi-sidebar');
+            var sidebar = getSidebar();
             startW = sidebar ? sidebar.offsetWidth : saved;
             handle.classList.add('dragging');
             document.body.style.userSelect = 'none';
@@ -313,6 +442,7 @@
             if (!dragging) return;
             var newW = applyWidth(startW + (e.clientX - startX));
             localStorage.setItem(STORAGE_KEY, newW);
+            positionToggleTab();
         });
 
         document.addEventListener('mouseup', function () {
@@ -324,15 +454,48 @@
         });
     }
 
+    /* ── observe sidebar width changes (for collapse/expand) ────────────── */
+
+    var sidebarObserver = null;
+
+    function observeSidebar() {
+        var sidebar = getSidebar();
+        if (!sidebar) return;
+        if (sidebarObserver) sidebarObserver.disconnect();
+        sidebarObserver = new ResizeObserver(function () {
+            syncMargin();
+            positionToggleTab();
+        });
+        sidebarObserver.observe(sidebar);
+
+        /* Also watch class changes to detect open/closed state */
+        var classObserver = new MutationObserver(function () {
+            positionToggleTab();
+            syncMargin();
+        });
+        classObserver.observe(sidebar, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    /* ── init ─────────────────────────────────────────────────────────── */
+
+    function init() {
+        attachResizeHandle();
+        attachToggleTab();
+        observeSidebar();
+        syncMargin();
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', attachHandle);
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        attachHandle();
+        init();
     }
 
     document.addEventListener('livewire:navigated', function () {
         var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
         applyWidth(saved);
+        positionToggleTab();
+        observeSidebar();
     });
 })();
 </script>

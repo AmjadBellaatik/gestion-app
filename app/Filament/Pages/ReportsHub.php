@@ -14,7 +14,6 @@ use App\Models\Sale;
 use App\Models\StockMovement;
 use App\Models\Warranty;
 use Carbon\Carbon;
-use Filament\Actions\Action;
 use Filament\Pages\Page;
 
 class ReportsHub extends Page
@@ -111,22 +110,7 @@ class ReportsHub extends Page
 
     protected function getHeaderActions(): array
     {
-        if (! $this->reportType) {
-            return [];
-        }
-
-        return [
-            Action::make('export_pdf')
-                ->label(__('messages.export_pdf'))
-                ->icon('heroicon-o-document-arrow-down')
-                ->color('danger')
-                ->url(fn () => route('reports.pdf', [
-                    'type' => $this->reportType,
-                    'from' => $this->dateFrom,
-                    'to'   => $this->dateTo,
-                ]))
-                ->openUrlInNewTab(),
-        ];
+        return [];
     }
 
     public function getViewData(): array
