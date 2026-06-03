@@ -151,31 +151,18 @@
     }
 
     /* ── SIDEBAR — truly fixed, never scrolls with the page ────────────── */
-    /* Both open and closed states must stay fixed to viewport */
-    .fi-sidebar {
+    /* Only override position; let Filament's own top/height rules (topbar offset
+       etc.) stay intact so the sidebar appears correctly below the header. */
+    .fi-sidebar,
+    .fi-body-has-sidebar-fully-collapsible-on-desktop .fi-sidebar,
+    .fi-body-has-sidebar-collapsible-on-desktop .fi-sidebar {
         position: fixed !important;
-        top: 0 !important;
-        height: 100dvh !important;
-        /* Sidebar nav handles its own internal scroll; no double scrollbar */
+        /* Sidebar nav handles internal scroll; prevent a double scrollbar */
         overflow: hidden !important;
     }
 
-    /* Undo any sticky Filament applies via @apply on desktop */
     @media (min-width: 1024px) {
-        .fi-sidebar,
-        .fi-body-has-sidebar-fully-collapsible-on-desktop .fi-sidebar,
-        .fi-body-has-sidebar-collapsible-on-desktop .fi-sidebar {
-            position: fixed !important;
-            top: 0 !important;
-        }
-
-        /* Remove the Filament topbar height offset so sidebar starts at very top */
-        .fi-body-has-topbar .fi-sidebar {
-            top: 0 !important;
-            height: 100dvh !important;
-        }
-
-        /* The inner nav section handles its own scroll */
+        /* The inner nav section scrolls independently */
         .fi-sidebar .fi-sidebar-nav {
             overflow-y: auto;
             overflow-x: hidden;
