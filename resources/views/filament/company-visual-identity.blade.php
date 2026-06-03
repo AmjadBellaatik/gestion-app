@@ -243,4 +243,96 @@
 
     /* ── FOOTER ─────────────────────────────────────────────────────────── */
     .fi-footer { padding: 0.5rem 1rem; }
+
+    /* ── SIDEBAR RESIZE HANDLE ──────────────────────────────────────────── */
+    #sidebar-resize-handle {
+        position: fixed;
+        top: 0;
+        width: 5px;
+        height: 100vh;
+        cursor: col-resize;
+        z-index: 9999;
+        background: transparent;
+        transition: background 0.15s;
+    }
+    #sidebar-resize-handle:hover,
+    #sidebar-resize-handle.dragging {
+        background: color-mix(in srgb, var(--company-primary) 45%, transparent);
+    }
+    @media (max-width: 1023px) {
+        #sidebar-resize-handle { display: none; }
+    }
 </style>
+
+<script>
+(function () {
+    var STORAGE_KEY = 'fi-sidebar-width';
+    var MIN = 192;
+    var MAX = 420;
+    var DEFAULT = 256;
+
+    function applyWidth(w) {
+        w = Math.max(MIN, Math.min(MAX, w));
+        var sidebar = document.querySelector('.fi-sidebar');
+        if (sidebar) {
+            sidebar.style.width = w + 'px';
+            sidebar.style.minWidth = w + 'px';
+            sidebar.style.maxWidth = w + 'px';
+        }
+        var handle = document.getElementById('sidebar-resize-handle');
+        if (handle) handle.style.left = w + 'px';
+        return w;
+    }
+
+    function attachHandle() {
+        var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
+        applyWidth(saved);
+
+        var handle = document.getElementById('sidebar-resize-handle');
+        if (!handle) {
+            handle = document.createElement('div');
+            handle.id = 'sidebar-resize-handle';
+            document.body.appendChild(handle);
+        }
+        handle.style.left = Math.max(MIN, Math.min(MAX, saved)) + 'px';
+
+        var startX, startW, dragging = false;
+
+        handle.onmousedown = function (e) {
+            e.preventDefault();
+            dragging = true;
+            startX = e.clientX;
+            var sidebar = document.querySelector('.fi-sidebar');
+            startW = sidebar ? sidebar.offsetWidth : saved;
+            handle.classList.add('dragging');
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+        };
+
+        document.addEventListener('mousemove', function (e) {
+            if (!dragging) return;
+            var newW = applyWidth(startW + (e.clientX - startX));
+            localStorage.setItem(STORAGE_KEY, newW);
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (!dragging) return;
+            dragging = false;
+            handle.classList.remove('dragging');
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachHandle);
+    } else {
+        attachHandle();
+    }
+
+    document.addEventListener('livewire:navigated', function () {
+        var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
+        applyWidth(saved);
+    });
+})();
+</script>

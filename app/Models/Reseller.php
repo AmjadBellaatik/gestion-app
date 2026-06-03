@@ -20,6 +20,8 @@ class Reseller extends Model
 
         'email',
 
+        'website',
+
         'address',
 
         'city',

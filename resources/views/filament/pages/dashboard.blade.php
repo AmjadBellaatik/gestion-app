@@ -165,6 +165,23 @@
                 </div>
             </div>
 
+            {{-- Gross Profit --}}
+            <div class="db-card db-card-accent {{ $grossProfit >= 0 ? 'db-card-em' : 'db-card-re' }}">
+                <div class="db-kpi">
+                    <div class="db-kpi-icon {{ $grossProfit >= 0 ? 'bg-em' : 'bg-re' }}">
+                        <x-heroicon-o-arrow-trending-up class="{{ $grossProfit >= 0 ? 'cl-em' : 'cl-re' }}" />
+                    </div>
+                    <div class="db-kpi-body">
+                        <p class="db-kpi-lbl">{{ __('messages.gross_profit') }}</p>
+                        <p class="db-kpi-val {{ $grossProfit < 0 ? 'cl-re' : '' }}">MAD {{ $fmt($grossProfit) }}</p>
+                        <p class="db-kpi-sub cl-gr">
+                            <x-heroicon-m-calculator />
+                            {{ __('messages.sale_price_minus_cost') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             {{-- Unpaid Invoices --}}
             <div class="db-card db-card-accent {{ $unpaidAmount > 0 ? 'db-card-re' : 'db-card-em' }}">
                 <div class="db-kpi">

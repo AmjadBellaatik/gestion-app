@@ -56,6 +56,18 @@ class ResellerForm
 
                     ->maxLength(255),
 
+                TextInput::make('website')
+
+                    ->label(
+                        __('messages.website')
+                    )
+
+                    ->url()
+
+                    ->placeholder('https://')
+
+                    ->maxLength(255),
+
                 Textarea::make('address')
 
                     ->label(

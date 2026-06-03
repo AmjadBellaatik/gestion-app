@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\RepairTicket;
 use App\Models\Reseller;
 use App\Models\Sale;
+use App\Models\SaleItem;
 use App\Models\Technician;
 
 class AppServiceProvider extends ServiceProvider
@@ -117,6 +118,17 @@ class AppServiceProvider extends ServiceProvider
                     (($p->stock_in ?? 0) - ($p->stock_out ?? 0))
                 ) * (float) $p->purchase_price);
 
+            // Gross profit: (unit_price - purchase_price) * qty for product-based sale items this month
+            $monthlySaleIds = Sale::whereYear('created_at', $year)
+                ->whereMonth('created_at', $month)
+                ->pluck('id');
+
+            $grossProfit = (float) SaleItem::whereIn('sale_id', $monthlySaleIds)
+                ->whereNotNull('product_id')
+                ->join('products', 'sale_items.product_id', '=', 'products.id')
+                ->selectRaw('COALESCE(SUM((sale_items.unit_price - COALESCE(products.purchase_price, 0)) * sale_items.quantity), 0) as profit')
+                ->value('profit');
+
             $revenueByMonth = [];
 
             for ($m = 1; $m <= 12; $m++) {
@@ -139,6 +151,7 @@ class AppServiceProvider extends ServiceProvider
                 'year',
                 'revenueCurrent',
                 'revenuePrev',
+                'grossProfit',
                 'unpaidAmount',
                 'unpaidCount',
                 'resellerDebts',

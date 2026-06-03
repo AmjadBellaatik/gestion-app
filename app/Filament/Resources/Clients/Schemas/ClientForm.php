@@ -4,8 +4,6 @@ namespace App\Filament\Resources\Clients\Schemas;
 
 use App\Models\Reseller;
 
-use Filament\Forms;
-
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -26,114 +24,60 @@ class ClientForm
 
             ->components([
 
-                Grid::make(3)
+                /*
+                |--------------------------------------------------------------------------
+                | IDENTIFICATION
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make(__('messages.identification'))
 
                     ->schema([
 
-                        Select::make(
-                            'client_type'
-                        )
+                        Grid::make(2)->schema([
 
-                            ->label(
-                                __('messages.client_type')
-                            )
+                            Select::make('client_type')
 
-                            ->options([
+                                ->label(__('messages.client_type'))
 
-                                'person' => __(
-                                    'messages.person'
-                                ),
+                                ->options([
+                                    'person'         => __('messages.person'),
+                                    'company'        => __('messages.company'),
+                                    'administration' => __('messages.administration'),
+                                ])
 
-                                'company' => __(
-                                    'messages.company'
-                                ),
+                                ->default('person')
 
-                                'administration' => __(
-                                    'messages.administration'
-                                ),
+                                ->live()
 
-                            ])
+                                ->required(),
 
-                            ->default('person')
+                            Select::make('reseller_id')
 
-                            ->live()
+                                ->label(__('messages.reseller'))
 
-                            ->required(),
+                                ->options(
+                                    fn () => Reseller::query()
+                                        ->where('is_active', true)
+                                        ->where('is_blocked', false)
+                                        ->pluck('name', 'id')
+                                        ->toArray()
+                                )
 
-                        Select::make(
-                            'reseller_id'
-                        )
+                                ->searchable()
 
-                            ->label(
-                                __('messages.reseller')
-                            )
+                                ->preload()
 
-                            ->options(
-                                fn () => Reseller::query()
-                                    ->where('is_active', true)
-                                    ->where('is_blocked', false)
-                                    ->pluck('name', 'id')
-                                    ->toArray()
-                            )
+                                ->createOptionForm([
+                                    TextInput::make('name')->label(__('messages.name'))->required(),
+                                    TextInput::make('phone')->label(__('messages.phone'))->tel(),
+                                    TextInput::make('email')->label(__('messages.email'))->email(),
+                                    TextInput::make('address')->label(__('messages.address')),
+                                ])
 
-                            ->searchable()
+                                ->createOptionUsing(fn (array $data) => Reseller::create($data)->id),
 
-                            ->preload()
-                            ->createOptionForm([
-                                TextInput::make('name')->label(__('messages.name'))->required(),
-                                TextInput::make('phone')->label(__('messages.phone'))->tel(),
-                                TextInput::make('email')->label(__('messages.email'))->email(),
-                                TextInput::make('address')->label(__('messages.address')),
-                            ])
-                            ->createOptionUsing(fn (array $data) => Reseller::create($data)->id),
-
-                        TextInput::make(
-                            'company_name'
-                        )
-
-                            ->label(
-                                __('messages.company_name')
-                            )
-
-                            ->visible(
-                                fn ($get) =>
-
-                                    $get(
-                                        'client_type'
-                                    ) === 'company'
-                            )
-
-                            ->required(
-                                fn ($get) =>
-
-                                    $get(
-                                        'client_type'
-                                    ) === 'company'
-                            ),
-
-                        TextInput::make(
-                            'administration_name'
-                        )
-
-                            ->label(
-                                __('messages.administration_name')
-                            )
-
-                            ->visible(
-                                fn ($get) =>
-
-                                    $get(
-                                        'client_type'
-                                    ) === 'administration'
-                            )
-
-                            ->required(
-                                fn ($get) =>
-
-                                    $get(
-                                        'client_type'
-                                    ) === 'administration'
-                            ),
+                        ]),
 
                     ]),
 
@@ -143,79 +87,39 @@ class ClientForm
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make(
-                    __('messages.person_information')
-                )
+                Section::make(__('messages.person_information'))
 
-                    ->visible(
-                        fn ($get) =>
-
-                            $get(
-                                'client_type'
-                            ) === 'person'
-                    )
+                    ->visible(fn ($get) => $get('client_type') === 'person')
 
                     ->schema([
 
-                        Grid::make(3)
+                        Grid::make(3)->schema([
 
-                            ->schema([
+                            TextInput::make('first_name')
+                                ->label(__('messages.first_name'))
+                                ->required(fn ($get) => $get('client_type') === 'person'),
 
-                                TextInput::make(
-                                    'first_name'
-                                )
+                            TextInput::make('last_name')
+                                ->label(__('messages.last_name'))
+                                ->required(fn ($get) => $get('client_type') === 'person'),
 
-                                    ->label(
-                                        __('messages.first_name')
-                                    )
+                            TextInput::make('cin')
+                                ->label(__('messages.national_id'))
+                                ->required(fn ($get) => $get('client_type') === 'person'),
 
-                                    ->required(),
+                        ]),
 
-                                TextInput::make(
-                                    'last_name'
-                                )
+                        Grid::make(2)->schema([
 
-                                    ->label(
-                                        __('messages.last_name')
-                                    )
+                            DatePicker::make('birth_date')
+                                ->label(__('messages.birth_date')),
 
-                                    ->required(),
+                            Select::make('nationality')
+                                ->label(__('messages.nationality'))
+                                ->options(config('nationalities'))
+                                ->searchable(),
 
-                                TextInput::make(
-                                    'cin'
-                                )
-
-                                    ->label(
-                                        __('messages.national_id')
-                                    )
-
-                                    ->required(),
-
-                                DatePicker::make(
-                                    'birth_date'
-                                )
-
-                                    ->label(
-                                        __('messages.birth_date')
-                                    ),
-
-                                Select::make(
-                                    'nationality'
-                                )
-
-                                    ->label(
-                                        __('messages.nationality')
-                                    )
-
-                                    ->options(
-                                        config(
-                                            'nationalities'
-                                        )
-                                    )
-
-                                    ->searchable(),
-
-                            ]),
+                        ]),
 
                     ]),
 
@@ -225,65 +129,34 @@ class ClientForm
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make(
-                    __('messages.company_information')
-                )
+                Section::make(__('messages.company_information'))
 
-                    ->visible(
-                        fn ($get) =>
-
-                            $get(
-                                'client_type'
-                            ) === 'company'
-                    )
+                    ->visible(fn ($get) => $get('client_type') === 'company')
 
                     ->schema([
 
-                        Grid::make(2)
+                        TextInput::make('company_name')
+                            ->label(__('messages.company_name'))
+                            ->required(fn ($get) => $get('client_type') === 'company')
+                            ->columnSpanFull(),
 
-                            ->schema([
+                        Grid::make(2)->schema([
 
-                                TextInput::make(
-                                    'ice'
-                                )
+                            TextInput::make('ice')
+                                ->label(__('messages.ice'))
+                                ->required(fn ($get) => $get('client_type') === 'company'),
 
-                                    ->label(
-                                        __('messages.ice')
-                                    )
+                            TextInput::make('rc')
+                                ->label(__('messages.rc'))
+                                ->required(fn ($get) => $get('client_type') === 'company'),
 
-                                    ->required(),
+                            TextInput::make('if')
+                                ->label(__('messages.if')),
 
-                                TextInput::make(
-                                    'rc'
-                                )
+                            TextInput::make('representative_name')
+                                ->label(__('messages.representative_name')),
 
-                                    ->label(
-                                        __('messages.rc')
-                                    )
-
-                                    ->required(),
-
-                                TextInput::make(
-                                    'if'
-                                )
-
-                                    ->label(
-                                        __('messages.if')
-                                    )
-
-                                    ->required(),
-
-                                TextInput::make(
-                                    'representative_name'
-                                )
-
-                                    ->label(
-                                        __('messages.representative_name')
-                                    )
-
-                                    ->required(),
-
-                            ]),
+                        ]),
 
                     ]),
 
@@ -293,107 +166,74 @@ class ClientForm
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make(
-                    __('messages.administration_information')
-                )
+                Section::make(__('messages.administration_information'))
 
-                    ->visible(
-                        fn ($get) =>
-
-                            $get(
-                                'client_type'
-                            ) === 'administration'
-                    )
+                    ->visible(fn ($get) => $get('client_type') === 'administration')
 
                     ->schema([
 
-                        Grid::make(2)
+                        TextInput::make('administration_name')
+                            ->label(__('messages.administration_name'))
+                            ->required(fn ($get) => $get('client_type') === 'administration')
+                            ->columnSpanFull(),
 
-                            ->schema([
+                        Grid::make(2)->schema([
 
-                                TextInput::make(
-                                    'department'
-                                )
+                            TextInput::make('department')
+                                ->label(__('messages.department')),
 
-                                    ->label(
-                                        __('messages.department')
-                                    ),
+                            TextInput::make('responsible_person')
+                                ->label(__('messages.responsible_person')),
 
-                                TextInput::make(
-                                    'responsible_person'
-                                )
-
-                                    ->label(
-                                        __('messages.responsible_person')
-                                    )
-
-                                    ->required(),
-
-                            ]),
+                        ]),
 
                     ]),
 
                 /*
                 |--------------------------------------------------------------------------
-                | GENERAL INFORMATION
+                | CONTACT INFORMATION
                 |--------------------------------------------------------------------------
                 */
 
-                Grid::make(2)
+                Section::make(__('messages.contact_information'))
 
                     ->schema([
 
-                        TextInput::make(
-                            'phone'
-                        )
+                        Grid::make(2)->schema([
 
-                            ->label(
-                                __('messages.phone')
-                            )
+                            TextInput::make('phone')
+                                ->label(__('messages.phone'))
+                                ->tel(),
 
-                            ->tel(),
+                            TextInput::make('email')
+                                ->label(__('messages.email'))
+                                ->email(),
 
-                        TextInput::make(
-                            'email'
-                        )
+                        ]),
 
-                            ->label(
-                                __('messages.email')
-                            )
-
-                            ->email(),
+                        Textarea::make('address')
+                            ->label(__('messages.address'))
+                            ->rows(3)
+                            ->columnSpanFull(),
 
                     ]),
 
-                Textarea::make(
-                    'address'
-                )
-
-                    ->label(
-                        __('messages.address')
-                    )
-
-                    ->rows(4)
-
-                    ->columnSpanFull(),
-
-                Textarea::make(
-                    'notes'
-                )
-
-                    ->label(
-                        __('messages.notes')
-                    )
-
-                    ->rows(4)
-
-                    ->columnSpanFull(),
-
                 /*
                 |--------------------------------------------------------------------------
-                | STATUS
+                | NOTES & STATUS
                 |--------------------------------------------------------------------------
                 */
+
+                Section::make(__('messages.notes'))
+
+                    ->schema([
+
+                        Textarea::make('notes')
+                            ->label(__('messages.notes'))
+                            ->rows(3)
+                            ->columnSpanFull(),
+
+                    ]),
 
                 Section::make(__('messages.status'))
 
@@ -423,13 +263,6 @@ class ClientForm
                             ->columnSpanFull(),
 
                     ]),
-
-                TextInput::make('balance')
-                    ->label(__('messages.balance'))
-                    ->numeric()
-                    ->disabled()
-                    ->dehydrated(false)
-                    ->suffix('MAD'),
 
             ]);
     }

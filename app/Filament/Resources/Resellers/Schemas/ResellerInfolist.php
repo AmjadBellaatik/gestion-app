@@ -62,6 +62,18 @@ class ResellerInfolist
                                     ->placeholder('-'),
 
                                 TextEntry::make(
+                                    'website'
+                                )
+
+                                    ->label(
+                                        __('messages.website')
+                                    )
+
+                                    ->placeholder('-')
+
+                                    ->url(),
+
+                                TextEntry::make(
                                     'address'
                                 )
 
