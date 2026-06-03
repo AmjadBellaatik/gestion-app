@@ -4,71 +4,109 @@
 @php $fmt = fn(float $v) => number_format($v, 2, '.', ' '); @endphp
 
 <style>
+/* ── Report type picker ───────────────────────────────────── */
 .rpt-type-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: .875rem;
 }
 .rpt-type-card {
+    position: relative;
     background: #fff;
-    border: 2px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 1.5rem 1.25rem;
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: .875rem;
+    padding: 1.5rem 1.125rem 1.375rem;
     cursor: pointer;
-    transition: border-color .15s, box-shadow .15s, transform .1s;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: .6rem;
+    gap: .75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+    overflow: hidden;
+}
+.rpt-type-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(var(--primary-500),.06) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity .15s ease;
+    pointer-events: none;
+}
+.rpt-type-card:hover::before { opacity: 1; }
+.dark .rpt-type-card {
+    background: rgb(30,41,59);
+    border-color: rgba(255,255,255,.08);
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
 }
 .rpt-type-card:hover {
-    border-color: #6366f1;
-    box-shadow: 0 4px 16px rgba(99,102,241,.15);
+    border-color: rgb(var(--primary-500));
+    box-shadow: 0 0 0 3px rgba(var(--primary-500),.12), 0 6px 18px rgba(0,0,0,.08);
     transform: translateY(-2px);
 }
-.rpt-type-card.active {
-    border-color: #6366f1;
-    background: #f5f3ff;
+.dark .rpt-type-card:hover {
+    box-shadow: 0 0 0 3px rgba(var(--primary-500),.22), 0 6px 18px rgba(0,0,0,.3);
 }
-.rpt-type-card svg {
-    width: 2rem;
-    height: 2rem;
-    color: #6366f1;
+.rpt-type-card-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: .625rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(var(--primary-500),.1);
+    transition: background .15s ease, transform .12s ease;
+}
+.rpt-type-card:hover .rpt-type-card-icon {
+    background: rgba(var(--primary-500),.18);
+    transform: scale(1.08);
+}
+.dark .rpt-type-card-icon {
+    background: rgba(var(--primary-500),.15);
+}
+.dark .rpt-type-card:hover .rpt-type-card-icon {
+    background: rgba(var(--primary-500),.25);
+}
+.rpt-type-card-icon svg {
+    width: 1.375rem;
+    height: 1.375rem;
+    color: rgb(var(--primary-500));
 }
 .rpt-type-card-label {
-    font-size: .9rem;
+    font-size: .8125rem;
     font-weight: 600;
-    color: #374151;
+    color: rgb(55,65,81);
+    line-height: 1.35;
+    letter-spacing: .01em;
 }
+.dark .rpt-type-card-label { color: rgb(226,232,240); }
+
+/* ── Back button ──────────────────────────────────────────── */
 .rpt-back-btn {
     display: inline-flex;
     align-items: center;
     gap: .4rem;
-    font-size: .85rem;
+    font-size: .8125rem;
     font-weight: 600;
-    color: #6366f1;
+    color: rgb(var(--primary-500));
     cursor: pointer;
-    margin-bottom: 1rem;
     background: none;
     border: none;
-    padding: 0;
+    padding: .375rem .625rem .375rem 0;
 }
-.rpt-back-btn:hover { text-decoration: underline; }
+.rpt-back-btn:hover { opacity: .75; text-decoration: underline; }
+
+/* ── Report title ─────────────────────────────────────────── */
 .rpt-report-title {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 700;
-    color: #111827;
+    color: rgb(17,24,39);
     margin-bottom: 1.25rem;
 }
-@media (prefers-color-scheme: dark) {
-    .rpt-type-card { background: #1f2937; border-color: #374151; }
-    .rpt-type-card:hover { border-color: #818cf8; }
-    .rpt-type-card.active { background: #1e1b4b; border-color: #818cf8; }
-    .rpt-type-card-label { color: #f9fafb; }
-    .rpt-report-title { color: #f9fafb; }
-}
+.dark .rpt-report-title { color: rgb(248,250,252); }
 </style>
 
 <div class="rpt-wrap">
@@ -81,47 +119,47 @@
     <div class="rpt-type-grid">
 
         <button class="rpt-type-card" wire:click="setReportType('sales')">
-            <x-heroicon-o-shopping-cart style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-shopping-cart /></div>
             <span class="rpt-type-card-label">{{ __('messages.sales_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('payments')">
-            <x-heroicon-o-banknotes style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-banknotes /></div>
             <span class="rpt-type-card-label">{{ __('messages.payments_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('clients')">
-            <x-heroicon-o-user-group style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-user-group /></div>
             <span class="rpt-type-card-label">{{ __('messages.clients_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('resellers')">
-            <x-heroicon-o-building-storefront style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-building-storefront /></div>
             <span class="rpt-type-card-label">{{ __('messages.resellers_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('stock')">
-            <x-heroicon-o-archive-box style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-archive-box /></div>
             <span class="rpt-type-card-label">{{ __('messages.stock_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('motorcycles')">
-            <x-heroicon-o-truck style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-truck /></div>
             <span class="rpt-type-card-label">{{ __('messages.motorcycles_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('repairs')">
-            <x-heroicon-o-wrench-screwdriver style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-wrench-screwdriver /></div>
             <span class="rpt-type-card-label">{{ __('messages.repairs_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('warranties')">
-            <x-heroicon-o-shield-check style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-shield-check /></div>
             <span class="rpt-type-card-label">{{ __('messages.warranty_report') }}</span>
         </button>
 
         <button class="rpt-type-card" wire:click="setReportType('activity')">
-            <x-heroicon-o-clipboard-document-list style="width:2rem;height:2rem;color:#6366f1;"/>
+            <div class="rpt-type-card-icon"><x-heroicon-o-clipboard-document-list /></div>
             <span class="rpt-type-card-label">{{ __('messages.activity_report') }}</span>
         </button>
 

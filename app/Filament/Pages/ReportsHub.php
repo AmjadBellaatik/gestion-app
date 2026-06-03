@@ -182,7 +182,7 @@ class ReportsHub extends Page
 
     private function clientsData(Carbon $from, Carbon $to): array
     {
-        $clients        = Client::withCount('sales')->withSum('sales', 'total')->orderBy('name')->get();
+        $clients        = Client::withCount('sales')->withSum('sales', 'total')->orderBy('id')->get();
         $totalClients   = $clients->count();
         $activeClients  = $clients->where('is_active', true)->count();
         $blockedClients = $clients->where('is_blocked', true)->count();
@@ -196,7 +196,7 @@ class ReportsHub extends Page
     private function resellersData(Carbon $from, Carbon $to): array
     {
         $resellers = Reseller::withCount(['sales as total_orders' => fn ($q) => $q->whereBetween('created_at', [$from, $to])])
-            ->withSum(['payments as total_paid' => fn ($q) => $q->where('status', 'paid')->whereBetween('created_at', [$from, $to])], 'amount')
+            ->withSum(['payments as total_paid' => fn ($q) => $q->where('payments.status', 'paid')->whereBetween('payments.created_at', [$from, $to])], 'amount')
             ->orderBy('name')
             ->get()
             ->map(function ($r) {
