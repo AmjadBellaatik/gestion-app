@@ -20,9 +20,6 @@ class MotorcycleModelInfolist
                             ->label(__('messages.homologation_date'))
                             ->date()
                             ->placeholder('-'),
-                        TextEntry::make('brand.name')
-                            ->label(__('messages.brand'))
-                            ->placeholder('-'),
                     ])
                     ->columns(2),
 

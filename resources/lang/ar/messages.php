@@ -1007,4 +1007,5 @@ return [
     'ip_address'                => 'عنوان IP',
     'success'                   => 'نجاح',
     'unknown'                   => 'غير معروف',
+    'orders'                    => 'الطلبات',
 ];

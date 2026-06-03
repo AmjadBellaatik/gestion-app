@@ -1005,4 +1005,5 @@ return [
     'ip_address'                => 'Adresse IP',
     'success'                   => 'Succès',
     'unknown'                   => 'Inconnu',
+    'orders'                    => 'Commandes',
 ];
