@@ -46,6 +46,8 @@ return Application::configure(
 
             \App\Http\Middleware\SetCompany::class,
 
+            \App\Http\Middleware\SessionLifetime::class,
+
         ]);
 
         /*

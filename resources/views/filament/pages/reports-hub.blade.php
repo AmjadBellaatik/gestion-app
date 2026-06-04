@@ -91,7 +91,7 @@
     gap: .4rem;
     font-size: .8125rem;
     font-weight: 600;
-    color: rgb(var(--primary-500));
+    color: var(--company-primary, #f59e0b);
     cursor: pointer;
     background: none;
     border: none;
@@ -107,7 +107,7 @@
     font-size: .8125rem;
     font-weight: 600;
     color: #fff;
-    background: rgb(var(--primary-500));
+    background: var(--company-primary, #f59e0b);
     border-radius: .5rem;
     padding: .375rem .875rem;
     text-decoration: none;
@@ -216,7 +216,7 @@
             'activity'    => __('messages.activity_report'),
         ];
     @endphp
-    <p class="rpt-report-title">{{ $reportLabels[$reportType] ?? $reportType }}</p>
+    <p class="rpt-report-title">{{ $reportLabels[$reportType ?? ''] ?? $reportType }}</p>
 
     @include('filament.partials.period-selector')
 

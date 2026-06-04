@@ -19,6 +19,8 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
 
         Event::listen(Login::class, function (Login $event): void {
+            session(['login_at' => now()->timestamp]);
+
             LoginLog::create([
                 'user_id'      => $event->user->id,
                 'email'        => $event->user->email,

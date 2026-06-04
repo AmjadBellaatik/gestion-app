@@ -5,6 +5,9 @@
 @endphp
 
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nositelinkssearchbox">
+<meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="bingbot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 
 <style>
     :root {
@@ -527,3 +530,70 @@
     });
 })();
 </script>
+
+@auth
+<script>
+/* ── Auto-logout: 30 min inactivity + 8 h max session ─────────────── */
+(function () {
+    var IDLE_LIMIT    = 30 * 60 * 1000;   /* 30 min in ms */
+    var SESSION_LIMIT = 8  * 60 * 60 * 1000; /* 8 h in ms */
+    var STORAGE_IDLE  = 'erp_last_activity';
+    var STORAGE_LOGIN = 'erp_session_start';
+    var LOGOUT_URL    = '{{ route("filament.admin.auth.logout") }}';
+    var CHECK_EVERY   = 60 * 1000; /* check every 60 s */
+
+    /* Initialise login timestamp only once per browser session */
+    if (!sessionStorage.getItem(STORAGE_LOGIN)) {
+        sessionStorage.setItem(STORAGE_LOGIN, Date.now().toString());
+    }
+
+    function touch() {
+        localStorage.setItem(STORAGE_IDLE, Date.now().toString());
+    }
+
+    /* Bump last-activity on any real user interaction */
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(function (evt) {
+        document.addEventListener(evt, touch, { passive: true, capture: true });
+    });
+
+    touch(); /* record activity on page load */
+
+    function check() {
+        var now       = Date.now();
+        var lastAct   = parseInt(localStorage.getItem(STORAGE_IDLE) || '0', 10);
+        var loginTime = parseInt(sessionStorage.getItem(STORAGE_LOGIN) || '0', 10);
+
+        var idle        = lastAct   ? now - lastAct   : 0;
+        var sessionAge  = loginTime ? now - loginTime : 0;
+
+        if (idle >= IDLE_LIMIT || sessionAge >= SESSION_LIMIT) {
+            /* POST to the Filament logout endpoint to properly clear the session */
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = LOGOUT_URL;
+
+            var csrf = document.createElement('input');
+            csrf.type  = 'hidden';
+            csrf.name  = '_token';
+            csrf.value = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            form.appendChild(csrf);
+
+            document.body.appendChild(form);
+            sessionStorage.removeItem(STORAGE_LOGIN);
+            localStorage.removeItem(STORAGE_IDLE);
+            form.submit();
+        }
+    }
+
+    /* Sync last-activity across tabs via storage events */
+    window.addEventListener('storage', function (e) {
+        if (e.key === STORAGE_IDLE) check();
+    });
+
+    /* Re-hook after Livewire navigations */
+    document.addEventListener('livewire:navigated', function () { touch(); });
+
+    setInterval(check, CHECK_EVERY);
+})();
+</script>
+@endauth

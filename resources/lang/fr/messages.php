@@ -1016,4 +1016,5 @@ return [
     'source_type'               => 'Type de source',
     'reference_number'          => 'Numéro de référence',
     'date'                      => 'Date',
+    'session_expired'           => 'Votre session a expiré. Veuillez vous reconnecter.',
 ];

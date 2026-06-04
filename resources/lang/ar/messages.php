@@ -1018,4 +1018,5 @@ return [
     'source_type'               => 'نوع المصدر',
     'reference_number'          => 'رقم المرجع',
     'date'                      => 'التاريخ',
+    'session_expired'           => 'انتهت جلستك. يرجى تسجيل الدخول مجدداً.',
 ];

@@ -1,4 +1,2 @@
 User-agent: *
 Disallow: /
-
-X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex
