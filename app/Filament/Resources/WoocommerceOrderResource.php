@@ -258,13 +258,13 @@ class WoocommerceOrderResource extends Resource
         }
 
         $parts = array_filter([
-            trim(($address['first_name'] ?? '') . ' ' . ($address['last_name'] ?? '')),
-            $address['company']   ?? '',
-            $address['address_1'] ?? '',
-            $address['address_2'] ?? '',
-            trim(($address['city'] ?? '') . ' ' . ($address['postcode'] ?? '')),
-            $address['state']   ?? '',
-            $address['country'] ?? '',
+            e(trim(($address['first_name'] ?? '') . ' ' . ($address['last_name'] ?? ''))),
+            e($address['company']   ?? ''),
+            e($address['address_1'] ?? ''),
+            e($address['address_2'] ?? ''),
+            e(trim(($address['city'] ?? '') . ' ' . ($address['postcode'] ?? ''))),
+            e($address['state']   ?? ''),
+            e($address['country'] ?? ''),
         ]);
 
         return implode('<br>', $parts) ?: '<span style="color:#9ca3af">—</span>';

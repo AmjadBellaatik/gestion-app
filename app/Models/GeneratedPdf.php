@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CompanyScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -24,6 +25,15 @@ class GeneratedPdf extends Model
         'generated_at' => 'datetime',
         'template_version' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new CompanyScope);
+
+        static::creating(function (GeneratedPdf $model) {
+            $model->company_id ??= session('company_id');
+        });
+    }
 
     public function company(): BelongsTo
     {

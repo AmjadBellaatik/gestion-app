@@ -153,7 +153,7 @@
 
         <div class="footer">
 
-            {!! $document->brand?->footer !!}
+            {!! \App\Helpers\HtmlSanitizer::clean($document->brand?->footer) !!}
 
         </div>
 

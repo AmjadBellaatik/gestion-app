@@ -112,26 +112,22 @@ class ReportService
 
     public static function profits(array $filters = [])
     {
+        // Transaction has CompanyScope but we also apply an explicit company_id filter
+        // from the validated request filters as defense-in-depth.
         $income = Transaction::query()
-
             ->where('direction', 'in')
-
+            ->when($filters['company_id'] ?? null, fn ($q, $c) => $q->where('company_id', $c))
             ->sum('amount');
 
         $expenses = Transaction::query()
-
             ->where('direction', 'out')
-
+            ->when($filters['company_id'] ?? null, fn ($q, $c) => $q->where('company_id', $c))
             ->sum('amount');
 
         return [
-
-            'income' => $income,
-
+            'income'   => $income,
             'expenses' => $expenses,
-
-            'profit' => $income - $expenses,
-
+            'profit'   => $income - $expenses,
         ];
     }
 

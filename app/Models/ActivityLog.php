@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CompanyScope;
 use Illuminate\Database\Eloquent\Model;
 
 class ActivityLog extends Model
@@ -34,12 +35,18 @@ class ActivityLog extends Model
     ];
 
     protected $casts = [
-
         'old_values' => 'array',
-
         'new_values' => 'array',
-
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new CompanyScope);
+
+        static::creating(function (ActivityLog $model) {
+            $model->company_id ??= session('company_id');
+        });
+    }
 
     public function user()
     {

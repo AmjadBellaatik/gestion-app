@@ -147,10 +147,14 @@ class Reseller extends Model
             ->where('status', 'paid')
             ->sum('amount');
 
+        // Use sum('total') — not count() — as the basis for debt calculation.
+        // Using count() caused current_debt = count - money_sum, always resolving to ~0.
+        $totalSaleAmount = $this->sales()->sum('total');
+
         $this->updateQuietly([
             'total_orders' => $totalOrders,
             'total_paid'   => $totalPaid,
-            'current_debt' => max(0, $totalOrders - $totalPaid),
+            'current_debt' => max(0, $totalSaleAmount - $totalPaid),
         ]);
     }
 }

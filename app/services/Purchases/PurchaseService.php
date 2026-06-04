@@ -38,8 +38,8 @@ class PurchaseService
                     'warehouse_id' =>
                         $purchase->warehouse_id,
 
-                    'type' =>
-                        'purchase',
+                    'type'          => 'entry',
+                    'movement_type' => 'purchase',
 
                     'quantity' =>
                         $item->quantity,

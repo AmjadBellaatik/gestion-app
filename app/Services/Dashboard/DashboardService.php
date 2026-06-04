@@ -91,9 +91,7 @@ class DashboardService
 
                 ->count(),
 
-            'reseller_credits' => Reseller::query()
-
-                ->sum('credit'),
+            'reseller_credits' => Reseller::query()->sum('credit_balance'),
 
             'monthly_sales' => Transaction::query()
 

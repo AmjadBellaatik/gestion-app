@@ -21,13 +21,30 @@ use Illuminate\Http\Response;
 
 class ReportPdfController extends Controller
 {
+    private const ALLOWED_TYPES = [
+        'sales', 'payments', 'clients', 'resellers', 'stock',
+        'motorcycles', 'repairs', 'warranties', 'activity',
+    ];
+
     public function generate(Request $request): Response
     {
         abort_unless(auth()->user()?->can('view_reports'), 403);
 
-        $type = $request->query('type', 'sales');
-        $from = Carbon::parse($request->query('from', now()->startOfMonth()))->startOfDay();
-        $to   = Carbon::parse($request->query('to',   now()->endOfMonth()))->endOfDay();
+        // Validate and whitelist all query parameters before use
+        $request->validate([
+            'type' => ['required', 'string', 'in:' . implode(',', self::ALLOWED_TYPES)],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to'   => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $type = $request->query('type');
+        $from = Carbon::createFromFormat('Y-m-d', $request->query('from', now()->startOfMonth()->toDateString()))->startOfDay();
+        $to   = Carbon::createFromFormat('Y-m-d', $request->query('to',   now()->endOfMonth()->toDateString()))->endOfDay();
+
+        // Ensure date range is logical
+        if ($from->greaterThan($to)) {
+            abort(422, 'The from date must be before the to date.');
+        }
 
         $periodLabel = $from->format('d M Y') . ' – ' . $to->format('d M Y');
         $company     = Company::find(session('company_id')) ?? Company::first();
@@ -42,7 +59,6 @@ class ReportPdfController extends Controller
             'repairs'     => $this->repairsData($from, $to),
             'warranties'  => $this->warrantiesData($from, $to),
             'activity'    => $this->activityData($from, $to),
-            default       => [],
         };
 
         $pdf = Pdf::loadView("reports.pdf.{$type}", array_merge($data, [
@@ -52,7 +68,9 @@ class ReportPdfController extends Controller
             'company'     => $company,
         ]))->setPaper('a4', 'portrait');
 
-        $filename = $type . '-report-' . $from->format('Y-m-d') . '-' . $to->format('Y-m-d') . '.pdf';
+        // Sanitize filename: only alphanumeric, dash, underscore, dot
+        $filename = preg_replace('/[^a-z0-9\-_.]/', '', $type)
+            . '-report-' . $from->format('Y-m-d') . '-' . $to->format('Y-m-d') . '.pdf';
 
         return response($pdf->output(), 200, [
             'Content-Type'        => 'application/pdf',
@@ -184,7 +202,11 @@ class ReportPdfController extends Controller
 
     private function activityData(Carbon $from, Carbon $to): array
     {
-        $activities      = ActivityLog::with('user')->whereBetween('created_at', [$from, $to])->latest()->limit(500)->get();
+        // ActivityLog has no CompanyScope — filter manually to prevent cross-tenant leakage.
+        $activities      = ActivityLog::with('user')
+            ->where('company_id', session('company_id'))
+            ->whereBetween('created_at', [$from, $to])
+            ->latest()->limit(500)->get();
         $logins          = LoginLog::whereBetween('created_at', [$from, $to])->latest()->limit(200)->get();
         $totalActivities = $activities->count();
         $uniqueUsers     = $activities->pluck('user_id')->unique()->filter()->count();

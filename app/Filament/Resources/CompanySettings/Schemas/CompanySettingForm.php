@@ -85,7 +85,7 @@ class CompanySettingForm
                                 'image/png',
                                 'image/jpeg',
                                 'image/webp',
-                                'image/svg+xml',
+                                // SVG removed: can contain embedded JavaScript (stored XSS)
                             ])
 
                             ->image()

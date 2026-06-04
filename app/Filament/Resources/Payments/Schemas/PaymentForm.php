@@ -267,6 +267,8 @@ class PaymentForm
                     Forms\Components\FileUpload::make('chequePayment.scan_path')
                         ->label(__('messages.scan'))
                         ->directory('cheques')
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                        ->maxSize(5120)
                         ->columnSpanFull(),
 
                 ])
@@ -305,6 +307,8 @@ class PaymentForm
                     Forms\Components\FileUpload::make('bankTransferPayment.confirmation_file')
                         ->label(__('messages.confirmation_file'))
                         ->directory('bank_transfers')
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                        ->maxSize(5120)
                         ->columnSpanFull(),
 
                 ])

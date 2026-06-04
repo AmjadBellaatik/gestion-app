@@ -17,6 +17,10 @@ class CompanyScope implements Scope
     ): void {
 
         if (!session()->has('company_id')) {
+            // Fail-closed: missing tenant context must never expose cross-tenant data.
+            // Queue jobs and internal services that need unrestricted access must call
+            // Model::withoutGlobalScopes() explicitly.
+            $builder->whereRaw('0 = 1');
             return;
         }
 

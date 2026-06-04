@@ -49,7 +49,7 @@ class RepairItem extends Model
             StockMovement::create([
                 'company_id'    => session('company_id'),
                 'product_id'    => $item->product_id,
-                'movement_type' => 'repair_usage',
+                'movement_type' => 'repair',
                 'type'          => 'exit',
                 'quantity'      => (float) $item->quantity,
                 'unit_cost'     => (float) $item->unit_price,

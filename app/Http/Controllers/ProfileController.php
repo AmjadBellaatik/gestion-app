@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 
 class ProfileController extends Controller
 {
@@ -41,9 +42,9 @@ class ProfileController extends Controller
 
             'language' => 'required|in:fr,en,ar',
 
-            'password' => 'nullable|min:6|confirmed',
+            'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
 
-            'profile_picture' => 'nullable|image',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
 
         ]);
 
@@ -141,7 +142,7 @@ class ProfileController extends Controller
 
             'notifications' => 'nullable|boolean',
 
-            'password' => 'nullable|min:6|confirmed',
+            'password' => ['nullable', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
 
         ]);
 

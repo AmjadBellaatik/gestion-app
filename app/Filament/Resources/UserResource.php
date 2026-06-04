@@ -187,7 +187,9 @@ class UserResource extends Resource
 
                             ->directory('profile_pictures')
 
-                            ->image(),
+                            ->image()
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->maxSize(2048),
 
                         Select::make('companies')
 

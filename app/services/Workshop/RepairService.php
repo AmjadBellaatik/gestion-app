@@ -36,39 +36,15 @@ class RepairService
             */
 
             StockMovement::create([
-
-                'company_id' =>
-
-                    $ticket->company_id,
-
-                'product_id' =>
-
-                    $item->product_id,
-
-                'type' => 'repair',
-
-                'quantity' =>
-
-                    $item->quantity,
-
-                'reference_type' =>
-
-                    RepairTicket::class,
-
-                'reference_id' =>
-
-                    $ticket->id,
-
-                'notes' =>
-
-                    'Repair Ticket: '
-
-                    . $ticket->ticket_number,
-
-                'created_by' =>
-
-                    auth()->id(),
-
+                'company_id'     => $ticket->company_id,
+                'product_id'     => $item->product_id,
+                'type'           => 'exit',
+                'movement_type'  => 'repair',
+                'quantity'       => $item->quantity,
+                'reference_type' => RepairTicket::class,
+                'reference_id'   => $ticket->id,
+                'notes'          => 'Repair Ticket: ' . $ticket->ticket_number,
+                'created_by'     => auth()?->id(),
             ]);
 
         }
@@ -141,31 +117,19 @@ class RepairService
         |--------------------------------------------------------------------------
         */
 
-        AccountingService::createTransaction([
-
-            'type' => 'repair',
-
-            'amount' =>
-
-                $ticket->total_cost,
-
-            'direction' => 'income',
-
-            'reference_type' =>
-
-                RepairTicket::class,
-
-            'reference_id' =>
-
-                $ticket->id,
-
-            'description' =>
-
-                'Repair Ticket '
-
-                . $ticket->ticket_number,
-
-        ]);
+        try {
+            AccountingService::createEntry([
+                'company_id'  => $ticket->company_id,
+                'reference'   => $ticket->ticket_number,
+                'description' => 'Repair Ticket ' . $ticket->ticket_number,
+                'lines'       => [
+                    ['account_code' => '531100', 'debit' => (float) $ticket->total_cost, 'credit' => 0],
+                    ['account_code' => '706100', 'debit' => 0, 'credit' => (float) $ticket->total_cost],
+                ],
+            ]);
+        } catch (\Throwable) {
+            // Accounting failures must never block repair completion.
+        }
 
         /*
         |--------------------------------------------------------------------------

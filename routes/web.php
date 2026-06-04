@@ -22,7 +22,6 @@ use App\Http\Controllers\CompanySwitchController;
 use App\Http\Controllers\DocumentPdfController;
 use App\Http\Controllers\DocumentVerificationController;
 
-use App\Services\Documents\PdfService;
 use App\Services\Documents\DocumentPlaceholderService;
 
 use App\Services\Amounts\AmountInWordsService;
@@ -45,7 +44,7 @@ Route::get('/', function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get(
+Route::middleware('throttle:30,1')->get(
 
     '/verify/document/{uuid}',
 
@@ -85,7 +84,9 @@ Route::middleware([
 
     'auth',
 
-    'permission:manage_sales'
+    'permission:manage_sales',
+
+    'throttle:60,1',
 
 ])->group(function () {
 
@@ -109,7 +110,9 @@ Route::middleware([
 
     'auth',
 
-    'permission:manage_users'
+    'permission:manage_users',
+
+    'throttle:60,1',
 
 ])->group(function () {
 
@@ -133,7 +136,9 @@ Route::middleware([
 
     'auth',
 
-    'permission:manage_settings'
+    'permission:manage_settings',
+
+    'throttle:60,1',
 
 ])->group(function () {
 
@@ -157,7 +162,9 @@ Route::middleware([
 
     'auth',
 
-    'permission:view_reports'
+    'permission:view_reports',
+
+    'throttle:30,1',
 
 ])->group(function () {
 
@@ -183,7 +190,9 @@ Route::middleware([
 
     'auth',
 
-    'permission:manage_repairs'
+    'permission:manage_repairs',
+
+    'throttle:60,1',
 
 ])->group(function () {
 
@@ -228,6 +237,8 @@ Route::middleware([
 Route::middleware([
 
     'auth',
+
+    'throttle:120,1',
 
 ])->group(function () {
 
@@ -356,7 +367,7 @@ Route::middleware([
 |--------------------------------------------------------------------------
 */
 
-Route::get('/language/{locale}', function ($locale) {
+Route::middleware('throttle:10,1')->get('/language/{locale}', function ($locale) {
 
     if (! in_array($locale, [
 

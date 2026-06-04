@@ -13,18 +13,17 @@ class FundForm
     {
         return $schema
             ->components([
-                TextInput::make('company_id')
-                    ->required()
-                    ->numeric(),
                 TextInput::make('name')
                     ->required(),
                 TextInput::make('type')
                     ->required()
                     ->default('cash'),
                 TextInput::make('balance')
-                    ->required()
                     ->numeric()
-                    ->default(0.0),
+                    ->default(0.0)
+                    ->readOnly()
+                    ->dehydrated(false)
+                    ->helperText(__('messages.balance_auto_calculated')),
                 Toggle::make('is_active')
                     ->required(),
                 Textarea::make('notes')

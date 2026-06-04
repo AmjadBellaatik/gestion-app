@@ -2,89 +2,72 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-
 use App\Models\Setting;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class SettingController extends Controller
 {
     public function index()
     {
         $settings = Setting::query()
-
             ->orderBy('group')
-
             ->get()
-
             ->groupBy('group');
 
-        return view(
-
-            'settings.index',
-
-            compact('settings')
-
-        );
+        return view('settings.index', compact('settings'));
     }
 
-    public function create(): \Illuminate\Http\RedirectResponse
+    public function create(): RedirectResponse
     {
         return redirect()->route('settings.index');
     }
 
-    public function store(): \Illuminate\Http\RedirectResponse
+    public function store(): RedirectResponse
     {
         return redirect()->route('settings.index');
     }
 
-    public function show(string $setting): \Illuminate\Http\RedirectResponse
+    public function show(string $setting): RedirectResponse
     {
         return redirect()->route('settings.index');
     }
 
-    public function edit(string $setting): \Illuminate\Http\RedirectResponse
+    public function edit(string $setting): RedirectResponse
     {
         return redirect()->route('settings.index');
     }
 
-    public function destroy(string $setting): \Illuminate\Http\RedirectResponse
+    public function destroy(string $setting): RedirectResponse
     {
         return redirect()->route('settings.index');
     }
 
-    public function update(
-        Request $request
-    )
+    public function update(Request $request): RedirectResponse
     {
-        $settings =
-            $request->input(
-                'settings',
-                []
-            );
+        $validated = $request->validate([
+            'settings'   => ['required', 'array'],
+            'settings.*' => ['nullable', 'string', 'max:5000'],
+        ]);
 
-        foreach (
+        $incoming = $validated['settings'] ?? [];
 
-            $settings as $id => $value
+        // Fetch only IDs that genuinely belong to the current company
+        // (CompanyScope is applied automatically by the model)
+        $allowedIds = Setting::pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
 
-        ) {
+        foreach ($incoming as $rawId => $value) {
+            if (! in_array((string) $rawId, $allowedIds, true)) {
+                continue; // silently ignore IDs not owned by this company
+            }
 
             Setting::query()
-
-                ->where('id', $id)
-
-                ->update([
-
-                    'value' => $value,
-
-                ]);
+                ->where('id', (int) $rawId)
+                ->update(['value' => $value !== null ? strip_tags((string) $value) : null]);
         }
 
-        return back()->with(
-
-            'success',
-
-            'Settings updated successfully'
-
-        );
+        return back()->with('success', 'Settings updated successfully');
     }
 }

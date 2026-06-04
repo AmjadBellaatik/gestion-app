@@ -23,20 +23,25 @@ class WoocommerceWebhookController extends Controller
         // ── 1. Signature verification ──────────────────────────────────────────
         $secret = config('services.woocommerce.webhook_secret');
 
-        if ($secret) {
-            $signature = $request->header('X-WC-Webhook-Signature');
+        // Secret is mandatory — a missing WC_WEBHOOK_SECRET is a misconfiguration,
+        // not a valid "testing" state in any environment that receives live webhooks.
+        if (! $secret) {
+            Log::error('WooCommerce webhook: WC_WEBHOOK_SECRET is not configured');
+            return response('Service Unavailable', 503);
+        }
 
-            if (! $signature) {
-                Log::warning('WooCommerce webhook: missing signature header');
-                return response('Unauthorized', 401);
-            }
+        $signature = $request->header('X-WC-Webhook-Signature');
 
-            $computed = base64_encode(hash_hmac('sha256', $request->getContent(), $secret, true));
+        if (! $signature) {
+            Log::warning('WooCommerce webhook: missing signature header');
+            return response('Unauthorized', 401);
+        }
 
-            if (! hash_equals($computed, $signature)) {
-                Log::warning('WooCommerce webhook: signature mismatch');
-                return response('Forbidden', 403);
-            }
+        $computed = base64_encode(hash_hmac('sha256', $request->getContent(), $secret, true));
+
+        if (! hash_equals($computed, $signature)) {
+            Log::warning('WooCommerce webhook: signature mismatch');
+            return response('Forbidden', 403);
         }
 
         // ── 2. Parse payload ───────────────────────────────────────────────────

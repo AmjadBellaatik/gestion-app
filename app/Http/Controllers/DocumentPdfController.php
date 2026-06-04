@@ -13,6 +13,8 @@ class DocumentPdfController extends Controller
 {
     public function preview(Document $document): Response
     {
+        abort_unless(auth()->user()?->can('manage_documents'), 403);
+
         if (
             $document->documentType?->code === DocumentType::CONFORMITY
             || in_array($document->documentType?->code, [DocumentType::INVOICE, DocumentType::QUOTATION], true)
@@ -31,6 +33,8 @@ class DocumentPdfController extends Controller
 
     public function download(Document $document): \Symfony\Component\HttpFoundation\StreamedResponse
     {
+        abort_unless(auth()->user()?->can('manage_documents'), 403);
+
         if (
             $document->documentType?->code === DocumentType::CONFORMITY
             || in_array($document->documentType?->code, [DocumentType::INVOICE, DocumentType::QUOTATION], true)
@@ -46,6 +50,8 @@ class DocumentPdfController extends Controller
 
     public function regenerate(Document $document): RedirectResponse
     {
+        abort_unless(auth()->user()?->can('manage_documents'), 403);
+
         app(DocumentService::class)->storePdf($document);
 
         return back()->with('status', __('messages.pdf_regenerated'));
@@ -53,11 +59,15 @@ class DocumentPdfController extends Controller
 
     public function email(Document $document): RedirectResponse
     {
+        abort_unless(auth()->user()?->can('manage_documents'), 403);
+
         return back()->with('status', __('messages.email_sending_not_configured'));
     }
 
     public function destroy(Document $document): RedirectResponse
     {
+        abort_unless(auth()->user()?->can('manage_documents'), 403);
+
         $document->delete();
 
         return redirect('/admin/documents')->with('status', __('messages.document_deleted'));

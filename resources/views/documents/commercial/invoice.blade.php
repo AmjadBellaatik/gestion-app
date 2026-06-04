@@ -176,7 +176,7 @@
 
     <div style="margin-top:30px;">
 
-        {!! $document->brand->invoice_terms !!}
+        {!! \App\Helpers\HtmlSanitizer::clean($document->brand->invoice_terms) !!}
 
     </div>
 

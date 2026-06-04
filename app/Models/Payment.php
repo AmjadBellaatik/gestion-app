@@ -86,6 +86,11 @@ class Payment extends Model
                 $service->applyPayment($model);
             }
 
+            // Bank transfer confirmed by bank — treat as paid.
+            if ($model->payment_method === 'bank_transfer' && $model->status === 'received') {
+                $service->applyPayment($model);
+            }
+
             if (\in_array($model->status, ['rejected', 'cancelled', 'canceled'], true)) {
                 // Payment was cancelled — release holds and reverse if needed.
                 $service->reversePayment($model);
@@ -94,6 +99,13 @@ class Payment extends Model
             // Cheque bounced — block client / reseller.
             if ($model->payment_method === 'cheque' && $model->status === 'bounced') {
                 $service->handleBouncedCheque($model);
+            }
+        });
+
+        // Reverse balance BEFORE the soft-delete so the authoritative SUM is still correct.
+        static::deleting(function (Payment $model) {
+            if ($model->status === 'paid' || ($model->payment_method === 'bank_transfer' && $model->status === 'received')) {
+                app(PaymentService::class)->reversePayment($model);
             }
         });
 

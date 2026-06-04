@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 use App\Models\User;
 use App\Models\Company;
@@ -69,23 +71,30 @@ class DatabaseSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
+        // Use ADMIN_EMAIL / ADMIN_PASSWORD env vars if set; otherwise generate
+        // a cryptographically random password and print it once to the console.
+        // Never ships with a hardcoded default password.
+        $adminEmail    = env('ADMIN_EMAIL', 'admin@example.com');
+        $adminPassword = env('ADMIN_PASSWORD') ?: Str::password(20);
+        $isNew         = ! User::where('email', $adminEmail)->exists();
+
         $user = User::firstOrCreate(
-
+            ['email' => $adminEmail],
             [
-                'email' => 'admin@test.com',
-            ],
-
-            [
-
-                'name' => 'Admin',
-
-                'password' => bcrypt('password'),
-
+                'name'     => 'Admin',
+                'password' => Hash::make($adminPassword),
                 'language' => 'fr',
-
             ]
-
         );
+
+        if ($isNew) {
+            $this->command->info("─────────────────────────────────────────");
+            $this->command->info(" Admin account created");
+            $this->command->info(" Email   : {$adminEmail}");
+            $this->command->info(" Password: {$adminPassword}");
+            $this->command->info(" Save this password — it will not be shown again.");
+            $this->command->info("─────────────────────────────────────────");
+        }
 
         /*
         |--------------------------------------------------------------------------

@@ -886,24 +886,32 @@ class SaleService
             return;
         }
 
+        $dbName = DB::getDatabaseName();
+
         $col = DB::selectOne("
             SELECT IS_NULLABLE
             FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE()
+            WHERE TABLE_SCHEMA = ?
               AND TABLE_NAME   = 'stock_movements'
               AND COLUMN_NAME  = 'product_id'
-        ");
+        ", [$dbName]);
 
         if ($col && $col->IS_NULLABLE !== 'YES') {
             $fk = DB::selectOne("
                 SELECT CONSTRAINT_NAME
                 FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                WHERE TABLE_SCHEMA = DATABASE()
+                WHERE TABLE_SCHEMA = ?
                   AND TABLE_NAME   = 'stock_movements'
                   AND COLUMN_NAME  = 'product_id'
                   AND REFERENCED_TABLE_NAME IS NOT NULL
-            ");
+            ", [$dbName]);
             if ($fk) {
+                // Validate the constraint name contains only safe identifier characters
+                // before interpolating it into DDL (value is from INFORMATION_SCHEMA,
+                // not user input, but defensive validation prevents unexpected chars).
+                if (! preg_match('/^[A-Za-z0-9_]+$/', $fk->CONSTRAINT_NAME)) {
+                    throw new \RuntimeException('Unexpected CONSTRAINT_NAME value: ' . $fk->CONSTRAINT_NAME);
+                }
                 DB::statement("ALTER TABLE `stock_movements` DROP FOREIGN KEY `{$fk->CONSTRAINT_NAME}`");
             }
             DB::statement('ALTER TABLE `stock_movements` MODIFY `product_id` BIGINT UNSIGNED NULL');

@@ -230,7 +230,7 @@
 
         @if($company->footer)
 
-            {!! $company->footer !!}
+            {!! \App\Helpers\HtmlSanitizer::clean($company->footer) !!}
 
         @endif
 

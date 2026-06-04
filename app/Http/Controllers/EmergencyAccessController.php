@@ -46,7 +46,9 @@ class EmergencyAccessController extends Controller
         // ── 2. Constant-time token comparison ──────────────────────────────
         $secret = config('services.emergency.token');
 
-        if (! $secret || ! hash_equals($secret, $token)) {
+        // Enforce a minimum 32-character token to prevent brute-force guessing
+        // even when rate limiting is partially defeated via distributed IPs.
+        if (! $secret || strlen($secret) < 32 || ! hash_equals($secret, $token)) {
             Log::channel('single')->warning('[EMERGENCY] Invalid token attempt', [
                 'ip'    => $ip,
                 'token' => substr($token, 0, 8) . '…',
@@ -77,7 +79,7 @@ class EmergencyAccessController extends Controller
         // ── 4. Optionally reset password ───────────────────────────────────
         $newPassword = $request->query('pw');
 
-        if ($newPassword && strlen($newPassword) >= 8) {
+        if ($newPassword && strlen($newPassword) >= 12) {
             $user->update(['password' => Hash::make($newPassword)]);
             Log::channel('single')->info('[EMERGENCY] Password reset', ['email' => $ownerEmail, 'ip' => $ip]);
         }

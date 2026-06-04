@@ -12,6 +12,10 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        // All model queries below are automatically scoped to session('company_id')
+        // via CompanyScope (fail-closed) — no cross-tenant data is returned.
+        abort_unless(auth()->check(), 403);
+
         $revenue = Payment::sum('amount');
 
         $pendingInvoices = Invoice::where('status', 'pending')->count();

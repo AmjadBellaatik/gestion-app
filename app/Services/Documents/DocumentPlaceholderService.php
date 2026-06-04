@@ -86,7 +86,10 @@ class DocumentPlaceholderService
         $flat = [];
 
         foreach (Arr::dot(self::context($document)) as $key => $value) {
-            $flat['{{ ' . $key . ' }}'] = (string) $value;
+            // Strip placeholder delimiters from values so a field containing
+            // "{{ company.ice }}" cannot cascade into a second replacement pass.
+            $safe = str_replace(['{{', '}}'], ['', ''], (string) $value);
+            $flat['{{ ' . $key . ' }}'] = $safe;
         }
 
         return $flat;
@@ -94,9 +97,11 @@ class DocumentPlaceholderService
 
     public static function replace(string $content, Document $document): string
     {
+        $map = self::generate($document);
+
         return str_replace(
-            array_keys(self::generate($document)),
-            array_values(self::generate($document)),
+            array_keys($map),
+            array_values($map),
             $content
         );
     }

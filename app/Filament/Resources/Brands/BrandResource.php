@@ -54,7 +54,9 @@ class BrandResource extends Resource
                         ->required(),
                     TextInput::make('name')->label(__('messages.name'))->required()->maxLength(255),
                     TextInput::make('accreditation_reference')->label(__('messages.accreditation_reference'))->maxLength(255),
-                    FileUpload::make('logo')->label(__('messages.logo'))->image()->directory('brands/logos'),
+                    FileUpload::make('logo')->label(__('messages.logo'))->image()->directory('brands/logos')
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                        ->maxSize(2048),
                 ])
                 ->columns(2),
         ]);

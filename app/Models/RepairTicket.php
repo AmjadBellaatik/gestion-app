@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Scopes\CompanyScope;
 use App\Notifications\RepairStatusNotification;
 use App\Services\Payments\PaymentService;
+use Illuminate\Support\Facades\DB;
 
 class RepairTicket extends Model
 {
@@ -199,13 +200,29 @@ class RepairTicket extends Model
 
     public static function generateTicketNumber(): string
     {
-        $prefix = 'REP';
-        $year = now()->format('Y');
-        $count = self::withoutGlobalScopes()
-            ->whereYear('created_at', $year)
-            ->count() + 1;
+        $year      = now()->format('Y');
+        $companyId = (int) (session('company_id') ?? 0);
 
-        return $prefix . '-' . $year . '-' . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
+        // Advisory lock serializes concurrent ticket creation within the same company+year
+        // so two requests never read the same "last number" and generate a collision.
+        DB::select('SELECT GET_LOCK(?, 10) AS locked', ["rep_seq_{$companyId}_{$year}"]);
+
+        try {
+            $last = self::withoutGlobalScopes()
+                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->whereYear('created_at', $year)
+                ->orderByDesc('id')
+                ->value('ticket_number');
+
+            $next = 1;
+            if ($last && preg_match('/\-(\d+)$/', $last, $m)) {
+                $next = (int) $m[1] + 1;
+            }
+
+            return 'REP-' . $year . '-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+        } finally {
+            DB::select('SELECT RELEASE_LOCK(?)', ["rep_seq_{$companyId}_{$year}"]);
+        }
     }
 
     /*

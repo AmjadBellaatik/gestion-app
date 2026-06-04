@@ -51,7 +51,7 @@ class DocumentService
                 'status' => $data['status'] ?? 'generated',
                 'discount_amount' => $data['discount_amount'] ?? 0,
                 'notes' => $data['notes'] ?? null,
-                'generated_by' => auth()->id(),
+                'generated_by' => auth()?->id(),
                 'metadata' => $data['metadata'] ?? null,
             ]);
 

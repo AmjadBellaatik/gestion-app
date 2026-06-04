@@ -150,19 +150,18 @@ class PaymentService
                 ->find($payment->sale_id);
 
             if ($sale) {
-                $sale->update([
-                    'payment_status'   => 'unpaid',
-                    'paid_amount'      => max(0, (float) $sale->paid_amount - (float) $payment->amount),
-                    'remaining_amount' => min((float) $sale->total, (float) $sale->remaining_amount + (float) $payment->amount),
-                ]);
+                // Use the authoritative SUM-based reversal rather than stale-read arithmetic.
+                $this->reverseSaleBalance($sale, (float) $payment->amount);
 
                 if ($sale->reseller_id && $sale->reseller) {
+                    // Atomic increment/decrement avoids stale-read race when two cheques
+                    // for the same reseller bounce concurrently.
                     $sale->reseller->update([
                         'is_blocked'     => true,
                         'blocked_reason' => $blockedReason,
-                        'credit_balance' => (float) $sale->reseller->credit_balance - (float) $payment->amount,
-                        'current_debt'   => (float) $sale->reseller->current_debt   + (float) $payment->amount,
                     ]);
+                    $sale->reseller->decrement('credit_balance', (float) $payment->amount);
+                    $sale->reseller->increment('current_debt',   (float) $payment->amount);
                     if ($sale->reseller->email) {
                         $notifyUsers[] = $sale->reseller;
                     }
@@ -299,29 +298,42 @@ class PaymentService
 
     private function updateSaleBalance(Sale $sale, float $amount): void
     {
-        // Recompute from DB to avoid race-condition stale reads
-        $totalPaid    = (float) $sale->payments()
-            ->where('status', self::STATUS_PAID)
-            ->sum('amount');
-        $newRemaining = max(0, (float) $sale->total - $totalPaid);
+        // Pessimistic lock prevents two concurrent payment approvals from reading
+        // the same SUM and writing conflicting balances to the same sale row.
+        DB::transaction(function () use ($sale) {
+            $locked = Sale::withoutGlobalScopes()->lockForUpdate()->findOrFail($sale->id);
 
-        $sale->update([
-            'paid_amount'      => $totalPaid,
-            'remaining_amount' => $newRemaining,
-            'payment_status'   => $newRemaining <= 0 ? 'paid' : 'partial',
-        ]);
+            $totalPaid    = (float) $locked->payments()
+                ->where('status', self::STATUS_PAID)
+                ->sum('amount');
+            $newRemaining = max(0, (float) $locked->total - $totalPaid);
+
+            $locked->update([
+                'paid_amount'      => $totalPaid,
+                'remaining_amount' => $newRemaining,
+                'payment_status'   => $newRemaining <= 0 ? 'paid' : 'partial',
+            ]);
+        });
     }
 
     private function reverseSaleBalance(Sale $sale, float $amount): void
     {
-        $newPaid      = max(0, (float) $sale->paid_amount - $amount);
-        $newRemaining = max(0, (float) $sale->total - $newPaid);
+        // Pessimistic lock mirrors updateSaleBalance — recomputes from the authoritative
+        // SUM of paid payments rather than decrementing a potentially-stale snapshot.
+        DB::transaction(function () use ($sale) {
+            $locked = Sale::withoutGlobalScopes()->lockForUpdate()->findOrFail($sale->id);
 
-        $sale->update([
-            'paid_amount'      => $newPaid,
-            'remaining_amount' => $newRemaining,
-            'payment_status'   => $newPaid <= 0 ? 'unpaid' : 'partial',
-        ]);
+            $totalPaid    = (float) $locked->payments()
+                ->where('status', self::STATUS_PAID)
+                ->sum('amount');
+            $newRemaining = max(0, (float) $locked->total - $totalPaid);
+
+            $locked->update([
+                'paid_amount'      => $totalPaid,
+                'remaining_amount' => $newRemaining,
+                'payment_status'   => $totalPaid <= 0 ? 'unpaid' : ($newRemaining <= 0 ? 'paid' : 'partial'),
+            ]);
+        });
     }
 
     /*
@@ -332,18 +344,24 @@ class PaymentService
 
     private function updateRepairBalance(RepairTicket $ticket, float $amount): void
     {
-        $total        = (float) ($ticket->total_cost ?? 0);
-        $alreadyPaid  = (float) ($ticket->getAttribute('paid_amount') ?? 0);
-        $newPaid      = $alreadyPaid + $amount;
-        $newRemaining = max(0, $total - $newPaid);
+        // Pessimistic lock prevents stale-read race: recompute from authoritative SUM.
+        DB::transaction(function () use ($ticket) {
+            $locked = RepairTicket::withoutGlobalScopes()->lockForUpdate()->findOrFail($ticket->id);
 
-        $data = ['payment_status' => $newRemaining <= 0 ? 'paid' : 'partial'];
+            $total        = (float) ($locked->total_cost ?? 0);
+            $totalPaid    = (float) $locked->payments()
+                ->where('status', self::STATUS_PAID)
+                ->sum('amount');
+            $newRemaining = max(0, $total - $totalPaid);
 
-        if ($newRemaining <= 0) {
-            $data['paid_at'] = now();
-        }
+            $data = ['payment_status' => $newRemaining <= 0 ? 'paid' : 'partial'];
 
-        $ticket->update($data);
+            if ($newRemaining <= 0 && ! $locked->paid_at) {
+                $data['paid_at'] = now();
+            }
+
+            $locked->update($data);
+        });
     }
 
     /*
@@ -385,35 +403,40 @@ class PaymentService
 
     private function createTransaction(Payment $payment): void
     {
-        Transaction::create([
-            'company_id'      => $payment->company_id,
-            'type'            => $this->typeFor($payment),
-            'category'        => $this->categoryFor($payment),
-            'amount'          => $payment->amount,
-            'direction'       => $this->directionFor($payment),
-            'reference_type'  => Payment::class,
-            'reference_id'    => $payment->id,
-            'payment_method'  => $payment->payment_method,
-            'status'          => $this->transactionStatusFor($payment),
-            'description'     => $this->descriptionFor($payment),
-            'transaction_date' => now(),
-            'created_by'      => auth()->id(),
-        ]);
+        // firstOrCreate on reference_type+reference_id is idempotent against
+        // the TOCTOU race that the outer exists() check cannot prevent on its own.
+        Transaction::firstOrCreate(
+            [
+                'reference_type' => Payment::class,
+                'reference_id'   => $payment->id,
+            ],
+            [
+                'company_id'       => $payment->company_id,
+                'type'             => $this->typeFor($payment),
+                'category'         => $this->categoryFor($payment),
+                'amount'           => $payment->amount,
+                'direction'        => $this->directionFor($payment),
+                'payment_method'   => $payment->payment_method,
+                'status'           => $this->transactionStatusFor($payment),
+                'description'      => $this->descriptionFor($payment),
+                'transaction_date' => now(),
+                'created_by'       => auth()->id(),
+            ]
+        );
     }
 
     private function createTreasuryTransaction(Payment $payment): void
     {
-        if (TreasuryTransaction::where('payment_id', $payment->id)->exists()) {
-            return;
-        }
-
-        TreasuryTransaction::create([
-            'company_id'  => $payment->company_id,
-            'payment_id'  => $payment->id,
-            'type'        => 'entry',
-            'amount'      => $payment->amount,
-            'description' => $this->descriptionFor($payment),
-        ]);
+        // firstOrCreate replaces the exists()+create() TOCTOU race condition.
+        TreasuryTransaction::firstOrCreate(
+            ['payment_id' => $payment->id],
+            [
+                'company_id'  => $payment->company_id,
+                'type'        => 'entry',
+                'amount'      => $payment->amount,
+                'description' => $this->descriptionFor($payment),
+            ]
+        );
     }
 
     private function createAccountingEntry(Payment $payment): void

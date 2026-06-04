@@ -63,7 +63,7 @@
 
         <div class="footer">
 
-            {!! $document->company?->invoice_footer !!}
+            {!! \App\Helpers\HtmlSanitizer::clean($document->company?->invoice_footer) !!}
 
         </div>
 

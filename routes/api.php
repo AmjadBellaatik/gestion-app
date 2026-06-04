@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::post(
+Route::middleware('throttle:30,1')->post(
     '/webhooks/woocommerce/orders',
     [WoocommerceWebhookController::class, 'handle']
 )->name('webhooks.woocommerce.orders');
