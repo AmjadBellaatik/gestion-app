@@ -127,9 +127,10 @@
                             default => trim(data_get($document->metadata, 'manual_client_first_name') . ' ' . data_get($document->metadata, 'manual_client_last_name')),
                         } ?: data_get($document->metadata, 'manual_client_name');
                         $displayClientName = $isQuote ? $manualClientName : $clientName;
+                        $displayClientType = $isQuote ? $manualClientType : ($client?->client_type ?? 'person');
                         $displayClientPhone = $isQuote ? data_get($document->metadata, 'manual_client_phone') : $client?->phone;
-                        $displayClientEmail = $isQuote ? data_get($document->metadata, 'manual_client_email') : $client?->email;
-                        $displayClientAddress = $isQuote ? data_get($document->metadata, 'manual_client_address') : $client?->address;
+                        $displayClientIce   = $isQuote ? data_get($document->metadata, 'manual_client_ice')   : $client?->ice;
+                        $displayClientCin   = $isQuote ? data_get($document->metadata, 'manual_client_cin')   : $client?->cin;
                     @endphp
 
                     <div class="mt-8 rounded-lg border border-slate-200 p-6">
@@ -145,9 +146,12 @@
                             <div>
                                 <div class="text-sm font-semibold text-slate-500">{{ __('messages.client') }}</div>
                                 <div class="font-bold">{{ $displayClientName }}</div>
-                                <div>{{ $displayClientAddress }}</div>
-                                <div>{{ $displayClientPhone }}</div>
-                                <div>{{ $displayClientEmail }}</div>
+                                @if(in_array($displayClientType, ['company', 'administration']))
+                                    @if($displayClientIce)<div class="text-sm">ICE: {{ $displayClientIce }}</div>@endif
+                                    @if($displayClientPhone)<div class="text-sm">Tél: {{ $displayClientPhone }}</div>@endif
+                                @else
+                                    @if($displayClientCin)<div class="text-sm">CIN: {{ $displayClientCin }}</div>@endif
+                                @endif
                             </div>
                             <div>
                                 <div class="text-sm font-semibold text-slate-500">{{ __('messages.document_date') }}</div>
@@ -354,7 +358,12 @@
                             <div>
                                 <div class="text-sm font-semibold text-slate-500">{{ __('messages.client') }}</div>
                                 <div class="font-bold">{{ $dlClientName }}</div>
-                                @if($client?->address)<div class="text-sm">{{ $client->address }}</div>@endif
+                                @if(in_array($clientType, ['company', 'administration']))
+                                    @if($client?->ice)<div class="text-sm">ICE: {{ $client->ice }}</div>@endif
+                                    @if($client?->phone)<div class="text-sm">Tél: {{ $client->phone }}</div>@endif
+                                @else
+                                    @if($client?->cin)<div class="text-sm">CIN: {{ $client->cin }}</div>@endif
+                                @endif
                             </div>
                             <div>
                                 <div class="text-sm font-semibold text-slate-500">{{ __('messages.document_date') }}</div>
@@ -442,8 +451,12 @@
                             <div>
                                 <div class="text-sm font-semibold text-slate-500">{{ __('messages.client') }}</div>
                                 <div class="font-bold">{{ $retClientName }}</div>
-                                @if($client?->address)<div class="text-sm">{{ $client->address }}</div>@endif
-                                @if($client?->phone)<div class="text-sm">{{ $client->phone }}</div>@endif
+                                @if(in_array($retClientType, ['company', 'administration']))
+                                    @if($client?->ice)<div class="text-sm">ICE: {{ $client->ice }}</div>@endif
+                                    @if($client?->phone)<div class="text-sm">Tél: {{ $client->phone }}</div>@endif
+                                @else
+                                    @if($client?->cin)<div class="text-sm">CIN: {{ $client->cin }}</div>@endif
+                                @endif
                             </div>
                             <div>
                                 <div class="text-sm font-semibold text-slate-500">{{ __('messages.document_number') }}</div>
@@ -514,23 +527,84 @@
                         @endif
                     </div>
                 @else
-                    <div class="mt-8 grid gap-4 md:grid-cols-2">
-                        <div class="rounded-lg border border-slate-200 p-4">
-                            <div class="text-sm font-semibold text-slate-500">{{ __('messages.company') }}</div>
-                            <div class="font-bold">{{ $document->company?->name }}</div>
+                    <div class="mt-8 rounded-lg border border-slate-200 p-6">
+                        <h2 class="text-center text-2xl font-bold underline">
+                            {{ $document->documentType?->name ?? __('messages.document') }}
+                        </h2>
+
+                        <div class="mt-8 grid gap-4 md:grid-cols-2">
+                            <div>
+                                <div class="text-sm font-semibold text-slate-500">{{ __('messages.company') }}</div>
+                                <div class="font-bold">{{ $companyName }}</div>
+                            </div>
+                            @if($client)
+                            <div>
+                                <div class="text-sm font-semibold text-slate-500">{{ __('messages.client') }}</div>
+                                <div class="font-bold">{{ $clientName }}</div>
+                                @if(in_array($clientType, ['company', 'administration']))
+                                    @if($client?->ice)<div class="text-sm">ICE: {{ $client->ice }}</div>@endif
+                                    @if($client?->phone)<div class="text-sm">Tél: {{ $client->phone }}</div>@endif
+                                @else
+                                    @if($client?->cin)<div class="text-sm">CIN: {{ $client->cin }}</div>@endif
+                                @endif
+                            </div>
+                            @endif
+                            <div>
+                                <div class="text-sm font-semibold text-slate-500">{{ __('messages.document_number') }}</div>
+                                <div class="font-bold">{{ $document->document_number }}</div>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-slate-500">{{ __('messages.document_date') }}</div>
+                                <div class="font-bold">{{ $document->document_date?->format('d/m/Y') }}</div>
+                            </div>
                         </div>
-                        <div class="rounded-lg border border-slate-200 p-4">
-                            <div class="text-sm font-semibold text-slate-500">{{ __('messages.document_number') }}</div>
-                            <div class="font-bold">{{ $document->document_number }}</div>
+
+                        @if($document->items->isNotEmpty())
+                        <div class="mt-8 overflow-hidden rounded-lg border border-slate-200">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-900 text-white">
+                                    <tr>
+                                        <th class="p-3 text-left">{{ __('messages.description') }}</th>
+                                        <th class="p-3 text-right">{{ __('messages.quantity') }}</th>
+                                        <th class="p-3 text-right">{{ __('messages.unit_price_ttc') }}</th>
+                                        <th class="p-3 text-right">{{ __('messages.total_amount') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    @foreach($document->items as $item)
+                                    <tr>
+                                        <td class="p-3 font-semibold">{{ $item->description }}</td>
+                                        <td class="p-3 text-right">{{ number_format((float) $item->quantity, 2, ',', ' ') }}</td>
+                                        <td class="p-3 text-right">{{ number_format((float) $item->unit_price, 2, ',', ' ') }} MAD</td>
+                                        <td class="p-3 text-right font-bold">{{ number_format((float) $item->total, 2, ',', ' ') }} MAD</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
-                        <div class="rounded-lg border border-slate-200 p-4">
-                            <div class="text-sm font-semibold text-slate-500">{{ __('messages.date') }}</div>
-                            <div class="font-bold">{{ $document->document_date?->format('d/m/Y') }}</div>
+                        @php
+                            $fallTotalTtc = (float) $document->total_amount;
+                            if ($fallTotalTtc <= 0 && $document->items->isNotEmpty()) {
+                                $fallTotalTtc = (float) $document->items->sum(fn ($i) => (float) $i->total);
+                            }
+                            $fallTaxAmount = $fallTotalTtc > 0 ? round($fallTotalTtc * (20 / 120), 2) : (float) $document->tax_amount;
+                            $fallSubtotal  = $fallTotalTtc > 0 ? round($fallTotalTtc - $fallTaxAmount, 2) : (float) $document->subtotal;
+                        @endphp
+                        <div class="mt-6 grid gap-3 md:grid-cols-3">
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <div class="text-sm font-semibold text-slate-500">{{ __('messages.subtotal_ht') }}</div>
+                                <div class="font-bold">{{ number_format($fallSubtotal, 2, ',', ' ') }} MAD</div>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <div class="text-sm font-semibold text-slate-500">{{ __('messages.tva_20') }}</div>
+                                <div class="font-bold">{{ number_format($fallTaxAmount, 2, ',', ' ') }} MAD</div>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <div class="text-sm font-semibold text-slate-500">{{ __('messages.total_ttc') }}</div>
+                                <div class="font-bold">{{ number_format($fallTotalTtc, 2, ',', ' ') }} MAD</div>
+                            </div>
                         </div>
-                        <div class="rounded-lg border border-slate-200 p-4">
-                            <div class="text-sm font-semibold text-slate-500">{{ __('messages.uuid') }}</div>
-                            <div class="font-bold">{{ $document->uuid }}</div>
-                        </div>
+                        @endif
                     </div>
                 @endif
             @else

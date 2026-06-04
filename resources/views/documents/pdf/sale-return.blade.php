@@ -221,9 +221,12 @@
                 <div class="client-box">
                     <div class="box-title">{{ __('messages.client') }}</div>
                     <div><strong>{{ $clientName }}</strong></div>
-                    @if($client?->address)<div>{{ $client->address }}</div>@endif
-                    @if($client?->phone)<div>{{ $client->phone }}</div>@endif
-                    @if($client?->email)<div>{{ $client->email }}</div>@endif
+                    @if(in_array($clientType, ['company', 'administration']))
+                        @if($client?->ice)<div>{{ __('messages.ice') }}: {{ $client->ice }}</div>@endif
+                        @if($client?->phone)<div>{{ __('messages.phone') }}: {{ $client->phone }}</div>@endif
+                    @else
+                        @if($client?->cin)<div>CIN: {{ $client->cin }}</div>@endif
+                    @endif
                 </div>
             </td>
             <td style="width: 50%;">

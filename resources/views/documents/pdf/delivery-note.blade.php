@@ -228,17 +228,11 @@
         @if($isResellerBuyer)
             @if($buyer?->ice)<div>{{ __('messages.ice') }}: {{ $buyer->ice }}</div>@endif
             @if($buyer?->phone)<div>{{ __('messages.phone') }}: {{ $buyer->phone }}</div>@endif
-        @elseif($clientType === 'company')
-            @if($buyer?->phone)<div>{{ __('messages.phone') }}: {{ $buyer->phone }}</div>@endif
-            @if($buyer?->address)<div>{{ $buyer->address }}</div>@endif
-            @if($buyer?->city)<div>{{ $buyer->city }}</div>@endif
-            @if($buyer?->email)<div>Email: {{ $buyer->email }}</div>@endif
-            @if($buyer?->ice)<div>{{ __('messages.ice') }}: {{ $buyer->ice }}</div>@endif
-            @if($buyer?->rc)<div>{{ __('messages.rc') }}: {{ $buyer->rc }}</div>@endif
-            @if($buyer?->if)<div>IF: {{ $buyer->if }}</div>@endif
-            @if($buyer?->patente)<div>Patente: {{ $buyer->patente }}</div>@endif
+        @elseif(in_array($clientType, ['company', 'administration']))
+            @if($client?->ice)<div>{{ __('messages.ice') }}: {{ $client->ice }}</div>@endif
+            @if($client?->phone)<div>{{ __('messages.phone') }}: {{ $client->phone }}</div>@endif
         @else
-            @if($buyer?->address)<div>{{ $buyer->address }}</div>@endif
+            @if($client?->cin)<div>CIN: {{ $client->cin }}</div>@endif
         @endif
     </div>
 

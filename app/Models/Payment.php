@@ -66,11 +66,13 @@ class Payment extends Model
             $service = app(PaymentService::class);
 
             if ($model->status === 'paid') {
-                // Immediately credit the sale/repair balance.
+                // Cash / card — immediately credit balance + create ledger entries.
                 $service->applyPayment($model);
             } else {
-                // Pending payments (cheque / transfer) put linked motorcycle units on hold.
+                // Cheque / bank_transfer — put units on hold AND immediately
+                // reflect the committed amount in the sale/repair balance.
                 $service->holdLinkedMotorcycleUnits($model);
+                $service->reflectPendingPayment($model);
             }
         });
 
@@ -104,7 +106,8 @@ class Payment extends Model
 
         // Reverse balance BEFORE the soft-delete so the authoritative SUM is still correct.
         static::deleting(function (Payment $model) {
-            if ($model->status === 'paid' || ($model->payment_method === 'bank_transfer' && $model->status === 'received')) {
+            $terminal = ['rejected', 'cancelled', 'canceled', 'bounced'];
+            if (! \in_array($model->status, $terminal, true)) {
                 app(PaymentService::class)->reversePayment($model);
             }
         });

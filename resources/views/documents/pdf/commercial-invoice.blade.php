@@ -241,17 +241,11 @@
                     @if($isResellerBuyer)
                         @if($buyer?->ice){{ __('messages.ice') }}: {{ $buyer->ice }}<br>@endif
                         @if($buyer?->phone){{ __('messages.phone') }}: {{ $buyer->phone }}<br>@endif
-                    @elseif($clientType === 'company')
-                        @if($buyer?->phone){{ __('messages.phone') }}: {{ $buyer->phone }}<br>@endif
-                        @if($buyer?->address){{ $buyer->address }}<br>@endif
-                        @if($buyer?->city){{ $buyer->city }}<br>@endif
-                        @if($buyer?->email)Email: {{ $buyer->email }}<br>@endif
-                        @if($buyer?->ice){{ __('messages.ice') }}: {{ $buyer->ice }}<br>@endif
-                        @if($buyer?->rc){{ __('messages.rc') }}: {{ $buyer->rc }}<br>@endif
-                        @if($buyer?->if)IF: {{ $buyer->if }}<br>@endif
-                        @if($buyer?->patente)Patente: {{ $buyer->patente }}<br>@endif
+                    @elseif(in_array($clientType, ['company', 'administration']))
+                        @if($client?->ice){{ __('messages.ice') }}: {{ $client->ice }}<br>@endif
+                        @if($client?->phone){{ __('messages.phone') }}: {{ $client->phone }}<br>@endif
                     @else
-                        @if($buyer?->address){{ $buyer->address }}<br>@endif
+                        @if($client?->cin)CIN: {{ $client->cin }}<br>@endif
                     @endif
                 </div>
             </td>

@@ -96,6 +96,31 @@ class PaymentService
 
     /*
     |--------------------------------------------------------------------------
+    | Reflect Pending Payment (cheque / bank_transfer created → update balance)
+    |--------------------------------------------------------------------------
+    */
+
+    public function reflectPendingPayment(Payment $payment): void
+    {
+        DB::transaction(function () use ($payment) {
+            if ($payment->sale_id) {
+                $sale = Sale::withoutGlobalScopes()->find($payment->sale_id);
+                if ($sale) {
+                    $this->updateSaleBalance($sale, (float) $payment->amount);
+                }
+            }
+
+            if ($payment->repair_ticket_id) {
+                $ticket = RepairTicket::withoutGlobalScopes()->find($payment->repair_ticket_id);
+                if ($ticket) {
+                    $this->updateRepairBalance($ticket, (float) $payment->amount);
+                }
+            }
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Reverse Payment (cancellation / rejection)
     |--------------------------------------------------------------------------
     */
@@ -296,15 +321,25 @@ class PaymentService
     |--------------------------------------------------------------------------
     */
 
+    /*
+     * Active statuses: anything that is not yet rejected, cancelled, or bounced.
+     * Pending-validation cheques/transfers are committed funds — they should
+     * immediately reduce the remaining amount on the sale.
+     */
+    private const TERMINAL_STATUSES = [
+        self::STATUS_REJECTED,
+        self::STATUS_CANCELLED,
+        'canceled',
+        self::STATUS_BOUNCED,
+    ];
+
     private function updateSaleBalance(Sale $sale, float $amount): void
     {
-        // Pessimistic lock prevents two concurrent payment approvals from reading
-        // the same SUM and writing conflicting balances to the same sale row.
         DB::transaction(function () use ($sale) {
             $locked = Sale::withoutGlobalScopes()->lockForUpdate()->findOrFail($sale->id);
 
             $totalPaid    = (float) $locked->payments()
-                ->where('status', self::STATUS_PAID)
+                ->whereNotIn('status', self::TERMINAL_STATUSES)
                 ->sum('amount');
             $newRemaining = max(0, (float) $locked->total - $totalPaid);
 
@@ -318,13 +353,11 @@ class PaymentService
 
     private function reverseSaleBalance(Sale $sale, float $amount): void
     {
-        // Pessimistic lock mirrors updateSaleBalance — recomputes from the authoritative
-        // SUM of paid payments rather than decrementing a potentially-stale snapshot.
         DB::transaction(function () use ($sale) {
             $locked = Sale::withoutGlobalScopes()->lockForUpdate()->findOrFail($sale->id);
 
             $totalPaid    = (float) $locked->payments()
-                ->where('status', self::STATUS_PAID)
+                ->whereNotIn('status', self::TERMINAL_STATUSES)
                 ->sum('amount');
             $newRemaining = max(0, (float) $locked->total - $totalPaid);
 
@@ -344,13 +377,12 @@ class PaymentService
 
     private function updateRepairBalance(RepairTicket $ticket, float $amount): void
     {
-        // Pessimistic lock prevents stale-read race: recompute from authoritative SUM.
         DB::transaction(function () use ($ticket) {
             $locked = RepairTicket::withoutGlobalScopes()->lockForUpdate()->findOrFail($ticket->id);
 
             $total        = (float) ($locked->total_cost ?? 0);
             $totalPaid    = (float) $locked->payments()
-                ->where('status', self::STATUS_PAID)
+                ->whereNotIn('status', self::TERMINAL_STATUSES)
                 ->sum('amount');
             $newRemaining = max(0, $total - $totalPaid);
 
