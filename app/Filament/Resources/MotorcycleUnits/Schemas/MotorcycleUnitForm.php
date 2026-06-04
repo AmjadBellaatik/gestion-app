@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MotorcycleUnits\Schemas;
 
 use App\Models\Client;
+use App\Models\MotorcycleModel;
 use App\Models\Warehouse;
 use Filament\Forms;
 use Filament\Schemas\Schema;
@@ -24,16 +25,32 @@ class MotorcycleUnitForm
                         __('messages.type')
                     )
 
-                    ->relationship(
-                        'motorcycleModel',
-                        'type'
-                    )
+                    ->options(function () {
+                        return MotorcycleModel::orderBy('type')
+                            ->orderBy('variante')
+                            ->get()
+                            ->mapWithKeys(fn ($m) => [
+                                $m->id => trim($m->type . ($m->variante ? ' - ' . $m->variante : '')),
+                            ]);
+                    })
 
                     ->searchable()
 
                     ->preload()
 
-                    ->required(),
+                    ->required()
+
+                    ->live()
+
+                    ->afterStateUpdated(function ($state, callable $set) {
+                        if (! $state) {
+                            return;
+                        }
+                        $model = MotorcycleModel::find($state);
+                        if ($model?->boite_vitesse) {
+                            $set('boite_vitesse', $model->boite_vitesse);
+                        }
+                    }),
 
                 Forms\Components\Select::make(
                     'warehouse_id'
@@ -97,6 +114,30 @@ class MotorcycleUnitForm
 
                     ->unique(
                         ignoreRecord: true
+                    ),
+
+                Forms\Components\TextInput::make(
+                    'engine_number'
+                )
+
+                    ->label(
+                        __('messages.engine_number')
+                    ),
+
+                Forms\Components\TextInput::make(
+                    'color'
+                )
+
+                    ->label(
+                        __('messages.color')
+                    ),
+
+                Forms\Components\TextInput::make(
+                    'boite_vitesse'
+                )
+
+                    ->label(
+                        __('messages.boite_vitesse')
                     ),
 
                 Forms\Components\Select::make(

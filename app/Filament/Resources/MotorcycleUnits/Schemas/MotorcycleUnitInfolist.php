@@ -22,6 +22,18 @@ class MotorcycleUnitInfolist
                             ->label(__('messages.chassis_number'))
                             ->placeholder('-'),
 
+                        TextEntry::make('engine_number')
+                            ->label(__('messages.engine_number'))
+                            ->placeholder('-'),
+
+                        TextEntry::make('color')
+                            ->label(__('messages.color'))
+                            ->placeholder('-'),
+
+                        TextEntry::make('boite_vitesse')
+                            ->label(__('messages.boite_vitesse'))
+                            ->placeholder('-'),
+
                         TextEntry::make('status')
                             ->label(__('messages.status'))
                             ->badge()

@@ -22,6 +22,12 @@ class MotorcycleUnit extends Model
 
         'chassis_number',
 
+        'engine_number',
+
+        'color',
+
+        'boite_vitesse',
+
         'fabrication_number',
 
         'mileage',

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MotorcycleUnits\Tables;
 
 
+use App\Models\MotorcycleUnit;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables;
@@ -43,6 +44,48 @@ class MotorcycleUnitsTable
                     ->searchable()
 
                     ->sortable(),
+
+                TextColumn::make(
+                    'engine_number'
+                )
+
+                    ->label(
+                        __('messages.engine_number')
+                    )
+
+                    ->searchable()
+
+                    ->sortable()
+
+                    ->placeholder('-'),
+
+                TextColumn::make(
+                    'color'
+                )
+
+                    ->label(
+                        __('messages.color')
+                    )
+
+                    ->searchable()
+
+                    ->sortable()
+
+                    ->placeholder('-'),
+
+                TextColumn::make(
+                    'boite_vitesse'
+                )
+
+                    ->label(
+                        __('messages.boite_vitesse')
+                    )
+
+                    ->searchable()
+
+                    ->sortable()
+
+                    ->placeholder('-'),
 
                 TextColumn::make(
                     'status'
@@ -143,6 +186,24 @@ class MotorcycleUnitsTable
                             __('messages.repair'),
 
                     ]),
+
+                Tables\Filters\SelectFilter::make(
+                    'color'
+                )
+
+                    ->label(
+                        __('messages.color')
+                    )
+
+                    ->options(function () {
+                        return MotorcycleUnit::withoutGlobalScopes()
+                            ->whereNotNull('color')
+                            ->where('color', '!=', '')
+                            ->distinct()
+                            ->orderBy('color')
+                            ->pluck('color', 'color')
+                            ->toArray();
+                    }),
 
             ])
 
