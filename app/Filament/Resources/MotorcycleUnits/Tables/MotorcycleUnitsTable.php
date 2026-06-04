@@ -5,6 +5,7 @@ namespace App\Filament\Resources\MotorcycleUnits\Tables;
 
 use App\Models\MotorcycleUnit;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -214,6 +215,12 @@ class MotorcycleUnitsTable
                 DeleteAction::make()
 
                     ->requiresConfirmation(),
+
+            ])
+
+            ->bulkActions([
+
+                DeleteBulkAction::make(),
 
             ]);
     }
