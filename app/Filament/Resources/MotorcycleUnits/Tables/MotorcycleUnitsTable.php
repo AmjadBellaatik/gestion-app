@@ -4,6 +4,7 @@ namespace App\Filament\Resources\MotorcycleUnits\Tables;
 
 
 use App\Models\MotorcycleUnit;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -208,7 +209,7 @@ class MotorcycleUnitsTable
 
             ])
 
-            ->actions([
+            ->recordActions([
 
                 EditAction::make(),
 
@@ -218,9 +219,13 @@ class MotorcycleUnitsTable
 
             ])
 
-            ->bulkActions([
+            ->toolbarActions([
 
-                DeleteBulkAction::make(),
+                BulkActionGroup::make([
+
+                    DeleteBulkAction::make(),
+
+                ]),
 
             ]);
     }
