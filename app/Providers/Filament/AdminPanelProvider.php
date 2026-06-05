@@ -56,7 +56,7 @@ class AdminPanelProvider extends PanelProvider
 
             ->databaseNotificationsPolling('30s')
 
-            ->sidebarFullyCollapsibleOnDesktop()
+            ->sidebarCollapsibleOnDesktop()
 
             ->brandName('')
 

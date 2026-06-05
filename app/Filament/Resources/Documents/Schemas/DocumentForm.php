@@ -9,7 +9,6 @@ use App\Models\MotorcycleUnit;
 use App\Models\Product;
 use App\Models\RepairItem;
 use App\Models\RepairTicket;
-use App\Models\Supplier;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
@@ -26,12 +25,15 @@ class DocumentForm
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make(__('messages.document_information'))
-                ->schema([
-                    Hidden::make('language')
-                        ->default('fr')
-                        ->dehydrated(),
 
+            Hidden::make('language')
+                ->default('fr')
+                ->dehydrated(),
+
+            // ── 1. Document header ────────────────────────────────────────────
+            Section::make(__('messages.document_information'))
+                ->icon('heroicon-o-document-text')
+                ->schema([
                     Grid::make(2)->schema([
                         Select::make('document_type_id')
                             ->label(__('messages.document_type'))
@@ -50,7 +52,12 @@ class DocumentForm
                             ->default(now())
                             ->required(),
                     ]),
+                ]),
 
+            // ── 2. Linked record + client ─────────────────────────────────────
+            Section::make(__('messages.parties'))
+                ->icon('heroicon-o-user-group')
+                ->schema([
                     Grid::make(2)->schema([
                         Select::make('sale_id')
                             ->label(__('messages.sale'))
@@ -59,7 +66,8 @@ class DocumentForm
                                 ->orderByDesc('id')
                                 ->get()
                                 ->mapWithKeys(fn (Sale $sale) => [
-                                    $sale->id => ($sale->sale_number ?: ('SALE-' . $sale->id)) . ' - ' . ($sale->client?->display_name ?: '-'),
+                                    $sale->id => ($sale->sale_number ?: ('SALE-' . $sale->id))
+                                        . ' — ' . ($sale->client?->display_name ?: '-'),
                                 ])
                                 ->toArray())
                             ->searchable()
@@ -85,8 +93,8 @@ class DocumentForm
                                 $items = self::isSaleReturnDocument($get)
                                     ? self::resolveReturnableSaleItems($sale)
                                     : (self::isWarrantyContract($get)
-                                    ? self::resolveWarrantyDocumentSaleItems($sale)
-                                    : self::resolveCommercialSaleItems($sale));
+                                        ? self::resolveWarrantyDocumentSaleItems($sale)
+                                        : self::resolveCommercialSaleItems($sale));
 
                                 if ($items !== []) {
                                     $set('items', $items);
@@ -101,14 +109,14 @@ class DocumentForm
                                 }
                             }),
 
-
                         Select::make('repair_ticket_id')
                             ->label(__('messages.repair_ticket'))
                             ->options(fn () => RepairTicket::query()
                                 ->orderByDesc('id')
                                 ->get()
                                 ->mapWithKeys(fn (RepairTicket $ticket) => [
-                                    $ticket->id => ($ticket->ticket_number ?? ('#' . $ticket->id)) . ' - ' . ($ticket->client?->display_name ?? '-'),
+                                    $ticket->id => ($ticket->ticket_number ?? ('#' . $ticket->id))
+                                        . ' — ' . ($ticket->client?->display_name ?? '-'),
                                 ])
                                 ->toArray())
                             ->searchable()
@@ -178,138 +186,166 @@ class DocumentForm
                             ->visible(fn ($get) => ! self::isQuotationDocument($get) && ! self::isSupplierOrderDocument($get))
                             ->disabled(fn ($get) => self::isImportedFromRecord($get))
                             ->dehydrated()
-                            ->required(fn ($get) => (self::isConformityDocument($get) || self::isWarrantyContract($get) || self::isInvoiceDocument($get)) && ! self::selectedSaleHasReseller($get) && ! self::isImportedFromRecord($get)),
-                    ]),
-
-                    Grid::make(2)->schema([
-                        Select::make('metadata.manual_client_type')
-                            ->label(__('messages.client_type'))
-                            ->options([
-                                'person' => __('messages.person'),
-                                'company' => __('messages.company'),
-                                'administration' => __('messages.administration'),
-                            ])
-                            ->default('person')
-                            ->live()
-                            ->visible(fn ($get) => self::isQuotationDocument($get))
-                            ->required(fn ($get) => self::isQuotationDocument($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_client_first_name')
-                            ->label(__('messages.first_name'))
-                            ->visible(fn ($get) => self::isQuotationDocument($get) && ($get('metadata.manual_client_type') ?? 'person') === 'person')
-                            ->required(fn ($get) => self::isQuotationDocument($get) && ($get('metadata.manual_client_type') ?? 'person') === 'person')
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_client_last_name')
-                            ->label(__('messages.last_name'))
-                            ->visible(fn ($get) => self::isQuotationDocument($get) && ($get('metadata.manual_client_type') ?? 'person') === 'person')
-                            ->required(fn ($get) => self::isQuotationDocument($get) && ($get('metadata.manual_client_type') ?? 'person') === 'person')
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_client_company_name')
-                            ->label(__('messages.company_name'))
-                            ->visible(fn ($get) => self::isQuotationDocument($get) && $get('metadata.manual_client_type') === 'company')
-                            ->required(fn ($get) => self::isQuotationDocument($get) && $get('metadata.manual_client_type') === 'company')
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_client_administration_name')
-                            ->label(__('messages.administration_name'))
-                            ->visible(fn ($get) => self::isQuotationDocument($get) && $get('metadata.manual_client_type') === 'administration')
-                            ->required(fn ($get) => self::isQuotationDocument($get) && $get('metadata.manual_client_type') === 'administration')
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_client_phone')
-                            ->label(__('messages.phone'))
-                            ->visible(fn ($get) => self::isQuotationDocument($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_client_email')
-                            ->label(__('messages.email'))
-                            ->visible(fn ($get) => self::isQuotationDocument($get))
-                            ->dehydrated(),
+                            ->required(fn ($get) => (self::isConformityDocument($get) || self::isWarrantyContract($get) || self::isInvoiceDocument($get))
+                                && ! self::selectedSaleHasReseller($get)
+                                && ! self::isImportedFromRecord($get)),
 
                         TextInput::make('metadata.purchase_order_number')
                             ->label(__('messages.purchase_order'))
                             ->visible(fn ($get) => self::isInvoiceDocument($get))
                             ->dehydrated(),
-
-                        TextInput::make('metadata.supplier_quote_number')
-                            ->label(__('messages.provider_quote_reference'))
-                            ->visible(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_supplier_name')
-                            ->label(__('messages.provider_company_name'))
-                            ->visible(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->required(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_supplier_phone')
-                            ->label(__('messages.phone'))
-                            ->visible(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.manual_supplier_email')
-                            ->label(__('messages.email'))
-                            ->visible(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.provider_ice')
-                            ->label(__('messages.ice'))
-                            ->visible(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.provider_rc')
-                            ->label(__('messages.rc'))
-                            ->visible(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->dehydrated(),
-
-                        Textarea::make('metadata.manual_client_address')
-                            ->label(__('messages.address'))
-                            ->visible(fn ($get) => self::isQuotationDocument($get))
-                            ->dehydrated()
-                            ->columnSpanFull(),
-
-                        Textarea::make('metadata.manual_supplier_address')
-                            ->label(__('messages.address'))
-                            ->visible(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->dehydrated()
-                            ->columnSpanFull(),
                     ]),
-
-                    Grid::make(2)->schema([
-                        TextInput::make('metadata.warranty_duration_value')
-                            ->label(__('messages.warranty_duration'))
-                            ->numeric()
-                            ->minValue(1)
-                            ->visible(fn ($get) => self::isWarrantyContract($get))
-                            ->required(fn ($get) => self::isWarrantyContract($get))
-                            ->dehydrated(),
-
-                        Select::make('metadata.warranty_duration_unit')
-                            ->label(__('messages.warranty_duration_unit'))
-                            ->options([
-                                'weeks' => __('messages.weeks'),
-                                'months' => __('messages.months'),
-                                'years' => __('messages.years'),
-                            ])
-                            ->default('years')
-                            ->visible(fn ($get) => self::isWarrantyContract($get))
-                            ->required(fn ($get) => self::isWarrantyContract($get))
-                            ->dehydrated(),
-
-                        TextInput::make('metadata.warranty_kilometers')
-                            ->label(__('messages.warranty_distance'))
-                            ->numeric()
-                            ->minValue(1)
-                            ->suffix('KM')
-                            ->visible(fn ($get) => self::isWarrantyContract($get))
-                            ->required(fn ($get) => self::isWarrantyContract($get))
-                            ->dehydrated(),
-                    ])->columns(3),
                 ]),
 
+            // ── 3. Manual client (quotation) ──────────────────────────────────
+            Section::make(__('messages.client_details'))
+                ->icon('heroicon-o-user')
+                ->columns(2)
+                ->visible(fn ($get) => self::isQuotationDocument($get))
+                ->schema([
+                    Select::make('metadata.manual_client_type')
+                        ->label(__('messages.client_type'))
+                        ->options([
+                            'person'         => __('messages.person'),
+                            'company'        => __('messages.company'),
+                            'administration' => __('messages.administration'),
+                        ])
+                        ->default('person')
+                        ->live()
+                        ->visible(fn ($get) => self::isQuotationDocument($get))
+                        ->required(fn ($get) => self::isQuotationDocument($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_client_phone')
+                        ->label(__('messages.phone'))
+                        ->visible(fn ($get) => self::isQuotationDocument($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_client_first_name')
+                        ->label(__('messages.first_name'))
+                        ->visible(fn ($get) => self::isQuotationDocument($get)
+                            && ($get('metadata.manual_client_type') ?? 'person') === 'person')
+                        ->required(fn ($get) => self::isQuotationDocument($get)
+                            && ($get('metadata.manual_client_type') ?? 'person') === 'person')
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_client_last_name')
+                        ->label(__('messages.last_name'))
+                        ->visible(fn ($get) => self::isQuotationDocument($get)
+                            && ($get('metadata.manual_client_type') ?? 'person') === 'person')
+                        ->required(fn ($get) => self::isQuotationDocument($get)
+                            && ($get('metadata.manual_client_type') ?? 'person') === 'person')
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_client_company_name')
+                        ->label(__('messages.company_name'))
+                        ->visible(fn ($get) => self::isQuotationDocument($get)
+                            && $get('metadata.manual_client_type') === 'company')
+                        ->required(fn ($get) => self::isQuotationDocument($get)
+                            && $get('metadata.manual_client_type') === 'company')
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_client_administration_name')
+                        ->label(__('messages.administration_name'))
+                        ->visible(fn ($get) => self::isQuotationDocument($get)
+                            && $get('metadata.manual_client_type') === 'administration')
+                        ->required(fn ($get) => self::isQuotationDocument($get)
+                            && $get('metadata.manual_client_type') === 'administration')
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_client_email')
+                        ->label(__('messages.email'))
+                        ->visible(fn ($get) => self::isQuotationDocument($get))
+                        ->dehydrated(),
+
+                    Textarea::make('metadata.manual_client_address')
+                        ->label(__('messages.address'))
+                        ->visible(fn ($get) => self::isQuotationDocument($get))
+                        ->dehydrated()
+                        ->columnSpanFull(),
+                ]),
+
+            // ── 4. Supplier details (supplier order) ──────────────────────────
+            Section::make(__('messages.supplier_information'))
+                ->icon('heroicon-o-building-office')
+                ->columns(2)
+                ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                ->schema([
+                    TextInput::make('metadata.manual_supplier_name')
+                        ->label(__('messages.provider_company_name'))
+                        ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->required(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.supplier_quote_number')
+                        ->label(__('messages.provider_quote_reference'))
+                        ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_supplier_phone')
+                        ->label(__('messages.phone'))
+                        ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.manual_supplier_email')
+                        ->label(__('messages.email'))
+                        ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.provider_ice')
+                        ->label(__('messages.ice'))
+                        ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.provider_rc')
+                        ->label(__('messages.rc'))
+                        ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->dehydrated(),
+
+                    Textarea::make('metadata.manual_supplier_address')
+                        ->label(__('messages.address'))
+                        ->visible(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->dehydrated()
+                        ->columnSpanFull(),
+                ]),
+
+            // ── 5. Warranty parameters ────────────────────────────────────────
+            Section::make(__('messages.warranty_information'))
+                ->icon('heroicon-o-shield-check')
+                ->columns(3)
+                ->visible(fn ($get) => self::isWarrantyContract($get))
+                ->schema([
+                    TextInput::make('metadata.warranty_duration_value')
+                        ->label(__('messages.warranty_duration'))
+                        ->numeric()
+                        ->minValue(1)
+                        ->visible(fn ($get) => self::isWarrantyContract($get))
+                        ->required(fn ($get) => self::isWarrantyContract($get))
+                        ->dehydrated(),
+
+                    Select::make('metadata.warranty_duration_unit')
+                        ->label(__('messages.warranty_duration_unit'))
+                        ->options([
+                            'weeks'  => __('messages.weeks'),
+                            'months' => __('messages.months'),
+                            'years'  => __('messages.years'),
+                        ])
+                        ->default('years')
+                        ->visible(fn ($get) => self::isWarrantyContract($get))
+                        ->required(fn ($get) => self::isWarrantyContract($get))
+                        ->dehydrated(),
+
+                    TextInput::make('metadata.warranty_kilometers')
+                        ->label(__('messages.warranty_distance'))
+                        ->numeric()
+                        ->minValue(1)
+                        ->suffix('KM')
+                        ->visible(fn ($get) => self::isWarrantyContract($get))
+                        ->required(fn ($get) => self::isWarrantyContract($get))
+                        ->dehydrated(),
+                ]),
+
+            // ── 6. Document items ─────────────────────────────────────────────
             Repeater::make('items')
                 ->relationship()
                 ->label(__('messages.document_articles'))
@@ -322,29 +358,30 @@ class DocumentForm
                     Grid::make(4)->schema([
                         Hidden::make('item_type')
                             ->default('motorcycle')
-                            ->dehydrateStateUsing(fn ($state, callable $get) => self::isSupplierOrderDocument($get) ? 'service' : Str::lower((string) ($state ?: 'motorcycle')))
+                            ->dehydrateStateUsing(fn ($state, callable $get) => self::isSupplierOrderDocument($get)
+                                ? 'service'
+                                : Str::lower((string) ($state ?: 'motorcycle')))
                             ->dehydrated(fn ($get) => self::isConformityDocument($get) || self::isSupplierOrderDocument($get)),
 
                         Select::make('item_type')
                             ->label(__('messages.item_type'))
                             ->options(fn ($get) => self::isWarrantyContract($get)
                                 ? [
-                                    'motorcycle' => __('messages.motorcycle'),
-                                    'trotinette' => __('messages.trotinette'),
+                                    'motorcycle'      => __('messages.motorcycle'),
+                                    'trotinette'      => __('messages.trotinette'),
                                     'velo_electrique' => __('messages.velo_electrique'),
-                                    'velo_normal' => __('messages.velo_normal'),
+                                    'velo_normal'     => __('messages.velo_normal'),
                                 ]
                                 : [
-                                    'product' => __('messages.product'),
+                                    'product'    => __('messages.product'),
                                     'motorcycle' => __('messages.motorcycle'),
-                                    'service' => __('messages.service'),
+                                    'service'    => __('messages.service'),
                                 ])
                             ->default(fn ($get) => self::isWarrantyContract($get) ? 'motorcycle' : 'product')
                             ->afterStateHydrated(function ($state, callable $set): void {
                                 if (blank($state)) {
                                     return;
                                 }
-
                                 $set('item_type', Str::lower((string) $state));
                             })
                             ->dehydrateStateUsing(fn ($state) => Str::lower((string) $state))
@@ -356,7 +393,9 @@ class DocumentForm
                                 $set('product_id', null);
                                 $set('motorcycle_unit_id', null);
                             })
-                            ->required(fn ($get) => ! self::isConformityDocument($get) && ! self::isImportedFromRecord($get) && ! self::isSupplierOrderDocument($get)),
+                            ->required(fn ($get) => ! self::isConformityDocument($get)
+                                && ! self::isImportedFromRecord($get)
+                                && ! self::isSupplierOrderDocument($get)),
 
                         Select::make('product_id')
                             ->label(fn ($get) => self::isWarrantyContract($get)
@@ -369,7 +408,10 @@ class DocumentForm
                                 )
                                 ->orderBy('name')
                                 ->get()
-                                ->filter(fn (Product $product) => ! self::isQuotationDocument($get) && ! self::isSupplierOrderDocument($get) || $product->current_stock > 0 || self::isSupplierOrderDocument($get))
+                                ->filter(fn (Product $product) => ! self::isQuotationDocument($get)
+                                    && ! self::isSupplierOrderDocument($get)
+                                    || $product->current_stock > 0
+                                    || self::isSupplierOrderDocument($get))
                                 ->mapWithKeys(fn (Product $product) => [
                                     $product->id => trim($product->name . ' - ' . __('messages.' . $product->type)),
                                 ])
@@ -381,9 +423,7 @@ class DocumentForm
                                 if (! $state || ! self::isQuotationDocument($get)) {
                                     return;
                                 }
-
                                 $product = Product::query()->find($state);
-
                                 if ($product) {
                                     $set('unit_price', (float) $product->selling_price);
                                     self::updateFinancialTotals($set, $get);
@@ -391,25 +431,34 @@ class DocumentForm
                             })
                             ->disabled(fn ($get) => self::isImportedFromRecord($get))
                             ->dehydrated()
-                            ->visible(fn ($get) => ! self::isConformityDocument($get) && ! self::isSupplierOrderDocument($get) && (
-                                self::isWarrantyContract($get)
+                            ->visible(fn ($get) => ! self::isConformityDocument($get)
+                                && ! self::isSupplierOrderDocument($get)
+                                && (self::isWarrantyContract($get)
                                     ? in_array($get('item_type'), self::warrantyProductTypes(), true)
-                                    : $get('item_type') === 'product'
-                            ))
-                            ->required(fn ($get) => ! self::isConformityDocument($get) && ! self::isSupplierOrderDocument($get) && ! self::isImportedFromRecord($get) && (
-                                self::isWarrantyContract($get)
+                                    : $get('item_type') === 'product'))
+                            ->required(fn ($get) => ! self::isConformityDocument($get)
+                                && ! self::isSupplierOrderDocument($get)
+                                && ! self::isImportedFromRecord($get)
+                                && (self::isWarrantyContract($get)
                                     ? in_array($get('item_type'), self::warrantyProductTypes(), true)
-                                    : $get('item_type') === 'product'
-                            )),
+                                    : $get('item_type') === 'product')),
 
+                        // ── BUG FIX: use withoutGlobalScopes() + all statuses ──
                         Select::make('motorcycle_unit_id')
                             ->label(__('messages.motorcycle'))
-                            ->options(fn () => MotorcycleUnit::query()
+                            ->options(fn () => MotorcycleUnit::withoutGlobalScopes()
                                 ->with('motorcycleModel')
-                                ->whereIn('status', ['available', 'in_stock'])
+                                ->orderByDesc('id')
                                 ->get()
                                 ->mapWithKeys(fn (MotorcycleUnit $unit) => [
-                                    $unit->id => trim(($unit->motorcycleModel?->modele ?? __('messages.motorcycle')) . ' - ' . $unit->chassis_number),
+                                    $unit->id => trim(
+                                        ($unit->motorcycleModel?->marque ? $unit->motorcycleModel->marque . ' ' : '')
+                                        . ($unit->motorcycleModel?->modele ?? __('messages.motorcycle'))
+                                        . ' — ' . $unit->chassis_number
+                                        . ($unit->status !== 'in_stock'
+                                            ? ' (' . $unit->status . ')'
+                                            : '')
+                                    ),
                                 ])
                                 ->toArray())
                             ->searchable()
@@ -419,11 +468,9 @@ class DocumentForm
                                 if (! $state || ! self::isQuotationDocument($get)) {
                                     return;
                                 }
-
-                                $unit = MotorcycleUnit::query()
+                                $unit = MotorcycleUnit::withoutGlobalScopes()
                                     ->with('motorcycleModel')
                                     ->find($state);
-
                                 if ($unit) {
                                     $set('unit_price', (float) ($unit->motorcycleModel?->price_ttc ?? 0));
                                     self::updateFinancialTotals($set, $get);
@@ -431,8 +478,11 @@ class DocumentForm
                             })
                             ->disabled(fn ($get) => self::isImportedFromRecord($get))
                             ->dehydrated()
-                            ->visible(fn ($get) => ! self::isSupplierOrderDocument($get) && (self::isConformityDocument($get) || $get('item_type') === 'motorcycle'))
-                            ->required(fn ($get) => ! self::isSupplierOrderDocument($get) && ! self::isImportedFromRecord($get) && (self::isConformityDocument($get) || $get('item_type') === 'motorcycle')),
+                            ->visible(fn ($get) => ! self::isSupplierOrderDocument($get)
+                                && (self::isConformityDocument($get) || $get('item_type') === 'motorcycle'))
+                            ->required(fn ($get) => ! self::isSupplierOrderDocument($get)
+                                && ! self::isImportedFromRecord($get)
+                                && (self::isConformityDocument($get) || $get('item_type') === 'motorcycle')),
 
                         TextInput::make('quantity')
                             ->label(__('messages.quantity'))
@@ -476,7 +526,11 @@ class DocumentForm
 
                         TextInput::make('warranty_months')
                             ->label(__('messages.warranty_duration'))
-                            ->visible(fn ($get) => ! self::isConformityDocument($get) && ! self::isWarrantyContract($get) && ! self::isQuotationDocument($get) && ! self::isInvoiceDocument($get) && ! self::isSupplierOrderDocument($get))
+                            ->visible(fn ($get) => ! self::isConformityDocument($get)
+                                && ! self::isWarrantyContract($get)
+                                && ! self::isQuotationDocument($get)
+                                && ! self::isInvoiceDocument($get)
+                                && ! self::isSupplierOrderDocument($get))
                             ->disabled(fn ($get) => self::isImportedFromRecord($get))
                             ->dehydrated()
                             ->numeric(),
@@ -485,42 +539,47 @@ class DocumentForm
                 ->defaultItems(1)
                 ->columnSpanFull(),
 
+            // ── 7. Financial summary ──────────────────────────────────────────
             Section::make(__('messages.financial_information'))
+                ->icon('heroicon-o-calculator')
+                ->columns(4)
+                ->visible(fn ($get) => ! self::isConformityDocument($get)
+                    && ! self::isWarrantyContract($get)
+                    && ! self::isInvoiceDocument($get))
                 ->schema([
-                    Grid::make(4)->schema([
-                        TextInput::make('subtotal')
-                            ->label(__('messages.subtotal_ht'))
-                            ->numeric()
-                            ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
-                            ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->live(onBlur: true),
+                    TextInput::make('subtotal')
+                        ->label(__('messages.subtotal_ht'))
+                        ->numeric()
+                        ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
+                        ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->live(onBlur: true),
 
-                        TextInput::make('tax_rate')
-                            ->label(__('messages.tax_rate'))
-                            ->numeric()
-                            ->default(20)
-                            ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
-                            ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->suffix('%'),
+                    TextInput::make('tax_rate')
+                        ->label(__('messages.tax_rate'))
+                        ->numeric()
+                        ->default(20)
+                        ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
+                        ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->suffix('%'),
 
-                        TextInput::make('tax_amount')
-                            ->label(__('messages.tax_amount'))
-                            ->numeric()
-                            ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
-                            ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->live(onBlur: true),
+                    TextInput::make('tax_amount')
+                        ->label(__('messages.tax_amount'))
+                        ->numeric()
+                        ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
+                        ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->live(onBlur: true),
 
-                        TextInput::make('total_amount')
-                            ->label(__('messages.total_ttc'))
-                            ->numeric()
-                            ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
-                            ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
-                            ->live(onBlur: true),
-                    ]),
-                ])
-                ->visible(fn ($get) => ! self::isConformityDocument($get) && ! self::isWarrantyContract($get) && ! self::isInvoiceDocument($get)),
+                    TextInput::make('total_amount')
+                        ->label(__('messages.total_ttc'))
+                        ->numeric()
+                        ->disabled(fn ($get) => ! self::isSupplierOrderDocument($get))
+                        ->dehydrated(fn ($get) => self::isSupplierOrderDocument($get))
+                        ->live(onBlur: true),
+                ]),
 
+            // ── 8. Notes ──────────────────────────────────────────────────────
             Section::make(__('messages.additional_information'))
+                ->icon('heroicon-o-chat-bubble-bottom-center-text')
                 ->schema([
                     Textarea::make('notes')
                         ->label(__('messages.notes'))
@@ -528,6 +587,8 @@ class DocumentForm
                 ]),
         ]);
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static function isConformityDocument(callable $get): bool
     {
@@ -639,20 +700,20 @@ class DocumentForm
             ->map(function ($item): ?array {
                 if ($item->motorcycle_unit_id) {
                     return [
-                        'item_type' => 'motorcycle',
+                        'item_type'          => 'motorcycle',
                         'motorcycle_unit_id' => $item->motorcycle_unit_id,
-                        'quantity' => 1,
-                        'unit_price' => 0,
-                        'discount_amount' => 0,
+                        'quantity'           => 1,
+                        'unit_price'         => 0,
+                        'discount_amount'    => 0,
                     ];
                 }
 
                 if ($item->product_id && in_array($item->product?->type, self::warrantyProductTypes(), true)) {
                     return [
-                        'item_type' => $item->product->type,
-                        'product_id' => $item->product_id,
-                        'quantity' => $item->quantity ?: 1,
-                        'unit_price' => 0,
+                        'item_type'       => $item->product->type,
+                        'product_id'      => $item->product_id,
+                        'quantity'        => $item->quantity ?: 1,
+                        'unit_price'      => 0,
                         'discount_amount' => 0,
                     ];
                 }
@@ -674,11 +735,11 @@ class DocumentForm
         }
 
         return [[
-            'item_type' => 'motorcycle',
+            'item_type'          => 'motorcycle',
             'motorcycle_unit_id' => $motorcycleUnitId,
-            'quantity' => 1,
-            'unit_price' => 0,
-            'discount_amount' => 0,
+            'quantity'           => 1,
+            'unit_price'         => 0,
+            'discount_amount'    => 0,
         ]];
     }
 
@@ -688,20 +749,20 @@ class DocumentForm
             ->map(function ($item): ?array {
                 if ($item->motorcycle_unit_id) {
                     return [
-                        'item_type' => 'motorcycle',
+                        'item_type'          => 'motorcycle',
                         'motorcycle_unit_id' => $item->motorcycle_unit_id,
-                        'quantity' => 1,
-                        'unit_price' => $item->unit_price ?: ($item->motorcycleUnit?->motorcycleModel?->price_ttc ?? 0),
-                        'discount_amount' => $item->discount ?? 0,
+                        'quantity'           => 1,
+                        'unit_price'         => $item->unit_price ?: ($item->motorcycleUnit?->motorcycleModel?->price_ttc ?? 0),
+                        'discount_amount'    => $item->discount ?? 0,
                     ];
                 }
 
                 if ($item->product_id) {
                     return [
-                        'item_type' => 'product',
-                        'product_id' => $item->product_id,
-                        'quantity' => $item->quantity ?: 1,
-                        'unit_price' => $item->unit_price ?: ($item->product?->selling_price ?? 0),
+                        'item_type'       => 'product',
+                        'product_id'      => $item->product_id,
+                        'quantity'        => $item->quantity ?: 1,
+                        'unit_price'      => $item->unit_price ?: ($item->product?->selling_price ?? 0),
                         'discount_amount' => $item->discount ?? 0,
                     ];
                 }
@@ -754,20 +815,20 @@ class DocumentForm
 
                 if ($item->motorcycle_unit_id) {
                     return [
-                        'item_type' => 'motorcycle',
+                        'item_type'          => 'motorcycle',
                         'motorcycle_unit_id' => $item->motorcycle_unit_id,
-                        'quantity' => 1,
-                        'unit_price' => 0,
-                        'discount_amount' => 0,
+                        'quantity'           => 1,
+                        'unit_price'         => 0,
+                        'discount_amount'    => 0,
                     ];
                 }
 
                 if ($item->product_id) {
                     return [
-                        'item_type' => 'product',
-                        'product_id' => $item->product_id,
-                        'quantity' => $remaining,
-                        'unit_price' => 0,
+                        'item_type'       => 'product',
+                        'product_id'      => $item->product_id,
+                        'quantity'        => $remaining,
+                        'unit_price'      => 0,
                         'discount_amount' => 0,
                     ];
                 }
@@ -806,14 +867,14 @@ class DocumentForm
 
         $total = collect($items)
             ->sum(function (array $item): float {
-                $quantity = (float) ($item['quantity'] ?? 1);
+                $quantity  = (float) ($item['quantity'] ?? 1);
                 $unitPrice = (float) ($item['unit_price'] ?? 0);
-                $discount = (float) ($item['discount_amount'] ?? 0);
+                $discount  = (float) ($item['discount_amount'] ?? 0);
 
                 return max(($quantity * $unitPrice) - $discount, 0);
             });
 
-        $tax = round($total * (20 / 120), 2);
+        $tax      = round($total * (20 / 120), 2);
         $subtotal = round($total - $tax, 2);
 
         if ($get('items') !== null) {
