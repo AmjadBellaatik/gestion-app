@@ -351,9 +351,13 @@
     function isDesktop() { return window.innerWidth >= 1024; }
     function isRTL()     { return document.documentElement.dir === 'rtl'; }
 
-    /* Returns true when any modal/dialog is currently open */
+    /* Returns true when any modal/dialog is actually VISIBLE (not just in DOM) */
     function isModalOpen() {
-        return !!document.querySelector('[role="dialog"]');
+        var els = document.querySelectorAll('[role="dialog"]');
+        for (var i = 0; i < els.length; i++) {
+            if (window.getComputedStyle(els[i]).display !== 'none') return true;
+        }
+        return false;
     }
 
     /* ── Sync main content margin to match sidebar width ─────────────── */
