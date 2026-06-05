@@ -59,8 +59,14 @@ trait HasReportPeriod
     protected function periodLabel(): string
     {
         [$from, $to] = $this->resolveRange();
+        /* Use -u-nu-latn extension for Arabic so month names stay Arabic
+           but day/year digits remain Latin (0-9).                        */
+        $locale = app()->getLocale();
+        $carbonLocale = $locale === 'ar' ? 'ar-u-nu-latn' : $locale;
 
-        return $from->format('d M Y') . ' – ' . $to->format('d M Y');
+        return $from->locale($carbonLocale)->isoFormat('D MMM YYYY')
+             . ' – '
+             . $to->locale($carbonLocale)->isoFormat('D MMM YYYY');
     }
 
     public static function canAccess(): bool

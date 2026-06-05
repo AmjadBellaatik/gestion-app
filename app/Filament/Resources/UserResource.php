@@ -248,7 +248,12 @@ class UserResource extends Resource
                                     $query->where('name', '!=', 'Super Admin');
                                 }
 
-                                return $query->pluck('name', 'name');
+                                return $query->pluck('name', 'name')
+                                    ->mapWithKeys(function ($name) {
+                                        $key = 'messages.role_' . strtolower(str_replace(' ', '_', $name));
+                                        $label = __($key);
+                                        return [$name => $label !== $key ? $label : $name];
+                                    });
                             }),
 
                         Select::make('permissions')
@@ -273,6 +278,11 @@ class UserResource extends Resource
                                 Permission::query()
                                     ->orderBy('name')
                                     ->pluck('name', 'name')
+                                    ->mapWithKeys(function ($name) {
+                                        $key = 'messages.permission_' . $name;
+                                        $label = __($key);
+                                        return [$name => $label !== $key ? $label : $name];
+                                    })
                                     ->all()
                             ),
 

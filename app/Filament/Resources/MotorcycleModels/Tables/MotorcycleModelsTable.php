@@ -86,14 +86,6 @@ class MotorcycleModelsTable
 
                     ->sortable(),
 
-                TextColumn::make('cylindree')
-
-                    ->label(
-                        __('messages.engine_capacity')
-                    )
-
-                    ->sortable(),
-
                 TextColumn::make('date_homologation')
 
                     ->label(

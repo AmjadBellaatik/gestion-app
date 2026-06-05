@@ -4,6 +4,40 @@
     $accent = $company?->accent_color ?: '#2563eb';
 @endphp
 
+{{-- Force Latin (0-9) digits everywhere — must run before any other script --}}
+<script>
+(function () {
+    /* When the page locale is Arabic, browsers & Intl APIs default to
+       Arabic-Indic numerals (٠١٢٣٤٥٦٧٨٩). This patch forces Latin digits
+       globally by appending the Unicode extension -u-nu-latn to any 'ar*' locale. */
+    var _Orig = Intl.NumberFormat;
+    function patchLocale(l) {
+        if (typeof l !== 'string' || !/^ar/i.test(l)) return l;
+        if (l.indexOf('nu-latn') !== -1) return l;
+        return l.indexOf('-u-') !== -1 ? l + '-nu-latn' : l + '-u-nu-latn';
+    }
+    function PatchedNF(locales, options) {
+        if (typeof locales === 'string') locales = patchLocale(locales);
+        else if (Array.isArray(locales)) locales = locales.map(patchLocale);
+        return new _Orig(locales, options);
+    }
+    PatchedNF.prototype           = _Orig.prototype;
+    PatchedNF.supportedLocalesOf  = _Orig.supportedLocalesOf.bind(_Orig);
+    try { Intl.NumberFormat = PatchedNF; } catch (e) {}
+
+    /* Also patch Intl.DateTimeFormat so date parts stay in Latin digits */
+    var _OrigDTF = Intl.DateTimeFormat;
+    function PatchedDTF(locales, options) {
+        if (typeof locales === 'string') locales = patchLocale(locales);
+        else if (Array.isArray(locales)) locales = locales.map(patchLocale);
+        return new _OrigDTF(locales, options);
+    }
+    PatchedDTF.prototype          = _OrigDTF.prototype;
+    PatchedDTF.supportedLocalesOf = _OrigDTF.supportedLocalesOf.bind(_OrigDTF);
+    try { Intl.DateTimeFormat = PatchedDTF; } catch (e) {}
+})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nositelinkssearchbox">
 <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
@@ -403,6 +437,15 @@
         return w;
     }
 
+    /* ── Release width control so Filament shrinks to icon-only size ───── */
+    function clearWidth() {
+        var sidebar = getSidebar();
+        if (!sidebar) return;
+        sidebar.style.width    = '';
+        sidebar.style.minWidth = '';
+        sidebar.style.maxWidth = '';
+    }
+
     /* ── Toggle tab chevron icon ──────────────────────────────────────── */
     function updateToggleIcon(sidebarIsOpen) {
         var tab = getToggleTab();
@@ -474,9 +517,6 @@
 
     /* ── Resize handle ────────────────────────────────────────────────── */
     function attachResizeHandle() {
-        var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
-        applyWidth(saved);
-
         var handle = getHandle();
         if (!handle) {
             handle = document.createElement('div');
@@ -484,13 +524,23 @@
             document.body.appendChild(handle);
         }
 
+        var saved   = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
         var clamped = Math.max(MIN, Math.min(MAX, saved));
+
+        /* Pre-position the handle for when the sidebar opens */
         if (isRTL()) {
             handle.style.right = clamped + 'px';
             handle.style.left  = '';
         } else {
             handle.style.left  = clamped + 'px';
             handle.style.right = '';
+        }
+
+        /* Only force the saved width if sidebar is already open (avoids overriding
+           Filament's icon-only collapsed width on first render)                  */
+        var sidebar = getSidebar();
+        if (sidebar && sidebar.classList.contains('fi-sidebar-open')) {
+            applyWidth(saved);
         }
 
         var startX, startW, dragging = false;
@@ -500,8 +550,8 @@
             e.preventDefault();
             dragging = true;
             startX = e.clientX;
-            var sidebar = getSidebar();
-            startW = sidebar ? sidebar.offsetWidth : saved;
+            var s = getSidebar();
+            startW = s ? s.offsetWidth : saved;
             handle.classList.add('dragging');
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'col-resize';
@@ -544,6 +594,14 @@
 
         sidebarClassObserver = new MutationObserver(function () {
             requestAnimationFrame(function () {
+                var s      = getSidebar();
+                var isOpen = s && s.classList.contains('fi-sidebar-open');
+                if (isOpen) {
+                    var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
+                    applyWidth(saved);
+                } else {
+                    clearWidth(); /* Let Filament control the icon-only width */
+                }
                 syncMargin();
                 positionToggleTab();
             });
@@ -566,8 +624,13 @@
     }
 
     document.addEventListener('livewire:navigated', function () {
-        var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
-        applyWidth(saved);
+        var s = getSidebar();
+        if (s && s.classList.contains('fi-sidebar-open')) {
+            var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10) || DEFAULT;
+            applyWidth(saved);
+        } else {
+            clearWidth();
+        }
         positionToggleTab();
         observeSidebar();
     });

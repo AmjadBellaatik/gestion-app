@@ -89,7 +89,7 @@ class Profile extends Page implements HasForms
                 )
 
                     ->label(
-                        'Profile Picture'
+                        __('messages.profile_picture')
                     )
 
                     ->avatar()
@@ -184,7 +184,7 @@ class Profile extends Page implements HasForms
         Notification::make()
 
             ->title(
-                'Profile updated successfully'
+                __('messages.profile_updated')
             )
 
             ->success()

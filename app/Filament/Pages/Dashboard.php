@@ -170,7 +170,11 @@ class Dashboard extends \Filament\Pages\Dashboard
             RepairTicket::where('status', 'cancelled')->count(),
         ];
 
-        $periodLabel = $from->format('d M Y') . ' – ' . $to->format('d M Y');
+        $locale = app()->getLocale();
+        $carbonLocale = $locale === 'ar' ? 'ar-u-nu-latn' : $locale;
+        $periodLabel = $from->locale($carbonLocale)->isoFormat('D MMM YYYY')
+                     . ' – '
+                     . $to->locale($carbonLocale)->isoFormat('D MMM YYYY');
 
         return compact(
             'year', 'month', 'chartYear',
