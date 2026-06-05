@@ -25,8 +25,10 @@ class DocumentNumberService
                 ->first();
 
             if (! $sequence) {
-                // Recover from a missing/reset sequence by finding the highest number already issued.
+                // Recover from a missing/reset sequence by finding the highest number already issued
+                // among non-deleted documents (deleted docs free their number back up).
                 $existingMax = Document::withoutGlobalScopes()
+                    ->whereNull('deleted_at')
                     ->where('company_id', $document->company_id)
                     ->where('document_type_id', $document->document_type_id)
                     ->whereNotNull('document_number')

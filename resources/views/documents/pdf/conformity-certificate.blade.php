@@ -128,8 +128,7 @@
     $clientIdentity = $isResellerSale ? '' : ($clientType === 'company'
         ? $client?->rc
         : ($clientType === 'administration' ? null : ($client?->rc ?: $client?->cin)));
-    $capacity = $model?->cylindree ? $model->cylindree . ' CC' : null;
-    $power = trim($capacity . ($model?->puissance_effective ? ' / ' . $model->puissance_effective : ''));
+    $capacity = $model?->cylindree ? $model->cylindree . ' cm³' : null;
     $city = strtoupper(\Illuminate\Support\Str::ascii($company->city ?: 'SALE'));
 @endphp
 
@@ -166,7 +165,7 @@
     <div class="line"><span class="bullet">&#10146;</span><span class="label">{{ __('messages.type') }}</span>: <span class="value">{{ $model?->type }}</span></div>
     <div class="line"><span class="bullet">&#10146;</span><span class="label">{{ __('messages.conformity_category_label') }}</span>: <span class="value">{{ $model?->categorie }}</span></div>
     <div class="line"><span class="bullet">&#10146;</span><span class="label">{{ __('messages.conformity_chassis_label') }}</span>: <span class="value">{{ $unit?->chassis_number }}</span></div>
-    <div class="line"><span class="bullet">&#10146;</span><span class="label">{{ __('messages.conformity_engine_power') }}</span>: <span class="value">{{ $power }}</span></div>
+    <div class="line"><span class="bullet">&#10146;</span><span class="label">{{ __('messages.engine_capacity') }}</span>: <span class="value">{{ $capacity }}</span></div>
     <div class="line"><span class="bullet">&#10146;</span><span class="label">{{ __('messages.fuel') }}</span>: <span class="value">{{ $model?->carburant }}</span></div>
     <div class="line"><span class="bullet">&#10146;</span><span class="label">{{ __('messages.conformity_cylinder_label') }}</span>: <span class="value">{{ $model?->nombre_cylindres }}</span></div>
 

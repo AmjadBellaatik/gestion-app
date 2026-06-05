@@ -103,7 +103,7 @@ class SaleInfolist
                                     $label = e($document->documentType?->name ?: 'Document');
                                     $number = e($document->document_number ?: ('#' . $document->id));
 
-                                    return '<a href="' . $viewUrl . '" style="display:inline-flex; padding:6px 10px; margin:0 8px 8px 0; border-radius:6px; background:#1f2937; color:#fff; text-decoration:none; font-weight:600;">' . $label . ' - ' . $number . '</a>';
+                                    return '<a href="' . $viewUrl . '" target="_blank" style="display:inline-flex; padding:6px 10px; margin:0 8px 8px 0; border-radius:6px; background:#1f2937; color:#fff; text-decoration:none; font-weight:600;">' . $label . ' - ' . $number . '</a>';
                                 })->implode('');
 
                                 return new HtmlString($html);
