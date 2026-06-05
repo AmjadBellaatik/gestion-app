@@ -237,12 +237,6 @@
         #sidebar-toggle-tab { display: none !important; }
     }
 
-    /* ── Disable toggle tab + resize handle when a modal/dialog is open ── */
-    body:has([role="dialog"]) #sidebar-toggle-tab,
-    body:has([role="dialog"]) #sidebar-resize-handle {
-        pointer-events: none !important;
-        opacity: 0 !important;
-    }
 
     /* ── TABLES ─────────────────────────────────────────────────────────── */
     /* Horizontal scroll on mobile instead of broken overflow */
@@ -325,7 +319,9 @@
         width: 5px;
         height: 100vh;
         cursor: col-resize;
-        z-index: 9999;
+        /* z-index 35: above sidebar (30) but below Filament modals (~50)
+           so modals naturally intercept clicks without any JS hacks */
+        z-index: 35;
         background: transparent;
         transition: background 0.15s;
     }
