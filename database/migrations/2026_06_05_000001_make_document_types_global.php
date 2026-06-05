@@ -10,14 +10,30 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Drop the foreign key first (MySQL requires FK gone before its index)
-        Schema::table('document_types', function (Blueprint $table) {
-            $table->dropForeign(['company_id']);
-        });
+        //    Guard against servers where the FK was never created.
+        $database = DB::connection()->getDatabaseName();
+        $fkExists = DB::table('information_schema.KEY_COLUMN_USAGE')
+            ->where('TABLE_SCHEMA', $database)
+            ->where('TABLE_NAME', 'document_types')
+            ->where('COLUMN_NAME', 'company_id')
+            ->whereNotNull('REFERENCED_TABLE_NAME')
+            ->exists();
 
-        // 2. Now drop the composite unique constraint (company_id, code)
-        Schema::table('document_types', function (Blueprint $table) {
-            $table->dropUnique('document_types_company_id_code_unique');
-        });
+        if ($fkExists) {
+            Schema::table('document_types', function (Blueprint $table) {
+                $table->dropForeign(['company_id']);
+            });
+        }
+
+        // 2. Drop the composite unique constraint (company_id, code) if it exists
+        $indexExists = collect(DB::select("SHOW INDEX FROM `document_types`"))
+            ->contains('Key_name', 'document_types_company_id_code_unique');
+
+        if ($indexExists) {
+            Schema::table('document_types', function (Blueprint $table) {
+                $table->dropUnique('document_types_company_id_code_unique');
+            });
+        }
 
         // 3. Make company_id nullable
         Schema::table('document_types', function (Blueprint $table) {
@@ -33,7 +49,7 @@ return new class extends Migration
             ->groupBy('code');
 
         $keepIds = [];
-        foreach ($rows as $code => $group) {
+        foreach ($rows as $group) {
             // Keep the first (lowest id) row for each code, discard duplicates
             $keepIds[] = $group->first()->id;
         }
