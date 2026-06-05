@@ -14,6 +14,9 @@ class MotorcycleModelInfolist
             ->components([
                 Section::make(__('messages.homologation'))
                     ->schema([
+                        TextEntry::make('brand.name')
+                            ->label(__('messages.brand'))
+                            ->placeholder('-'),
                         TextEntry::make('titre_homologation')
                             ->label(__('messages.homologation_title')),
                         TextEntry::make('date_homologation')
@@ -25,7 +28,10 @@ class MotorcycleModelInfolist
 
                 Section::make(__('messages.vehicle_identification'))
                     ->schema([
-                        self::entry('marque', 'marque'),
+                        TextEntry::make('marque')
+                            ->label(__('messages.marque'))
+                            ->getStateUsing(fn ($record) => $record->marque ?: $record->brand?->name)
+                            ->placeholder('-'),
                         self::entry('genre', 'genre'),
                         self::entry('type', 'type'),
                         self::entry('variante', 'variante'),

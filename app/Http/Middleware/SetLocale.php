@@ -38,6 +38,10 @@ class SetLocale
 
         app()->setLocale($locale);
 
+        if ($locale === 'ar') {
+            \Illuminate\Support\Number::useLocale('ar@numbers=latn');
+        }
+
         return $next($request);
     }
 }

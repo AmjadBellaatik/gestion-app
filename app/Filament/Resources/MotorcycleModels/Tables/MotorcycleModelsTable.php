@@ -26,6 +26,8 @@ class MotorcycleModelsTable
                         __('messages.brand')
                     )
 
+                    ->getStateUsing(fn ($record) => $record->marque ?: $record->brand?->name)
+
                     ->searchable()
 
                     ->sortable()

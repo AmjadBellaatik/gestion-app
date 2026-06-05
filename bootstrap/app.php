@@ -48,6 +48,8 @@ return Application::configure(
 
             \App\Http\Middleware\SessionLifetime::class,
 
+            \App\Http\Middleware\ConvertArabicNumerals::class,
+
         ]);
 
         /*

@@ -43,6 +43,11 @@ class MotorcycleModelForm
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->afterStateHydrated(function ($state, callable $set): void {
+                                if (! $state) return;
+                                $brand = Brand::withoutGlobalScope(CompanyScope::class)->find($state);
+                                if ($brand) $set('marque', $brand->name);
+                            })
                             ->afterStateUpdated(function ($state, callable $set): void {
                                 $brand = $state ? Brand::withoutGlobalScope(CompanyScope::class)->find($state) : null;
                                 $set('marque', $brand?->name);
