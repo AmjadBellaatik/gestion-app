@@ -247,6 +247,8 @@ class MotorcycleModelsTable
 
             ])
 
+            ->filtersFormMaxHeight('380px')
+
             ->actions([
                 ViewAction::make(),
                 EditAction::make(),
