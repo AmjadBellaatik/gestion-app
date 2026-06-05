@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\MotorcycleModels\Schemas;
 
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -12,19 +13,56 @@ class MotorcycleModelInfolist
     {
         return $schema
             ->components([
-                Section::make(__('messages.homologation'))
+                Grid::make(2)
                     ->schema([
-                        TextEntry::make('brand.name')
-                            ->label(__('messages.brand'))
-                            ->placeholder('-'),
-                        TextEntry::make('titre_homologation')
-                            ->label(__('messages.homologation_title')),
-                        TextEntry::make('date_homologation')
-                            ->label(__('messages.homologation_date'))
-                            ->date()
-                            ->placeholder('-'),
-                    ])
-                    ->columns(2),
+                        Section::make(__('messages.homologation'))
+                            ->columnSpan(1)
+                            ->schema([
+                                TextEntry::make('brand.name')
+                                    ->label(__('messages.brand'))
+                                    ->placeholder('-'),
+                                TextEntry::make('titre_homologation')
+                                    ->label(__('messages.homologation_title')),
+                                TextEntry::make('date_homologation')
+                                    ->label(__('messages.homologation_date'))
+                                    ->date()
+                                    ->placeholder('-'),
+                            ])
+                            ->columns(2),
+
+                        Section::make(__('messages.pricing_stock'))
+                            ->columnSpan(1)
+                            ->schema([
+                                TextEntry::make('price_ttc')
+                                    ->label(__('messages.price_ttc'))
+                                    ->money('MAD'),
+                                TextEntry::make('reseller_price')
+                                    ->label(__('messages.reseller_price'))
+                                    ->money('MAD'),
+                                TextEntry::make('stock_alert')
+                                    ->label(__('messages.stock_alert'))
+                                    ->badge()
+                                    ->color('warning'),
+                                TextEntry::make('units_in_stock')
+                                    ->label(__('messages.in_stock'))
+                                    ->getStateUsing(fn ($record) => $record->units()->where('status', 'in_stock')->count())
+                                    ->badge()
+                                    ->color(fn ($state, $record) => $state <= ($record->stock_alert ?? 0) && $state > 0
+                                        ? 'warning'
+                                        : ($state === 0 ? 'danger' : 'success')),
+                                TextEntry::make('units_reserved')
+                                    ->label(__('messages.reserved'))
+                                    ->getStateUsing(fn ($record) => $record->units()->where('status', 'reserved')->count())
+                                    ->badge()
+                                    ->color('info'),
+                                TextEntry::make('units_sold')
+                                    ->label(__('messages.sold'))
+                                    ->getStateUsing(fn ($record) => $record->units()->where('status', 'sold')->count())
+                                    ->badge()
+                                    ->color('gray'),
+                            ])
+                            ->columns(2),
+                    ]),
 
                 Section::make(__('messages.vehicle_identification'))
                     ->schema([

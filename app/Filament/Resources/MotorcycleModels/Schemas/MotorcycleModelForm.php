@@ -3,11 +3,14 @@
 namespace App\Filament\Resources\MotorcycleModels\Schemas;
 
 use App\Models\Brand;
+use App\Models\Company;
 use App\Models\Scopes\CompanyScope;
 use App\Models\Supplier;
 use App\Models\MotorcycleModel;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -42,6 +45,7 @@ class MotorcycleModelForm
                                 ->toArray())
                             ->searchable()
                             ->preload()
+                            ->required()
                             ->live()
                             ->afterStateHydrated(function ($state, callable $set): void {
                                 if (! $state) return;
@@ -53,11 +57,26 @@ class MotorcycleModelForm
                                 $set('marque', $brand?->name);
                             })
                             ->createOptionForm([
-                                TextInput::make('name')->label(__('messages.name'))->required()->maxLength(255),
-                                TextInput::make('accreditation_reference')->label(__('messages.accreditation_reference'))->maxLength(255),
+                                Select::make('company_id')
+                                    ->label(__('messages.company'))
+                                    ->options(fn () => Company::query()->orderBy('name')->pluck('name', 'id')->toArray())
+                                    ->searchable()
+                                    ->preload()
+                                    ->default(fn () => session('company_id'))
+                                    ->required(),
+                                TextInput::make('name')
+                                    ->label(__('messages.name'))
+                                    ->required()
+                                    ->maxLength(255),
+                                TextInput::make('accreditation_reference')
+                                    ->label(__('messages.accreditation_reference'))
+                                    ->maxLength(255),
                             ])
                             ->createOptionUsing(fn (array $data) => Brand::create($data)->id)
                             ->columnSpanFull(),
+
+                        Forms\Components\Hidden::make('marque')
+                            ->dehydrated(),
 
                         Forms\Components\TextInput::make('titre_homologation')
                             ->label(__('messages.homologation_title')),
@@ -76,12 +95,6 @@ class MotorcycleModelForm
                 Section::make(__('messages.vehicle_identification'))
                     ->columnSpan(1)
                     ->schema([
-
-                        Forms\Components\TextInput::make('marque')
-                            ->label(__('messages.brand'))
-                            ->hidden(fn ($get) => filled($get('brand_id')))
-                            ->dehydrated()
-                            ->required(fn ($get) => !filled($get('brand_id'))),
 
                         Forms\Components\TextInput::make('genre')
                             ->label(__('messages.genre')),
@@ -117,7 +130,28 @@ class MotorcycleModelForm
                                 ->pluck('name', 'name')
                                 ->toArray())
                             ->searchable()
-                            ->preload(),
+                            ->preload()
+                            ->createOptionForm([
+                                TextInput::make('name')
+                                    ->label(__('messages.supplier'))
+                                    ->required()
+                                    ->maxLength(255),
+                                TextInput::make('phone')
+                                    ->label(__('messages.phone'))
+                                    ->tel()
+                                    ->maxLength(255),
+                                TextInput::make('email')
+                                    ->label(__('messages.email'))
+                                    ->email()
+                                    ->maxLength(255),
+                                Textarea::make('address')
+                                    ->label(__('messages.address'))
+                                    ->columnSpanFull(),
+                            ])
+                            ->createOptionUsing(function (array $data): string {
+                                Supplier::create($data);
+                                return $data['name'];
+                            }),
 
                         Forms\Components\TextInput::make('digit_uf')
                             ->label(__('messages.uf_digit')),
