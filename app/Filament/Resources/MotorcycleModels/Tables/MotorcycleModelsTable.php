@@ -247,8 +247,6 @@ class MotorcycleModelsTable
 
             ])
 
-            ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContent)
-
             ->actions([
                 ViewAction::make(),
                 EditAction::make(),
