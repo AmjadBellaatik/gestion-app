@@ -122,7 +122,9 @@ class MotorcycleUnitForm
 
                     ->label(
                         __('messages.engine_number')
-                    ),
+                    )
+
+                    ->required(),
 
                 Forms\Components\TextInput::make(
                     'color'

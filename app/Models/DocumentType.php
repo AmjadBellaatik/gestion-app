@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\CompanyScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -48,10 +47,7 @@ class DocumentType extends Model
 
     protected static function booted(): void
     {
-        static::addGlobalScope(new CompanyScope);
-
         static::creating(function (DocumentType $type) {
-            $type->company_id ??= session('company_id');
             $type->default_language ??= 'fr';
             $type->language ??= 'fr';
             $type->category ??= 'commercial';
