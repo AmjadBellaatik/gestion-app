@@ -239,29 +239,28 @@ class ResellerForm
 
                             ->default(30),
 
-                        Toggle::make(
-                            'is_blocked'
-                        )
+                        Toggle::make('is_active')
+                            ->label(__('messages.active'))
+                            ->default(true)
+                            ->disabled(fn ($get) => (bool) $get('is_blocked'))
+                            ->dehydrated(),
 
-                            ->label(
-                                __('messages.is_blocked')
-                            )
+                        Toggle::make('is_blocked')
+                            ->label(__('messages.is_blocked'))
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set) {
+                                if ($state) {
+                                    $set('is_active', false);
+                                } else {
+                                    $set('is_active', true);
+                                }
+                            })
+                            ->visible(fn () => auth()->user()->can('block_reseller')),
 
-                            ->visible(fn () =>
-
-                                auth()->user()->can(
-                                    'block_reseller'
-                                )
-                            ),
-
-                        Textarea::make(
-                            'blocked_reason'
-                        )
-
-                            ->label(
-                                __('messages.blocked_reason')
-                            )
-
+                        Textarea::make('blocked_reason')
+                            ->label(__('messages.blocked_reason'))
+                            ->visible(fn ($get) => (bool) $get('is_blocked'))
+                            ->required(fn ($get) => (bool) $get('is_blocked'))
                             ->columnSpanFull(),
 
                     ])

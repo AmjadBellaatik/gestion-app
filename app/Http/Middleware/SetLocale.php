@@ -39,7 +39,11 @@ class SetLocale
         app()->setLocale($locale);
 
         if ($locale === 'ar') {
-            \Illuminate\Support\Number::useLocale('ar@numbers=latn');
+            // Keep translator on 'ar' (translations work) but patch the config locale
+            // so Filament's money/numeric formatters use Latin digits (ar-u-nu-latn).
+            // app()->setLocale() already fired LocaleUpdated and set translator to 'ar'.
+            config(['app.locale' => 'ar-u-nu-latn']);
+            \Illuminate\Support\Number::useLocale('ar-u-nu-latn');
         }
 
         return $next($request);

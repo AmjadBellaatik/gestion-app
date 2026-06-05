@@ -66,10 +66,6 @@ class MotorcycleModelInfolist
 
                 Section::make(__('messages.vehicle_identification'))
                     ->schema([
-                        TextEntry::make('marque')
-                            ->label(__('messages.marque'))
-                            ->getStateUsing(fn ($record) => $record->marque ?: $record->brand?->name)
-                            ->placeholder('-'),
                         self::entry('genre', 'genre'),
                         self::entry('type', 'type'),
                         self::entry('variante', 'variante'),

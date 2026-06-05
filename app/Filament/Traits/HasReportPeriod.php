@@ -62,7 +62,7 @@ trait HasReportPeriod
         /* Use -u-nu-latn extension for Arabic so month names stay Arabic
            but day/year digits remain Latin (0-9).                        */
         $locale = app()->getLocale();
-        $carbonLocale = $locale === 'ar' ? 'ar-u-nu-latn' : $locale;
+        $carbonLocale = str_starts_with($locale, 'ar') ? 'ar-u-nu-latn' : $locale;
 
         return $from->locale($carbonLocale)->isoFormat('D MMM YYYY')
              . ' – '

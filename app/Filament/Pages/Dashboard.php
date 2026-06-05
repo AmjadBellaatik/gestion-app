@@ -171,7 +171,7 @@ class Dashboard extends \Filament\Pages\Dashboard
         ];
 
         $locale = app()->getLocale();
-        $carbonLocale = $locale === 'ar' ? 'ar-u-nu-latn' : $locale;
+        $carbonLocale = str_starts_with($locale, 'ar') ? 'ar-u-nu-latn' : $locale;
         $periodLabel = $from->locale($carbonLocale)->isoFormat('D MMM YYYY')
                      . ' – '
                      . $to->locale($carbonLocale)->isoFormat('D MMM YYYY');

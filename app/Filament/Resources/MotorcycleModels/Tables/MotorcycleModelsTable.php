@@ -13,7 +13,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Forms\Components\DatePicker;
-use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 
 class MotorcycleModelsTable
@@ -248,9 +247,7 @@ class MotorcycleModelsTable
 
             ])
 
-            ->filtersFormWidth(Width::FourExtraLarge)
-            ->filtersFormColumns(3)
-            ->filtersFormMaxHeight('480px')
+            ->filtersFormMaxHeight('60vh')
 
             ->actions([
                 ViewAction::make(),

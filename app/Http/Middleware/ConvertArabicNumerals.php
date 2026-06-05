@@ -15,7 +15,7 @@ class ConvertArabicNumerals
     {
         $response = $next($request);
 
-        if (app()->getLocale() !== 'ar') {
+        if (! str_starts_with(app()->getLocale(), 'ar')) {
             return $response;
         }
 

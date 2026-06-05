@@ -100,6 +100,14 @@ class Reseller extends Model
             }
 
         });
+
+        static::saving(function ($model) {
+            if ($model->is_blocked) {
+                $model->is_active = false;
+            } elseif ($model->isDirty('is_blocked') && ! $model->is_blocked && $model->getOriginal('is_blocked')) {
+                $model->is_active = true;
+            }
+        });
     }
 
     /*
