@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { margin: 8mm 10mm 28mm 10mm; }
+        @page { margin: 8mm 10mm 36mm 10mm; }
         body {
             font-family: DejaVu Sans, sans-serif;
             color: #111;
@@ -93,16 +93,16 @@
             text-transform: uppercase;
         }
         .terms {
-            margin-top: 18px;
+            margin-top: 12px;
             text-align: justify;
         }
         .date-place {
-            margin-top: 20px;
+            margin-top: 12px;
             text-align: right;
             font-weight: 700;
         }
         .signatures {
-            margin-top: 42px;
+            margin-top: 20px;
         }
         .signatures td {
             width: 50%;
