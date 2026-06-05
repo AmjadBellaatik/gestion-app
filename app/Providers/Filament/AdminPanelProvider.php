@@ -58,8 +58,6 @@ class AdminPanelProvider extends PanelProvider
 
             ->sidebarCollapsibleOnDesktop()
 
-            ->defaultNumberLocale(fn () => app()->getLocale() === 'ar' ? 'ar@numbers=latn' : app()->getLocale())
-
             ->brandName('')
 
             ->favicon(
