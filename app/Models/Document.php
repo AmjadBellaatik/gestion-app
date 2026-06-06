@@ -91,6 +91,37 @@ class Document extends Model
                 $document->verification_url = url('/verify/document/' . $document->uuid);
             }
         });
+
+        static::deleting(function (Document $document) {
+            // On soft delete: mangle the document_number so the DB unique
+            // constraint (company_id, document_number) does not block a future
+            // document from reusing the freed number.
+            //
+            // The original number is preserved in metadata for audit purposes.
+            // Hard deletes (forceDelete) remove the row entirely, so no mangling
+            // is needed — the number is freed by the row's disappearance.
+            if ($document->isForceDeleting()) {
+                return;
+            }
+
+            $original = (string) ($document->document_number ?? '');
+
+            if ($original === '' || str_contains($original, '__VOID_')) {
+                return; // Already voided or no number assigned — nothing to do.
+            }
+
+            $void = $original . '__VOID_' . now()->format('YmdHis') . '_' . $document->id;
+
+            $document->metadata = array_merge(
+                (array) ($document->metadata ?? []),
+                ['original_document_number' => $original]
+            );
+            $document->document_number = $void;
+
+            // saveQuietly suppresses all model events so this update does not
+            // re-trigger creating/saving/deleting cycles.
+            $document->saveQuietly();
+        });
     }
 
     public function company(): BelongsTo

@@ -1,155 +1,6 @@
-<!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8">
-    <style>
-        @page { margin: 8mm 10mm 24mm 10mm; }
-        body {
-            font-family: DejaVu Sans, sans-serif;
-            color: #111;
-            font-size: 12px;
-            line-height: 1.45;
-        }
-        .watermark {
-            position: fixed;
-            top: 43%;
-            left: 0;
-            right: 0;
-            z-index: -1;
-            text-align: center;
-            font-size: 52px;
-            font-weight: 700;
-            color: #eef2f7;
-            transform: rotate(-28deg);
-        }
-        .doc-header,
-        .signatures {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .doc-header {
-            border-bottom: 2px solid #111;
-            padding-bottom: 8px;
-            margin-bottom: 18px;
-        }
-        .company-name {
-            font-size: 16px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .company-logo {
-            max-height: 60px;
-            max-width: 130px;
-            object-fit: contain;
-        }
-        .header-qr {
-            width: 58px;
-            height: 58px;
-        }
-        .header-qr-label {
-            font-size: 8px;
-            text-align: center;
-            color: #555;
-            margin-top: 2px;
-        }
-        .title {
-            margin: 12px 0 16px;
-            text-align: center;
-            font-size: 20px;
-            font-weight: 700;
-            text-decoration: underline;
-            text-transform: uppercase;
-        }
-        .meta-row {
-            margin-bottom: 4px;
-            font-size: 11px;
-        }
-        .meta-label {
-            font-weight: 700;
-        }
-        .client-box {
-            border: 1px solid #555;
-            padding: 8px 10px;
-            margin-bottom: 14px;
-        }
-        .client-box .box-title {
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-            font-size: 11px;
-        }
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 4px;
-        }
-        .items-table th {
-            background: #1f2937;
-            color: #fff;
-            padding: 6px 7px;
-            font-size: 10px;
-            text-align: left;
-        }
-        .items-table th.num { text-align: right; }
-        .items-table td {
-            border-bottom: 1px solid #d1d5db;
-            padding: 6px 7px;
-            vertical-align: top;
-        }
-        .items-table td.num { text-align: right; white-space: nowrap; }
-        .chassis {
-            font-size: 9px;
-            color: #555;
-        }
-        .totals {
-            width: 44%;
-            margin-left: auto;
-            margin-top: 10px;
-            border-collapse: collapse;
-        }
-        .totals td {
-            padding: 5px 7px;
-            border-bottom: 1px solid #d1d5db;
-        }
-        .totals td.num { text-align: right; white-space: nowrap; }
-        .totals tr.grand td {
-            font-weight: 700;
-            font-size: 13px;
-            background: #f3f4f6;
-        }
-        .signatures {
-            margin-top: 36px;
-        }
-        .signatures td {
-            width: 50%;
-            text-align: center;
-            font-weight: 700;
-            font-size: 11px;
-        }
-        .signature-line {
-            margin: 44px 28px 0;
-            border-top: 1px solid #111;
-            padding-top: 5px;
-        }
-        .doc-footer {
-            position: fixed;
-            left: 10mm;
-            right: 10mm;
-            bottom: 5mm;
-            height: 16mm;
-            border-top: 1px solid #777;
-            padding-top: 5px;
-            font-size: 9px;
-            line-height: 1.3;
-            color: #444;
-        }
-        .doc-footer table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-    </style>
-</head>
-<body>
+@extends('documents.pdf.layouts.master')
+
+@section('content')
 @php
     $companyName = $company->name;
     $buyer = $document->reseller ?: $document->sale?->reseller ?: $client;
@@ -160,15 +11,11 @@
         'administration' => $client?->administration_name,
         default          => trim(($client?->first_name ?? '') . ' ' . ($client?->last_name ?? '')),
     };
-    $buyerName = $isResellerBuyer
-        ? $buyer?->name
-        : $clientName;
+    $buyerName = $isResellerBuyer ? $buyer?->name : $clientName;
 
-    // Discount from the linked sale
     $discount     = $document->sale ? max(0.0, (float) $document->sale->discount) : 0.0;
     $discountNote = $document->sale?->discount_note;
 
-    // Totals — prefer stored values, fallback to summing items
     $totalTtc = (float) $document->total_amount;
     if ($totalTtc <= 0 && $document->items->isNotEmpty()) {
         $totalTtc = (float) $document->items->sum(fn ($item) => (float) $item->total);
@@ -181,14 +28,13 @@
         ? round($totalTtc - $taxAmount, 2)
         : (float) $document->subtotal;
 
-    // Watermark: brand of the first motorcycle, else company name
-    $firstUnit  = $document->items->first(fn ($i) => $i->motorcycleUnit)?->motorcycleUnit;
+    $firstUnit     = $document->items->first(fn ($i) => $i->motorcycleUnit)?->motorcycleUnit;
     $watermarkText = $firstUnit?->motorcycleModel?->brand?->name
         ?: $firstUnit?->motorcycleModel?->marque
         ?: $companyName;
 @endphp
 
-    <div class="watermark">{{ strtoupper($watermarkText) }}</div>
+    <div class="pdf-watermark">{{ strtoupper($watermarkText) }}</div>
 
     <table class="doc-header">
         <tr>
@@ -205,25 +51,16 @@
         </tr>
     </table>
 
-    <div class="title">{{ __('messages.delivery_note') }}</div>
+    <div class="doc-title">{{ __('messages.delivery_note') }}</div>
 
-    <div class="meta-row">
-        <span class="meta-label">{{ __('messages.document_number') }} :</span>
-        {{ $document->document_number }}
-    </div>
-    <div class="meta-row">
-        <span class="meta-label">{{ __('messages.document_date') }} :</span>
-        {{ $document->document_date?->format('d/m/Y') }}
-    </div>
+    <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.document_number') }} :</span> {{ $document->document_number }}</div>
+    <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.document_date') }} :</span> {{ $document->document_date?->format('d/m/Y') }}</div>
     @if($document->sale)
-    <div class="meta-row">
-        <span class="meta-label">{{ __('messages.sale') }} :</span>
-        {{ $document->sale?->sale_number }}
-    </div>
+    <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.sale') }} :</span> {{ $document->sale?->sale_number }}</div>
     @endif
 
-    <div class="client-box" style="margin-top: 12px;">
-        <div class="box-title">{{ __('messages.client') }}</div>
+    <div style="border: 1px solid #555; padding: 8px 10px; margin-top: 12px; margin-bottom: 14px;">
+        <div style="font-weight:700; text-transform:uppercase; margin-bottom:4px; font-size:11px;">{{ __('messages.client') }}</div>
         <div><strong>{{ $buyerName }}</strong></div>
         @if($isResellerBuyer)
             @if($buyer?->ice)<div>{{ __('messages.ice') }}: {{ $buyer->ice }}</div>@endif
@@ -264,70 +101,45 @@
         </tbody>
     </table>
 
-    <table class="totals">
-        <tr>
-            <td>{{ __('messages.subtotal_ht') }}</td>
-            <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
-        </tr>
-        <tr>
-            <td>{{ __('messages.tva_20') }}</td>
-            <td class="num">{{ number_format($taxAmount, 2, ',', ' ') }} MAD</td>
-        </tr>
-        @if($discount > 0)
-        <tr>
-            <td>{{ __('messages.gross_total') }}</td>
-            <td class="num">{{ number_format($grossTtc, 2, ',', ' ') }} MAD</td>
-        </tr>
-        <tr>
-            <td style="color:#b45309; font-weight:600;">
-                {{ __('messages.discount_amount') }}
-                @if($discountNote) <br><span style="font-weight:400; font-size:10px;">{{ $discountNote }}</span>@endif
-            </td>
-            <td class="num" style="color:#b45309; font-weight:600;">- {{ number_format($discount, 2, ',', ' ') }} MAD</td>
-        </tr>
-        <tr class="grand">
-            <td>{{ __('messages.net_total_after_discount') }}</td>
-            <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
-        </tr>
-        @else
-        <tr class="grand">
-            <td>{{ __('messages.total_ttc') }}</td>
-            <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
-        </tr>
-        @endif
-    </table>
-
-    <table class="signatures">
-        <tr>
-            <td><div class="signature-line">{{ __('messages.delivered_by') }}</div></td>
-            <td><div class="signature-line">{{ __('messages.received_by') }}</div></td>
-        </tr>
-    </table>
-
-    <div class="doc-footer">
-        <table>
+    <div class="pdf-protect">
+        <table class="totals">
             <tr>
-                <td style="width: 50%;">
-                    {{ $company->address ?: $company->legal_address }}
-                    @if($company->city) — {{ strtoupper($company->city) }}@endif
-                </td>
-                <td style="width: 50%; text-align: right;">
-                    @if($company->phone) Tél : {{ $company->phone }} @endif
-                    @if($company->email) | {{ $company->email }} @endif
-                </td>
+                <td>{{ __('messages.subtotal_ht') }}</td>
+                <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
             </tr>
             <tr>
-                <td>
-                    @if($company->ice) ICE : {{ $company->ice }} @endif
-                    @if($company->rc) | RC : {{ $company->rc }} @endif
-                    @if($company->if) | IF : {{ $company->if }} @endif
+                <td>{{ __('messages.tva_20') }}</td>
+                <td class="num">{{ number_format($taxAmount, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @if($discount > 0)
+            <tr>
+                <td>{{ __('messages.gross_total') }}</td>
+                <td class="num">{{ number_format($grossTtc, 2, ',', ' ') }} MAD</td>
+            </tr>
+            <tr>
+                <td style="color:#b45309; font-weight:600;">
+                    {{ __('messages.discount_amount') }}
+                    @if($discountNote) <br><span style="font-weight:400; font-size:10px;">{{ $discountNote }}</span>@endif
                 </td>
-                <td style="text-align: right;">
-                    @if($company->patente) Patente : {{ $company->patente }} @endif
-                    @if($company->cnss) | CNSS : {{ $company->cnss }} @endif
-                </td>
+                <td class="num" style="color:#b45309; font-weight:600;">- {{ number_format($discount, 2, ',', ' ') }} MAD</td>
+            </tr>
+            <tr class="grand">
+                <td>{{ __('messages.net_total_after_discount') }}</td>
+                <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @else
+            <tr class="grand">
+                <td>{{ __('messages.total_ttc') }}</td>
+                <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @endif
+        </table>
+
+        <table class="signatures">
+            <tr>
+                <td><div class="signature-line">{{ __('messages.delivered_by') }}</div></td>
+                <td><div class="signature-line">{{ __('messages.received_by') }}</div></td>
             </tr>
         </table>
     </div>
-</body>
-</html>
+@endsection

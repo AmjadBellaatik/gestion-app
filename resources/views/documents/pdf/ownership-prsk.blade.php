@@ -1,15 +1,34 @@
-<!doctype html>
-<html lang="{{ $document->language }}" dir="{{ $document->language === 'ar' ? 'rtl' : 'ltr' }}">
-<head>
-    <meta charset="utf-8">
-    @include('documents.pdf.partials.styles')
-</head>
-<body class="{{ $document->language === 'ar' ? 'rtl' : '' }}">
-    <div class="official-title">{{ __('messages.ownership_document') }}</div>
+@extends('documents.pdf.layouts.master-qr')
+
+@push('styles')
+<style>
     @php
-        $unit = $motorcycleUnit;
-        $model = $unit?->motorcycleModel;
+        $primaryColor = $company?->primary_color ?: '#111827';
+        $accentColor  = $company?->accent_color  ?: '#f3f4f6';
     @endphp
+
+    /* Official document typography */
+    .rtl { direction: rtl; text-align: right; }
+    .official-title { text-align: center; font-size: 15px; font-weight: 700; text-transform: uppercase; margin: 12px 0; }
+
+    /* Official data table */
+    .official-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .official-table td, .official-table th { border: 1px solid {{ $primaryColor }}; padding: 5px; }
+    .official-table th { background: {{ $accentColor }}; text-align: center; }
+
+    /* Signature block for legal doc — two columns, equal width */
+    .signatures td { height: 70px; vertical-align: bottom; }
+</style>
+@endpush
+
+@section('content')
+@php
+    $unit  = $motorcycleUnit;
+    $model = $unit?->motorcycleModel;
+@endphp
+
+    <div class="official-title">{{ __('messages.ownership_document') }}</div>
+
     <table class="official-table">
         <tr><th colspan="4">{{ __('messages.owner_identity') }}</th></tr>
         <tr>
@@ -42,13 +61,15 @@
             <td>{{ $model?->titre_homologation }}</td>
         </tr>
     </table>
+
     <p>{{ __('messages.ownership_declaration_sentence') }}</p>
-    <table class="signatures">
-        <tr>
-            <td>{{ __('messages.owner_signature') }}</td>
-            <td>{{ __('messages.company') }}</td>
-        </tr>
-    </table>
-    @include('documents.pdf.partials.footer')
-</body>
-</html>
+
+    <div class="pdf-protect">
+        <table class="signatures">
+            <tr>
+                <td>{{ __('messages.owner_signature') }}</td>
+                <td>{{ __('messages.company') }}</td>
+            </tr>
+        </table>
+    </div>
+@endsection

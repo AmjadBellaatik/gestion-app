@@ -103,7 +103,18 @@ class DocumentResource extends Resource
 
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label(__('messages.total_ttc'))
-                    ->money('MAD')
+                    ->formatStateUsing(function ($state, Document $record) {
+                        $priceTypes = [
+                            DocumentType::INVOICE,
+                            DocumentType::QUOTATION,
+                            DocumentType::SUPPLIER_ORDER,
+                            DocumentType::REPAIR_INVOICE,
+                        ];
+                        if (! in_array($record->documentType?->code, $priceTypes, true)) {
+                            return '-';
+                        }
+                        return 'MAD ' . number_format((float) $state, 2);
+                    })
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('generated_at')
@@ -159,7 +170,7 @@ class DocumentResource extends Resource
 
         return <<<HTML
             <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                <a href="{$viewUrl}" style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:6px; background:#374151; color:#fff; font-weight:600; font-size:12px; text-decoration:none;">{$viewLabel}</a>
+                <a href="{$viewUrl}" target="_blank" style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:6px; background:#374151; color:#fff; font-weight:600; font-size:12px; text-decoration:none;">{$viewLabel}</a>
                 <a href="{$downloadUrl}" style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:6px; background:#2563eb; color:#fff; font-weight:600; font-size:12px; text-decoration:none;">{$downloadLabel}</a>
                 <form method="POST" action="{$deleteUrl}" style="display:inline;" onsubmit="return confirm({$deleteConfirm})">
                     <input type="hidden" name="_token" value="{$token}">

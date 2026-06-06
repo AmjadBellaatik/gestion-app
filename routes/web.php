@@ -341,6 +341,21 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
+    | ACCOUNTING — Client Account Statement (HTML / PDF / CSV)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/clients/{client}/statement', [\App\Http\Controllers\ClientStatementController::class, 'show'])
+        ->name('clients.statement');
+
+    Route::get('/clients/{client}/statement/pdf', [\App\Http\Controllers\ClientStatementController::class, 'pdf'])
+        ->name('clients.statement.pdf');
+
+    Route::get('/clients/{client}/statement/csv', [\App\Http\Controllers\ClientStatementController::class, 'csv'])
+        ->name('clients.statement.csv');
+
+    /*
+    |--------------------------------------------------------------------------
     | Company Protected Routes Example
     |--------------------------------------------------------------------------
     */

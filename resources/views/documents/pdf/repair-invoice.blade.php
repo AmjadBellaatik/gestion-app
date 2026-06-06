@@ -1,16 +1,25 @@
 @extends('documents.pdf.layouts.master')
 
+@push('styles')
+<style>
+    .repair-banner { background: #1f2937; color: #fff; padding: 6px 10px; font-size: 11px; font-weight: 700; margin: 14px 0 4px; text-transform: uppercase; }
+</style>
+@endpush
+
 @section('content')
 @php
     $companyName = $company->name;
+    $clientType  = $client?->client_type ?: 'person';
+    $clientName  = match ($clientType) {
+        'company'        => $client?->company_name,
+        'administration' => $client?->administration_name,
+        default          => $client?->display_name,
+    };
 
-    $providerName    = data_get($document->metadata, 'manual_supplier_name');
-    $providerPhone   = data_get($document->metadata, 'manual_supplier_phone');
-    $providerEmail   = data_get($document->metadata, 'manual_supplier_email');
-    $providerAddress = data_get($document->metadata, 'manual_supplier_address');
-    $providerIce     = data_get($document->metadata, 'provider_ice');
-    $providerRc      = data_get($document->metadata, 'provider_rc');
-    $quoteRef        = data_get($document->metadata, 'supplier_quote_number');
+    $repairTicket = $document->repairTicket;
+    $repairNumber = $repairTicket?->ticket_number;
+    $repairUnit   = $motorcycleUnit ?? $document->primaryMotorcycleUnit();
+    $repairModel  = $repairUnit?->motorcycleModel;
 
     $totalTtc = (float) $document->total_amount;
     if ($totalTtc <= 0 && $document->items->isNotEmpty()) {
@@ -23,7 +32,7 @@
         ? round($totalTtc - $taxAmount, 2)
         : (float) $document->subtotal;
 
-    $watermarkText = strtoupper($companyName);
+    $watermarkText = strtoupper($repairModel?->brand?->name ?: $repairModel?->marque ?: $companyName);
 @endphp
 
     <div class="pdf-watermark">{{ $watermarkText }}</div>
@@ -43,13 +52,13 @@
         </tr>
     </table>
 
-    <div class="doc-title">{{ __('messages.supplier_order') }}</div>
+    <div class="doc-title">{{ __('messages.repair_invoice') }}</div>
     <div class="doc-ref">
         {{ __('messages.document_number') }} : {{ $document->document_number }}
         &nbsp;|&nbsp;
         {{ __('messages.document_date') }} : {{ $document->document_date?->format('d/m/Y') }}
-        @if($quoteRef)
-            &nbsp;|&nbsp; {{ __('messages.provider_quote_reference') }} : {{ $quoteRef }}
+        @if($repairNumber)
+            &nbsp;|&nbsp; Réf. réparation : {{ $repairNumber }}
         @endif
     </div>
 
@@ -57,23 +66,26 @@
         <tr>
             <td style="width: 50%;">
                 <div class="box">
-                    <div class="box-title">{{ __('messages.provider') }}</div>
-                    <strong>{{ $providerName }}</strong><br>
-                    @if($providerAddress){{ $providerAddress }}<br>@endif
-                    @if($providerPhone){{ __('messages.phone') }}: {{ $providerPhone }}<br>@endif
-                    @if($providerEmail){{ __('messages.email') }}: {{ $providerEmail }}<br>@endif
-                    @if($providerIce){{ __('messages.ice') }}: {{ $providerIce }}<br>@endif
-                    @if($providerRc){{ __('messages.rc') }}: {{ $providerRc }}@endif
+                    <div class="box-title">{{ __('messages.client') }}</div>
+                    <strong>{{ $clientName }}</strong><br>
+                    @if(in_array($clientType, ['company', 'administration']))
+                        @if($client?->ice){{ __('messages.ice') }}: {{ $client->ice }}<br>@endif
+                        @if($client?->phone){{ __('messages.phone') }}: {{ $client->phone }}<br>@endif
+                    @else
+                        @if($client?->cin)CIN: {{ $client->cin }}<br>@endif
+                        @if($client?->phone){{ __('messages.phone') }}: {{ $client->phone }}<br>@endif
+                    @endif
                 </div>
             </td>
             <td style="width: 50%;">
+                @if($repairUnit)
                 <div class="box">
-                    <div class="box-title">{{ __('messages.delivery_address') }}</div>
-                    <strong>{{ $companyName }}</strong><br>
-                    {{ $company->address ?: $company->legal_address }}<br>
-                    @if($company->city){{ strtoupper($company->city) }}<br>@endif
-                    @if($company->phone){{ __('messages.phone') }}: {{ $company->phone }}@endif
+                    <div class="box-title">{{ __('messages.motorcycle') }}</div>
+                    <strong>{{ $repairModel?->marque }} {{ $repairModel?->modele }}</strong><br>
+                    {{ __('messages.chassis_number') }}: {{ $repairUnit->chassis_number }}<br>
+                    @if($repairModel?->type){{ __('messages.type') }}: {{ $repairModel->type }}@endif
                 </div>
+                @endif
             </td>
         </tr>
     </table>
@@ -118,13 +130,20 @@
         </table>
 
         <div class="total-words">
-            {{ __('messages.total_in_letters') }} :
+            Arrêté la présente Facture de Réparation à la somme TTC de :
             <strong>{{ \App\Services\Amounts\AmountInWordsService::convert($totalTtc, 'fr') }}</strong>
         </div>
 
+        @if($document->notes)
+        <div style="margin-top: 12px; padding: 8px 10px; border: 1px solid #d1d5db; font-size: 11px;">
+            <div style="font-weight:700; text-transform:uppercase; margin-bottom:4px; font-size:10px;">{{ __('messages.notes') }}</div>
+            {{ $document->notes }}
+        </div>
+        @endif
+
         <table class="signatures">
             <tr>
-                <td><div class="signature-line">{{ __('messages.supplier_signature') }}</div></td>
+                <td><div class="signature-line">{{ __('messages.client_signature') }}</div></td>
                 <td><div class="signature-line">{{ __('messages.company_signature') }}</div></td>
             </tr>
         </table>

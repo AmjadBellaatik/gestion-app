@@ -179,11 +179,138 @@ class Client extends Model
         };
     }
 
+    /**
+     * Live outstanding balance — the single source of truth for what a client owes.
+     *
+     * Sums remaining_amount across the client's non-deleted sales that are still
+     * unpaid or partially paid. Because it reads the sales() relationship, it
+     * automatically excludes soft-deleted sales and respects CompanyScope.
+     *
+     * When the query eager-loads the aggregate via withOutstandingBalance()
+     * (see scope below), that pre-computed value is used to avoid an N+1 query;
+     * otherwise it falls back to a live aggregate. Both paths use the identical
+     * formula, so list and detail views can never diverge.
+     */
     public function getOutstandingBalanceAttribute(): float
     {
+        if (array_key_exists('outstanding_balance_sum', $this->attributes)) {
+            return (float) $this->attributes['outstanding_balance_sum'];
+        }
+
         return (float) $this->sales()
             ->whereIn('payment_status', ['unpaid', 'partial'])
             ->sum('remaining_amount');
+    }
+
+    /**
+     * Eager-load the outstanding balance as a SQL aggregate (single query),
+     * exposed to the accessor as `outstanding_balance_sum`. Use this in list
+     * queries so every row's balance comes from the same formula as the
+     * detail page without triggering N+1 queries.
+     */
+    public function scopeWithOutstandingBalance(Builder $query): Builder
+    {
+        return $query->withSum(
+            ['sales as outstanding_balance_sum' => fn (Builder $sub) => $sub
+                ->whereIn('payment_status', ['unpaid', 'partial'])],
+            'remaining_amount'
+        );
+    }
+
+    /**
+     * Number of days after which an unpaid/partial sale is considered overdue.
+     * Sales have no explicit due_date, so accounting uses an aging threshold
+     * from the sale creation date. Adjust here if a due_date is introduced.
+     */
+    public const OVERDUE_DAYS = 30;
+
+    /**
+     * Eager-load EVERY accounting figure in a single query for the Client
+     * Balances module. All money figures derive from the sales table (so they
+     * always reconcile: total = paid + remaining per sale) and share the exact
+     * same outstanding-balance definition as the detail and list pages.
+     *
+     * Exposed aggregate attributes:
+     *   - outstanding_balance_sum   SUM(remaining) on unpaid/partial sales   (= source of truth)
+     *   - total_sales_sum           SUM(total) of all sales
+     *   - total_payments_sum        SUM(paid_amount) of all sales
+     *   - credit_balance_sum        SUM(paid_amount - total) where overpaid (client credit)
+     *   - open_sales_count          COUNT of unpaid/partial sales
+     *   - overdue_sales_count       COUNT of unpaid/partial sales older than OVERDUE_DAYS
+     *   - overdue_amount_sum        SUM(remaining) of those overdue sales
+     *   - last_sale_at              MAX(sales.created_at)
+     *   - last_payment_at           MAX(payments.created_at) for validated payments
+     */
+    public function scopeWithAccountingAggregates(Builder $query): Builder
+    {
+        $overdueCutoff = now()->subDays(self::OVERDUE_DAYS);
+
+        return $query
+            // Outstanding (THE source of truth — identical formula everywhere)
+            ->withSum(
+                ['sales as outstanding_balance_sum' => fn (Builder $q) => $q
+                    ->whereIn('payment_status', ['unpaid', 'partial'])],
+                'remaining_amount'
+            )
+            ->withSum('sales as total_sales_sum', 'total')
+            ->withSum('sales as total_payments_sum', 'paid_amount')
+            ->withCount(['sales as open_sales_count' => fn (Builder $q) => $q
+                ->whereIn('payment_status', ['unpaid', 'partial'])])
+            ->withCount(['sales as overdue_sales_count' => fn (Builder $q) => $q
+                ->whereIn('payment_status', ['unpaid', 'partial'])
+                ->where('created_at', '<', $overdueCutoff)])
+            ->withSum(
+                ['sales as overdue_amount_sum' => fn (Builder $q) => $q
+                    ->whereIn('payment_status', ['unpaid', 'partial'])
+                    ->where('created_at', '<', $overdueCutoff)],
+                'remaining_amount'
+            )
+            ->withMax('sales as last_sale_at', 'created_at')
+            // Client credit (overpayment) — GREATEST not portable in withSum, use subquery
+            ->selectSub(
+                Sale::query()
+                    ->withoutGlobalScopes()
+                    ->selectRaw('COALESCE(SUM(GREATEST(paid_amount - total, 0)), 0)')
+                    ->whereColumn('sales.client_id', 'clients.id')
+                    ->whereNull('sales.deleted_at'),
+                'credit_balance_sum'
+            )
+            ->selectSub(
+                \App\Models\Payment::query()
+                    ->withoutGlobalScopes()
+                    ->selectRaw('MAX(created_at)')
+                    ->whereColumn('payments.client_id', 'clients.id')
+                    ->where('status', 'paid')
+                    ->whereNull('payments.deleted_at'),
+                'last_payment_at'
+            );
+    }
+
+    /* Convenience accessors over the eager-loaded aggregates (default 0/null). */
+    public function getTotalSalesAttribute(): float
+    {
+        return (float) ($this->attributes['total_sales_sum'] ?? 0);
+    }
+
+    public function getTotalPaymentsAttribute(): float
+    {
+        return (float) ($this->attributes['total_payments_sum'] ?? 0);
+    }
+
+    public function getCreditBalanceAttribute(): float
+    {
+        return (float) ($this->attributes['credit_balance_sum'] ?? 0);
+    }
+
+    public function getCurrentDebtAttribute(): float
+    {
+        // Current debt IS the outstanding balance (what the client owes now).
+        return $this->outstanding_balance;
+    }
+
+    public function getOverdueAmountAttribute(): float
+    {
+        return (float) ($this->attributes['overdue_amount_sum'] ?? 0);
     }
 
     /*

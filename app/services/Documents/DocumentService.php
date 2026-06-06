@@ -339,6 +339,18 @@ class DocumentService
             $view = 'documents.pdf.supplier-order';
         }
 
+        if ($document->documentType?->code === DocumentType::SALE_RETURN) {
+            $view = 'documents.pdf.sale-return';
+        }
+
+        if ($document->documentType?->code === DocumentType::OWNERSHIP) {
+            $view = 'documents.pdf.ownership-prsk';
+        }
+
+        if ($document->documentType?->code === DocumentType::REPAIR_INVOICE) {
+            $view = 'documents.pdf.repair-invoice';
+        }
+
         $company = Company::findOrFail($document->company_id);
         $qrSvg = base64_encode(
             QrCode::format('svg')->size(120)->margin(1)->generate($document->verification_url)

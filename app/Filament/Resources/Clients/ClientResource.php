@@ -103,6 +103,11 @@ class ClientResource extends Resource
 
         return $table
 
+            // Eager-load the outstanding balance as a single SQL aggregate so the
+            // list column reads the SAME formula as the detail page (the
+            // outstanding_balance accessor) without N+1 queries.
+            ->modifyQueryUsing(fn ($query) => $query->withOutstandingBalance())
+
             ->columns([
 
                 Tables\Columns\TextColumn::make(
@@ -165,14 +170,16 @@ class ClientResource extends Resource
                     ),
 
                 Tables\Columns\TextColumn::make(
-                    'balance'
+                    'outstanding_balance'
                 )
 
                     ->label(
                         __('messages.balance')
                     )
 
-                    ->money('MAD'),
+                    ->money('MAD')
+
+                    ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
 
                 Tables\Columns\IconColumn::make(
                     'is_blocked'
