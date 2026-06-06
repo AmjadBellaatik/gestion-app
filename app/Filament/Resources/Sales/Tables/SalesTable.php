@@ -106,7 +106,7 @@ class SalesTable
                         }
                     ),
 
-                TextColumn::make('created_at')
+                TextColumn::make('sale_date')
 
                     ->label(
                         __('messages.sale_date')
@@ -116,11 +116,34 @@ class SalesTable
 
                     ->sortable(),
 
+                TextColumn::make('created_at')
+
+                    ->label(
+                        __('messages.created_at')
+                    )
+
+                    ->dateTime()
+
+                    ->sortable()
+
+                    ->toggleable(isToggledHiddenByDefault: true),
+
             ])
 
             ->filters([
 
                 TrashedFilter::make(),
+
+                \Filament\Tables\Filters\Filter::make('sale_date')
+                    ->schema([
+                        \Filament\Forms\Components\DatePicker::make('from')
+                            ->label(__('messages.sale_date').' '.__('messages.from')),
+                        \Filament\Forms\Components\DatePicker::make('until')
+                            ->label(__('messages.sale_date').' '.__('messages.until')),
+                    ])
+                    ->query(fn ($query, array $data) => $query
+                        ->when($data['from'] ?? null, fn ($q, $d) => $q->whereDate('sale_date', '>=', $d))
+                        ->when($data['until'] ?? null, fn ($q, $d) => $q->whereDate('sale_date', '<=', $d))),
 
             ])
 

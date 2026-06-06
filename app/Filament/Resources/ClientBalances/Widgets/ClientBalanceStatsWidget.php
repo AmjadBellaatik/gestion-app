@@ -7,7 +7,6 @@ use App\Models\Payment;
 use App\Models\Sale;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Accounting summary for the Client Balances page.
@@ -43,7 +42,7 @@ class ClientBalanceStatsWidget extends StatsOverviewWidget
         // Overdue amount = remaining on unpaid/partial sales aged past threshold.
         $overdue = (float) Sale::query()
             ->whereIn('payment_status', ['unpaid', 'partial'])
-            ->where('created_at', '<', now()->subDays(Client::OVERDUE_DAYS))
+            ->whereDate('sale_date', '<', now()->subDays(Client::OVERDUE_DAYS))
             ->sum('remaining_amount');
 
         // Payments validated this calendar month.

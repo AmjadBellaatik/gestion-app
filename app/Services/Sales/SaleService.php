@@ -756,7 +756,8 @@ class SaleService
                     'reseller_id' => $sale->reseller_id,
                     'sale_id' => $sale->id,
                     'document_number' => $previousNumber,
-                    'document_date' => now()->toDateString(),
+                    // Sales documents carry the effective sale date, not "now".
+                    'document_date' => optional($sale->sale_date)->toDateString() ?? now()->toDateString(),
                     'status' => 'generated',
                     'metadata' => $isWarranty ? [
                         'warranty_duration_value' => $warrantySaleItem?->warranty_duration_value,

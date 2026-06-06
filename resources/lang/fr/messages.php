@@ -1097,4 +1097,13 @@ return [
     'payments_this_month'  => 'Paiements ce mois',
     'debit'                => 'Débit',
     'print'                => 'Imprimer',
+
+    // Manual sale date
+    'sale_date_admin_hint'    => 'Vous pouvez modifier la date de vente (antidatage autorisé, dates futures interdites).',
+    'sale_date_readonly_hint' => 'La date de vente est gérée automatiquement et ne peut être modifiée que par un administrateur.',
+    'sale_date_history'       => 'Historique de la date de vente',
+    'changed_at'              => 'Modifié le',
+    'changed_by'              => 'Modifié par',
+    'old_date'                => 'Ancienne date',
+    'new_date'                => 'Nouvelle date',
 ];

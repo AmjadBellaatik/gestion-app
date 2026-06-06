@@ -221,7 +221,7 @@ class ClientBalanceResource extends Resource
                     ->label(__('messages.only_overdue'))
                     ->query(fn (Builder $q) => $q->whereHas('sales', fn (Builder $s) => $s
                         ->whereIn('payment_status', ['unpaid', 'partial'])
-                        ->where('created_at', '<', now()->subDays(Client::OVERDUE_DAYS)))),
+                        ->whereDate('sale_date', '<', now()->subDays(Client::OVERDUE_DAYS)))),
 
                 Tables\Filters\Filter::make('only_active')
                     ->label(__('messages.only_active'))
@@ -246,14 +246,11 @@ class ClientBalanceResource extends Resource
                         \Filament\Forms\Components\TextInput::make('max')
                             ->label(__('messages.max'))->numeric(),
                     ])
-                    ->query(function (Builder $q, array $data) {
-                        $sub = fn () => Client::query()->getModel(); // noop for clarity
-                        return $q
-                            ->when($data['min'] ?? null, fn (Builder $q, $v) => $q
-                                ->havingRaw('COALESCE(outstanding_balance_sum,0) >= ?', [$v]))
-                            ->when($data['max'] ?? null, fn (Builder $q, $v) => $q
-                                ->havingRaw('COALESCE(outstanding_balance_sum,0) <= ?', [$v]));
-                    }),
+                    ->query(fn (Builder $q, array $data) => $q
+                        ->when($data['min'] ?? null, fn (Builder $q, $v) => $q
+                            ->havingRaw('COALESCE(outstanding_balance_sum,0) >= ?', [$v]))
+                        ->when($data['max'] ?? null, fn (Builder $q, $v) => $q
+                            ->havingRaw('COALESCE(outstanding_balance_sum,0) <= ?', [$v]))),
 
                 Tables\Filters\Filter::make('last_payment_date')
                     ->schema([

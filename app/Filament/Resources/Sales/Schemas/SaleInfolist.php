@@ -20,9 +20,13 @@ class SaleInfolist
                         TextEntry::make('sale_number')
                             ->label(__('messages.reference')),
 
-                        TextEntry::make('created_at')
+                        TextEntry::make('sale_date')
                             ->label(__('messages.sale_date'))
                             ->date(),
+
+                        TextEntry::make('created_at')
+                            ->label(__('messages.created_at'))
+                            ->dateTime(),
 
                         TextEntry::make('client_display')
                             ->label(__('messages.client'))

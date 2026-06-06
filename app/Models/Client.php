@@ -258,14 +258,14 @@ class Client extends Model
                 ->whereIn('payment_status', ['unpaid', 'partial'])])
             ->withCount(['sales as overdue_sales_count' => fn (Builder $q) => $q
                 ->whereIn('payment_status', ['unpaid', 'partial'])
-                ->where('created_at', '<', $overdueCutoff)])
+                ->whereDate('sale_date', '<', $overdueCutoff)])
             ->withSum(
                 ['sales as overdue_amount_sum' => fn (Builder $q) => $q
                     ->whereIn('payment_status', ['unpaid', 'partial'])
-                    ->where('created_at', '<', $overdueCutoff)],
+                    ->whereDate('sale_date', '<', $overdueCutoff)],
                 'remaining_amount'
             )
-            ->withMax('sales as last_sale_at', 'created_at')
+            ->withMax('sales as last_sale_at', 'sale_date')
             // Client credit (overpayment) — GREATEST not portable in withSum, use subquery
             ->selectSub(
                 Sale::query()

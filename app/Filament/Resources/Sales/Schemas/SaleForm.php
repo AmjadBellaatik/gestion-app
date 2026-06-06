@@ -10,7 +10,10 @@ use App\Models\MotorcycleUnit;
 use App\Models\Product;
 use App\Models\Reseller;
 
+use App\Filament\Resources\Sales\SaleResource;
+
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -100,6 +103,31 @@ class SaleForm
 
                             ]),
 
+                    ])
+                    ->columnSpanFull(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | SALE DATE
+                |--------------------------------------------------------------------------
+                | Defaults to today. Editable only by Admin / Super Admin (UI + server).
+                | Future dates are blocked for everyone (accounting period cutoff).
+                | Backdating is permitted only for admins. Non-admins see read-only.
+                */
+
+                Section::make(__('messages.sale_date'))
+                    ->schema([
+                        DatePicker::make('sale_date')
+                            ->label(__('messages.sale_date'))
+                            ->native(false)
+                            ->default(now()->toDateString())
+                            ->required()
+                            ->maxDate(now())                       // block future dates
+                            ->disabled(fn () => ! SaleResource::isAdminUser())
+                            ->dehydrated()                          // still submit when disabled
+                            ->helperText(fn () => SaleResource::isAdminUser()
+                                ? __('messages.sale_date_admin_hint')
+                                : __('messages.sale_date_readonly_hint')),
                     ])
                     ->columnSpanFull(),
 

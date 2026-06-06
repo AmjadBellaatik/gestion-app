@@ -1097,5 +1097,14 @@ return [
     'payments_this_month'  => 'Payments This Month',
     'debit'                => 'Debit',
     'print'                => 'Print',
+
+    // Manual sale date
+    'sale_date_admin_hint'    => 'You may change the sale date (backdating allowed, future dates blocked).',
+    'sale_date_readonly_hint' => 'The sale date is set automatically and can only be changed by an administrator.',
+    'sale_date_history'       => 'Sale Date History',
+    'changed_at'              => 'Changed At',
+    'changed_by'              => 'Changed By',
+    'old_date'                => 'Old Date',
+    'new_date'                => 'New Date',
 ];
 

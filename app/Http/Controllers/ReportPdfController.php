@@ -85,7 +85,7 @@ class ReportPdfController extends Controller
 
     private function salesData(Carbon $from, Carbon $to): array
     {
-        $sales        = Sale::with(['client', 'reseller'])->whereBetween('created_at', [$from, $to])->latest()->get();
+        $sales        = Sale::with(['client', 'reseller'])->whereBetween('sale_date', [$from, $to])->orderByDesc('sale_date')->get();
         $totalRevenue = $sales->sum('total');
         $totalPaid    = $sales->sum('paid_amount');
         $totalUnpaid  = $sales->sum('remaining_amount');

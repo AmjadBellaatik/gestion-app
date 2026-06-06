@@ -47,7 +47,7 @@
             @foreach($sales as $sale)
             <tr>
                 <td class="bold">{{ $sale->sale_number }}</td>
-                <td>{{ $sale->created_at->format('d/m/Y') }}</td>
+                <td>{{ ($sale->sale_date ?? $sale->created_at)->format('d/m/Y') }}</td>
                 <td>{{ $sale->client?->display_name ?? $sale->reseller?->name ?? '—' }}</td>
                 <td>MAD {{ $fmt($sale->total) }}</td>
                 <td>MAD {{ $fmt($sale->paid_amount) }}</td>

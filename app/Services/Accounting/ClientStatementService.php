@@ -25,9 +25,9 @@ class ClientStatementService
     {
         // Debits — sales billed
         $sales = $client->sales()
-            ->get(['id', 'sale_number', 'total', 'created_at'])
+            ->get(['id', 'sale_number', 'total', 'sale_date', 'created_at'])
             ->map(fn ($s) => [
-                'date'     => $s->created_at,
+                'date'     => $s->sale_date ?: $s->created_at,
                 'document' => $s->sale_number,
                 'type'     => 'sale',
                 'debit'    => (float) $s->total,

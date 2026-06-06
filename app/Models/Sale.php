@@ -25,6 +25,7 @@ class Sale extends Model
         'reseller_id',
         'user_id',
         'sale_number',
+        'sale_date',
         'sale_type',
         'subtotal',
         'discount',
@@ -43,6 +44,7 @@ class Sale extends Model
 
     protected $casts = [
         'returned_at' => 'datetime',
+        'sale_date'   => 'date',
     ];
 
     protected static function booted(): void
@@ -67,6 +69,26 @@ class Sale extends Model
 
             }
 
+            // Effective sale date defaults to today; never null.
+            if (empty($model->sale_date)) {
+                $model->sale_date = now()->toDateString();
+            }
+
+        });
+
+        // AUDIT TRAIL: log every sale_date modification, immutably.
+        static::updating(function (Sale $model) {
+            if ($model->isDirty('sale_date')) {
+                \App\Models\SaleDateLog::create([
+                    'company_id' => $model->company_id,
+                    'sale_id'    => $model->id,
+                    'user_id'    => auth()->id(),
+                    'user_name'  => auth()->user()?->name,
+                    'old_date'   => $model->getOriginal('sale_date'),
+                    'new_date'   => $model->sale_date,
+                    'changed_at' => now(),
+                ]);
+            }
         });
 
         static::created(function (Sale $model) {
@@ -110,6 +132,11 @@ class Sale extends Model
     | Relations
     |--------------------------------------------------------------------------
     */
+
+    public function saleDateLogs()
+    {
+        return $this->hasMany(SaleDateLog::class)->latest('changed_at');
+    }
 
     public function company()
     {

@@ -28,8 +28,13 @@ class DocumentService
             $type = DocumentType::findOrFail($data['document_type_id']);
             $template = $this->resolveTemplate($type, 'fr');
             $sale = filled($data['sale_id'] ?? null)
-                ? Sale::query()->select(['id', 'client_id', 'reseller_id'])->find($data['sale_id'])
+                ? Sale::query()->select(['id', 'client_id', 'reseller_id', 'sale_date'])->find($data['sale_id'])
                 : null;
+
+            // Sales documents inherit the sale's effective date unless one is given.
+            if (blank($data['document_date'] ?? null) && $sale?->sale_date) {
+                $data['document_date'] = $sale->sale_date->toDateString();
+            }
             $resellerId = $data['reseller_id'] ?? $sale?->reseller_id;
             $clientId = filled($resellerId)
                 ? null

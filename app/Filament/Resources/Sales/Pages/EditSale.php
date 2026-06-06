@@ -62,6 +62,16 @@ class EditSale extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        // Server-side sale_date permission enforcement (defense in depth):
+        //  - Non-admins cannot change it → revert to the stored value.
+        //  - Admins may backdate but never future-date → clamp to today.
+        $today = now()->toDateString();
+        if (! SaleResource::isAdminUser()) {
+            $data['sale_date'] = optional($this->getRecord()->sale_date)->toDateString();
+        } elseif (filled($data['sale_date'] ?? null) && $data['sale_date'] > $today) {
+            $data['sale_date'] = $today;
+        }
+
         foreach ($data['saleItems'] ?? [] as $row) {
             $itemId = $row['_sale_item_id'] ?? null;
             if (! $itemId) {
@@ -86,6 +96,12 @@ class EditSale extends EditRecord
     protected function afterSave(): void
     {
         $sale = $this->getRecord();
+
+        // Propagate the (possibly backdated) sale_date to every linked document
+        // so all sales PDFs immediately reflect the new effective date.
+        Document::query()
+            ->where('sale_id', $sale->id)
+            ->update(['document_date' => $sale->sale_date]);
 
         // Re-sync warranties from updated SaleItem warranty fields
         WarrantyService::activateFromSale($sale);

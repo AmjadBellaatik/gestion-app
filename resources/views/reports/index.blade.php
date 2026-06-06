@@ -178,7 +178,7 @@
                                     </td>
 
                                     <td>
-                                        {{ $sale->created_at }}
+                                        {{ $sale->sale_date ?? $sale->created_at }}
                                     </td>
 
                                 </tr>

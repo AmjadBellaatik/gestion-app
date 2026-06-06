@@ -45,9 +45,10 @@ class SalesReport extends Page
     {
         [$from, $to] = $this->resolveRange();
 
+        // Business reporting uses the effective sale_date, not the DB timestamp.
         $sales = Sale::with(['client', 'reseller'])
-            ->whereBetween('created_at', [$from, $to])
-            ->latest()
+            ->whereBetween('sale_date', [$from, $to])
+            ->orderByDesc('sale_date')
             ->get();
 
         $totalRevenue  = $sales->sum('total');
