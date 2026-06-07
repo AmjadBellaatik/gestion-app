@@ -28,14 +28,16 @@ class PasswordResetNotification extends Notification implements ShouldQueue
         $appName = config('app.name', 'Application');
         $expireMinutes = config('auth.passwords.' . config('auth.defaults.passwords') . '.expire', 60);
 
+        $mailLocale = $notifiable->language ?? app()->getLocale() ?? 'fr';
+
         return (new MailMessage)
-            ->subject(trans('messages.password_reset_subject', ['app' => $appName], 'fr'))
+            ->subject(trans('messages.password_reset_subject', ['app' => $appName], $mailLocale))
             ->view('emails.password-reset', [
                 'user' => $notifiable,
                 'resetUrl' => $resetUrl,
                 'appName' => $appName,
                 'expireMinutes' => $expireMinutes,
-                'mailLocale' => 'fr',
+                'mailLocale' => $mailLocale,
             ]);
     }
 }

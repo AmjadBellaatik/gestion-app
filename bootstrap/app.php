@@ -28,6 +28,19 @@ return Application::configure(
         Middleware $middleware
     ) {
 
+        /*
+        |--------------------------------------------------------------------------
+        | PHASE 0 — Consolidate guest redirects on Filament login
+        |--------------------------------------------------------------------------
+        | All `auth`-middleware guest redirects (and session-expiry redirects)
+        | now point at the Filament login page instead of the legacy Breeze
+        | route('login'). This decouples the framework from routes/auth.php so the
+        | legacy auth stack can be retired safely.
+        */
+        $middleware->redirectGuestsTo(
+            fn () => route('filament.admin.auth.login')
+        );
+
         $middleware->append([
 
             \App\Http\Middleware\SecurityHeaders::class,

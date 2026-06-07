@@ -3,13 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmergencyAccessController;
 
-use Barryvdh\DomPDF\Facade\Pdf;
-
-use PhpOffice\PhpWord\PhpWord;
-use PhpOffice\PhpWord\IOFactory;
-
-use App\Models\Document;
-
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RepairController;
@@ -22,10 +15,6 @@ use App\Http\Controllers\CompanySwitchController;
 use App\Http\Controllers\DocumentPdfController;
 use App\Http\Controllers\DocumentVerificationController;
 
-use App\Services\Documents\DocumentPlaceholderService;
-
-use App\Services\Amounts\AmountInWordsService;
-
 /*
 |--------------------------------------------------------------------------
 | Public Routes
@@ -37,6 +26,19 @@ Route::get('/', function () {
     return redirect('/admin');
 
 });
+
+/*
+|--------------------------------------------------------------------------
+| CSP Violation Report Collector
+|--------------------------------------------------------------------------
+| Browsers POST violation reports here (no session/CSRF token). CSRF-exempt
+| and tightly throttled. Used during Report-Only observation.
+*/
+
+Route::post('/csp-report', [\App\Http\Controllers\CspReportController::class, 'store'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class])
+    ->middleware('throttle:60,1')
+    ->name('csp.report');
 
 /*
 |--------------------------------------------------------------------------
@@ -62,95 +64,30 @@ Route::middleware('throttle:30,1')->get(
 
 /*
 |--------------------------------------------------------------------------
-| Locale Test
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/test-session', function () {
-
-    abort_unless(app()->isLocal(), 404);
-
-    return app()->getLocale();
-
-});
-
-/*
-|--------------------------------------------------------------------------
 | Sales Routes Protection
 |--------------------------------------------------------------------------
 */
 
-Route::middleware([
-
-    'auth',
-
-    'permission:manage_sales',
-
-    'throttle:60,1',
-
-])->group(function () {
-
-    Route::resource(
-
-        'sales',
-
-        SaleController::class
-
-    );
-
-});
-
 /*
 |--------------------------------------------------------------------------
-| User Management Routes Protection
+| PHASE 5 — Legacy Blade CRUD SOFT-DISABLED (superseded by Filament)
 |--------------------------------------------------------------------------
+| Sales → SaleResource, Users → UserResource, Settings → CompanySetting/Mail
+| settings. Commented (not deleted) for a reversible soak period. Uncomment to
+| roll back instantly; delete the controllers/views only after soak validation.
 */
 
-Route::middleware([
+// Route::middleware(['auth', 'permission:manage_sales', 'throttle:60,1'])->group(function () {
+//     Route::resource('sales', SaleController::class);
+// });
 
-    'auth',
+// Route::middleware(['auth', 'permission:manage_users', 'throttle:60,1'])->group(function () {
+//     Route::resource('users', UserController::class);
+// });
 
-    'permission:manage_users',
-
-    'throttle:60,1',
-
-])->group(function () {
-
-    Route::resource(
-
-        'users',
-
-        UserController::class
-
-    );
-
-});
-
-/*
-|--------------------------------------------------------------------------
-| Settings Routes Protection
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware([
-
-    'auth',
-
-    'permission:manage_settings',
-
-    'throttle:60,1',
-
-])->group(function () {
-
-    Route::resource(
-
-        'settings',
-
-        SettingController::class
-
-    );
-
-});
+// Route::middleware(['auth', 'permission:manage_settings', 'throttle:60,1'])->group(function () {
+//     Route::resource('settings', SettingController::class);
+// });
 
 /*
 |--------------------------------------------------------------------------
@@ -168,14 +105,10 @@ Route::middleware([
 
 ])->group(function () {
 
-    Route::get(
+    // PHASE 5 — legacy Blade reports page disabled (superseded by Filament Reports hub).
+    // Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
-        '/reports',
-
-        [ReportController::class, 'index']
-
-    )->name('reports.index');
-
+    // KEEP: used by Filament report pages (HasReportPeriod::pdfExportAction).
     Route::get('/reports/pdf', [ReportPdfController::class, 'generate'])->name('reports.pdf');
 
 });
@@ -196,17 +129,12 @@ Route::middleware([
 
 ])->group(function () {
 
-    Route::resource(
-
-        'repairs',
-
-        RepairController::class
-
-    );
+    // PHASE 5 — legacy Blade repairs CRUD disabled (superseded by RepairTicketResource).
+    // Route::resource('repairs', RepairController::class);
 
     /*
     |--------------------------------------------------------------------------
-    | Repair Print Routes
+    | Repair Print Routes — KEEP (used by Filament EditRepairTicket)
     |--------------------------------------------------------------------------
     */
 
@@ -258,65 +186,14 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
-    | Profile
+    | PHASE 5 — Legacy Profile SOFT-DISABLED (superseded by Filament Profile page)
     |--------------------------------------------------------------------------
+    | Commented for soak; uncomment to roll back.
     */
-
-    Route::get(
-
-        '/profile',
-
-        [
-
-            ProfileController::class,
-
-            'edit'
-
-        ]
-
-    )->name('profile.edit');
-
-    Route::put(
-
-        '/profile',
-
-        [
-
-            ProfileController::class,
-
-            'update'
-
-        ]
-
-    )->name('profile.update');
-
-    Route::get(
-
-        '/profile/settings',
-
-        [
-
-            ProfileController::class,
-
-            'settings'
-
-        ]
-
-    )->name('profile.settings');
-
-    Route::put(
-
-        '/profile/settings',
-
-        [
-
-            ProfileController::class,
-
-            'updateSettings'
-
-        ]
-
-    )->name('profile.settings.update');
+    // Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    // Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    // Route::get('/profile/settings', [ProfileController::class, 'settings'])->name('profile.settings');
+    // Route::put('/profile/settings', [ProfileController::class, 'updateSettings'])->name('profile.settings.update');
 
     /*
     |--------------------------------------------------------------------------
@@ -353,26 +230,6 @@ Route::middleware([
 
     Route::get('/clients/{client}/statement/csv', [\App\Http\Controllers\ClientStatementController::class, 'csv'])
         ->name('clients.statement.csv');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Company Protected Routes Example
-    |--------------------------------------------------------------------------
-    */
-
-    Route::middleware([
-
-        'permission:manage_stock'
-
-    ])->group(function () {
-
-        Route::get('/stock-test', function () {
-
-            return 'Stock Access Allowed';
-
-        });
-
-    });
 
 });
 
@@ -422,197 +279,6 @@ Route::middleware('throttle:10,1')->get('/language/{locale}', function ($locale)
 
 /*
 |--------------------------------------------------------------------------
-| PDF TEST
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/test-pdf', function () {
-
-    abort_unless(app()->isLocal(), 404);
-
-    $pdf = Pdf::loadHtml('
-
-        <h1>
-            PDF Works ✅
-        </h1>
-
-        <p>
-            Motorcycle ERP PDF System Ready
-        </p>
-
-    ');
-
-    return $pdf->download(
-
-        'test.pdf'
-
-    );
-
-});
-
-/*
-|--------------------------------------------------------------------------
-| WORD TEST
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/test-word', function () {
-
-    abort_unless(app()->isLocal(), 404);
-
-    $phpWord = new PhpWord();
-
-    $section = $phpWord->addSection();
-
-    $section->addText(
-
-        'PHPWord Works ✅'
-
-    );
-
-    $section->addText(
-
-        'Motorcycle ERP DOCX System Ready'
-
-    );
-
-    $tempFile = storage_path(
-
-        'app/test.docx'
-
-    );
-
-    $writer = IOFactory::createWriter(
-
-        $phpWord,
-
-        'Word2007'
-
-    );
-
-    $writer->save($tempFile);
-
-    return response()->download(
-
-        $tempFile
-
-    );
-
-});
-
-/*
-|--------------------------------------------------------------------------
-| Placeholder Engine Test
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/test-placeholders', function () {
-
-    abort_unless(app()->isLocal(), 404);
-
-    $document = Document::first();
-
-    if (! $document) {
-
-        return 'No document found';
-
-    }
-
-    $template = '
-
-        <h1>
-
-            {{ company.name }}
-
-        </h1>
-
-        <p>
-
-            ICE:
-            {{ company.ice }}
-
-        </p>
-
-        <p>
-
-            Client:
-            {{ client.full_name }}
-
-        </p>
-
-        <p>
-
-            VIN:
-            {{ motorcycle.vin_number }}
-
-        </p>
-
-        <p>
-
-            TTC:
-            {{ totals.total_ttc }}
-
-        </p>
-
-    ';
-
-    return DocumentPlaceholderService::replace(
-
-        $template,
-
-        $document
-
-    );
-
-});
-
-/*
-|--------------------------------------------------------------------------
-| Amount In Words Test
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/test-amount-words', function () {
-
-    abort_unless(app()->isLocal(), 404);
-
-    return [
-
-        'fr' => AmountInWordsService::convert(
-            10000,
-            'fr'
-        ),
-
-        'en' => AmountInWordsService::convert(
-            10000,
-            'en'
-        ),
-
-        'ar' => AmountInWordsService::convert(
-            10000,
-            'ar'
-        ),
-
-    ];
-
-});
-
-/*
-|--------------------------------------------------------------------------
-| Chart Test
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/test-chart', function () {
-
-    abort_unless(app()->isLocal(), 404);
-
-    return view('chart-test');
-
-});
-
-/*
-|--------------------------------------------------------------------------
 | Auth Routes
 |--------------------------------------------------------------------------
 */
@@ -622,4 +288,13 @@ Route::get('/system/health-check/{token}', [EmergencyAccessController::class, 'h
     ->middleware('throttle:5,10')
     ->name('system.health');
 
-require __DIR__.'/auth.php';
+/*
+|--------------------------------------------------------------------------
+| PHASE 5 — Legacy Breeze auth stack SOFT-DISABLED
+|--------------------------------------------------------------------------
+| Authentication is consolidated on Filament (/admin/login). Guest redirects
+| were repointed to Filament in Phase 0 (bootstrap/app.php redirectGuestsTo),
+| so disabling these routes is safe. Reversible: uncomment to restore Breeze.
+| Delete routes/auth.php + Auth controllers/views only after soak validation.
+*/
+// require __DIR__.'/auth.php';

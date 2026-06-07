@@ -73,6 +73,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Dedicated channel for CSP violation reports (Phase 8 observation).
+        'csp' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/csp.log'),
+            'level' => 'warning',
+            'days' => env('CSP_LOG_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

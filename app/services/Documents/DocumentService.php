@@ -26,7 +26,7 @@ class DocumentService
     {
         return DB::transaction(function () use ($data) {
             $type = DocumentType::findOrFail($data['document_type_id']);
-            $template = $this->resolveTemplate($type, 'fr');
+            $template = $this->resolveTemplate($type, $data['language'] ?? null);
             $sale = filled($data['sale_id'] ?? null)
                 ? Sale::query()->select(['id', 'client_id', 'reseller_id', 'sale_date'])->find($data['sale_id'])
                 : null;
@@ -52,7 +52,7 @@ class DocumentService
                 'repair_ticket_id' => $data['repair_ticket_id'] ?? null,
                 'document_number' => $data['document_number'] ?? null,
                 'document_date' => $data['document_date'] ?? now()->toDateString(),
-                'language' => 'fr',
+                'language' => $data['language'] ?? 'fr',
                 'status' => $data['status'] ?? 'generated',
                 'discount_amount' => $data['discount_amount'] ?? 0,
                 'notes' => $data['notes'] ?? null,
@@ -261,7 +261,7 @@ class DocumentService
     public function storePdf(Document $document): GeneratedPdf
     {
         $previousLocale = app()->getLocale();
-        app()->setLocale('fr');
+        app()->setLocale($document->language ?? 'fr');
 
         $document = Document::query()
             ->with([
@@ -414,7 +414,7 @@ class DocumentService
     public static function generatePdf(Document $document, string $template = ''): \Barryvdh\DomPDF\PDF
     {
         $previousLocale = app()->getLocale();
-        app()->setLocale('fr');
+        app()->setLocale($document->language ?? 'fr');
 
         $document = Document::query()
             ->with([

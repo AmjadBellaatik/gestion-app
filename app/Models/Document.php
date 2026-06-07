@@ -67,7 +67,7 @@ class Document extends Model
             $document->company_id ??= session('company_id');
             $document->uuid ??= (string) Str::uuid();
             $document->document_date ??= now()->toDateString();
-            $document->language = 'fr';
+            $document->language ??= 'fr';
             $document->status ??= 'generated';
             $document->tax_rate ??= self::TAX_RATE;
 
@@ -121,6 +121,30 @@ class Document extends Model
             // saveQuietly suppresses all model events so this update does not
             // re-trigger creating/saving/deleting cycles.
             $document->saveQuietly();
+        });
+
+        static::restoring(function (Document $document) {
+            $meta     = (array) ($document->metadata ?? []);
+            $original = $meta['original_document_number'] ?? null;
+
+            if (! $original || str_contains($original, '__VOID_')) {
+                return;
+            }
+
+            // Re-claim the original number only if no active document in the same
+            // company has already taken it (a replacement may have been issued).
+            $taken = static::withoutGlobalScope(CompanyScope::class)
+                ->where('company_id', $document->company_id)
+                ->where('document_number', $original)
+                ->whereNull('deleted_at')
+                ->exists();
+
+            if (! $taken) {
+                $document->document_number = $original;
+                unset($meta['original_document_number']);
+                $document->metadata = $meta ?: null;
+            }
+            // If taken, document keeps the __VOID_ number. Admin must reassign manually.
         });
     }
 

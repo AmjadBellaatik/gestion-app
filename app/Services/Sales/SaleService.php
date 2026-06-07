@@ -562,51 +562,11 @@ class SaleService
     |--------------------------------------------------------------------------
     | DOCUMENT GENERATION
     |--------------------------------------------------------------------------
+    | Removed dead methods generateInvoice() and generateBL() (zero callers,
+    | wrote malformed Document rows using non-existent number/total columns).
+    | Real document generation flows through generateSelectedDocumentsFromSale()
+    | → DocumentService::generate().
     */
-
-    protected static function generateInvoice(
-        Sale $sale
-    ): void {
-
-        Document::create([
-
-            'company_id' => session('company_id'),
-
-            'client_id' => $sale->client_id,
-
-            'number' => 'INV-'.$sale->sale_number,
-
-            'status' => 'validated',
-
-            'total' => $sale->total,
-
-            'notes' => 'Generated from sale',
-
-        ]);
-
-    }
-
-    protected static function generateBL(
-        Sale $sale
-    ): void {
-
-        Document::create([
-
-            'company_id' => session('company_id'),
-
-            'client_id' => $sale->client_id,
-
-            'number' => 'BL-'.$sale->sale_number,
-
-            'status' => 'validated',
-
-            'total' => 0,
-
-            'notes' => 'Bon de livraison',
-
-        ]);
-
-    }
 
     /** @deprecated — conformity is now generated via DocumentService::generate() */
     protected static function generateConformity(

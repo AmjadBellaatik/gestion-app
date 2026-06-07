@@ -100,7 +100,7 @@ class EmergencyAccessController extends Controller
             'ip'    => $ip,
         ]);
 
-        // ── 7. Redirect into the admin panel ───────────────────────────────
-        return redirect('/admin/dashboard');
+        // ── 7. Redirect into the Filament admin panel (dashboard = /admin) ──
+        return redirect()->route('filament.admin.pages.dashboard');
     }
 }
