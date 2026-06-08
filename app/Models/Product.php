@@ -42,8 +42,6 @@ class Product extends Model
 
         'name',
 
-        'sku',
-
         'barcode',
 
         'type',
@@ -109,6 +107,12 @@ class Product extends Model
                 $model->sku = self::generateSku();
             }
 
+        });
+
+        static::updating(function (Product $model) {
+            if ($model->isDirty('sku')) {
+                $model->sku = $model->getOriginal('sku');
+            }
         });
     }
 

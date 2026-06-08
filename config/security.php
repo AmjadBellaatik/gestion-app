@@ -33,7 +33,7 @@ return [
 
         // Master switches
         'enabled' => env('CSP_ENABLED', true),
-        'enforce' => env('CSP_ENFORCE', false), // start in Report-Only; flip after validation
+        'enforce' => env('CSP_ENFORCE', true), // Report-Only until CSP_ENFORCE=false is set explicitly
 
         // Where the browser POSTs violation reports (logged by CspReportController)
         'report_uri' => env('CSP_REPORT_URI', '/csp-report'),
@@ -90,7 +90,7 @@ return [
             'object-src'      => ["'none'"],   // no Flash/legacy plugins; PDFs are served, not <object>
             'base-uri'        => ["'self'"],   // block <base> hijacking
             'form-action'     => ["'self'"],   // forms post to same origin only
-            'frame-ancestors' => ["'self'"],   // anti-clickjacking (X-Frame-Options also DENYs)
+            'frame-ancestors' => ["'none'"],   // blocks all framing — consistent with X-Frame-Options: DENY
         ],
 
         /*

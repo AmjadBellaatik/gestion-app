@@ -81,6 +81,7 @@ class DocumentNumberService
                 ->where('document_type_id', $document->document_type_id)
                 ->whereNotNull('document_number')
                 ->where('document_number', 'like', $prefix . '-' . $year . '-%')
+                ->lockForUpdate()   // force current read — bypass REPEATABLE READ snapshot
                 ->get(['document_number'])
                 ->map(function ($d) {
                     $num = (string) $d->document_number;
@@ -142,9 +143,10 @@ class DocumentNumberService
 
             } while (
                 Document::withoutGlobalScopes()
-                    ->whereNull('deleted_at')               // only active documents block reuse
-                    ->where('company_id', $document->company_id) // scoped to this company
+                    ->whereNull('deleted_at')
+                    ->where('company_id', $document->company_id)
                     ->where('document_number', $number)
+                    ->lockForUpdate()   // force current read — bypass REPEATABLE READ snapshot
                     ->exists()
             );
 

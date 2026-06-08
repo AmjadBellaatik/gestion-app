@@ -4,7 +4,10 @@ namespace App\Services\Sales;
 
 use DB;
 
+use App\Models\RepairItem;
+use App\Models\RepairTicket;
 use App\Models\Sale;
+use App\Models\Scopes\CompanyScope;
 use App\Models\Payment;
 use App\Models\SaleItem;
 use App\Models\Product;
@@ -185,11 +188,40 @@ class SaleService
             $paidAmount = (float) ($data['paid_amount'] ?? 0);
             $paymentMethod = $data['payment_method'] ?? 'cash';
 
+            // ── Repair ticket validation ──────────────────────────────────────────
+            $repairTicketId = filled($data['repair_ticket_id'] ?? null) ? (int) $data['repair_ticket_id'] : null;
+            $repairTicket   = null;
+
+            if ($repairTicketId) {
+                $repairTicket = RepairTicket::withoutGlobalScope(CompanyScope::class)
+                    ->where('company_id', session('company_id'))
+                    ->whereIn('status', ['completed', 'delivered'])
+                    ->lockForUpdate()
+                    ->find($repairTicketId);
+
+                if (! $repairTicket) {
+                    throw new \InvalidArgumentException(__('messages.repair_already_invoiced'));
+                }
+
+                $alreadyLinked = Sale::withoutGlobalScope(CompanyScope::class)
+                    ->whereNotNull('repair_ticket_id')
+                    ->where('repair_ticket_id', $repairTicketId)
+                    ->exists();
+
+                if ($alreadyLinked) {
+                    throw new \InvalidArgumentException(__('messages.repair_already_invoiced'));
+                }
+            }
+
             $sale = Sale::create([
 
                 'client_id' => $data['client_id'] ?? null,
 
                 'reseller_id' => $data['reseller_id'] ?? null,
+
+                'repair_ticket_id' => $repairTicketId,
+
+                'sale_date' => $data['sale_date'] ?? null,
 
                 'sale_number' => self::generateSaleNumber(),
 
@@ -353,6 +385,16 @@ class SaleService
                 */
 
                 if (! empty($item['motorcycle_unit_id'])) {
+                    $unitForChassis = MotorcycleUnit::query()
+                        ->select(['id', 'chassis_number'])
+                        ->find((int) $item['motorcycle_unit_id']);
+
+                    if ($unitForChassis && blank($unitForChassis->chassis_number)) {
+                        throw new \InvalidArgumentException(
+                            __('messages.chassis_number_required')
+                        );
+                    }
+
                     self::handleMotorcycleUnitSale(
                         $sale,
                         (int) $item['motorcycle_unit_id']
@@ -407,7 +449,9 @@ class SaleService
                 collect($saleInputItems)->sum(fn ($item) => max(0.0, (float) ($item['discount'] ?? 0))),
                 $totalIncludingTax
             ));
-            $netTotal     = max(0.0, $totalIncludingTax - $discount);
+            // Repair total is already net of repair discount — add directly to net.
+            $repairTotal  = $repairTicket ? max(0.0, (float) ($repairTicket->total_cost ?? 0)) : 0.0;
+            $netTotal     = max(0.0, $totalIncludingTax - $discount) + $repairTotal;
             $saleTax      = round($netTotal * (20 / 120), 2);
             $saleSubtotal = round($netTotal - $saleTax, 2);
 
@@ -440,9 +484,12 @@ class SaleService
                     'client_id'      => $sale->client_id,
                     'amount'         => $paidAmount,
                     'payment_method' => $paymentMethod,
-                    'reference'      => $paymentMethod === 'cash'
-                        ? null
-                        : ($data['reference'] ?? $data['cheque_number'] ?? null),
+                    'reference'      => match ($paymentMethod) {
+                        'cash'          => null,
+                        'bank_transfer' => $data['transfer_reference'] ?? null,
+                        'cheque'        => $data['cheque_number'] ?? null,
+                        default         => $data['reference'] ?? null,
+                    },
                     'notes'          => 'Payment for sale ' . $sale->sale_number,
                 ]);
 
@@ -517,7 +564,8 @@ class SaleService
             self::generateSelectedDocumentsFromSale(
                 $sale,
                 $items,
-                $selectedDocumentCodes
+                $selectedDocumentCodes,
+                $repairTicket
             );
 
             /*
@@ -627,7 +675,8 @@ class SaleService
     public static function generateSelectedDocumentsFromSale(
         Sale $sale,
         array $saleItems,
-        array $selectedCodes
+        array $selectedCodes,
+        ?RepairTicket $repairTicket = null
     ): void {
         if (empty($selectedCodes)) {
             return;
@@ -695,6 +744,11 @@ class SaleService
 
             if ($isWarranty && ! $warrantySaleItem) {
                 continue;
+            }
+
+            // Append repair items to commercial documents when a ticket is bundled.
+            if ($repairTicket && in_array($code, [DocumentType::INVOICE, DocumentType::DELIVERY_NOTE], true)) {
+                $documentItems = array_merge($documentItems, self::resolveRepairDocumentItems($repairTicket));
             }
 
             DB::transaction(function () use ($sale, $type, $code, $isConformity, $isWarranty, $warrantySaleItem, $documentItems): void {
@@ -837,6 +891,56 @@ class SaleService
         }
 
         return (float) $model->price_ttc;
+    }
+
+    protected static function resolveRepairDocumentItems(RepairTicket $ticket): array
+    {
+        $items = RepairItem::where('repair_ticket_id', $ticket->id)
+            ->with('product')
+            ->get();
+
+        if ($items->isNotEmpty()) {
+            return $items->map(fn (RepairItem $item) => [
+                'item_type'      => $item->item_type,
+                'product_id'     => $item->product_id,
+                'description'    => $item->item_description,
+                'quantity'       => max(1.0, (float) $item->quantity),
+                'unit_price'     => (float) $item->unit_price,
+                'discount_amount'=> (float) ($item->discount_amount ?? 0),
+            ])->values()->all();
+        }
+
+        // Fallback: summarise labor + parts when no RepairItem rows exist.
+        $summary = [];
+        if ((float) ($ticket->labor_cost ?? 0) > 0) {
+            $summary[] = [
+                'item_type'   => 'labor',
+                'description' => __('messages.labor'),
+                'quantity'    => 1,
+                'unit_price'  => (float) $ticket->labor_cost,
+                'discount_amount' => 0,
+            ];
+        }
+        if ((float) ($ticket->parts_cost ?? 0) > 0) {
+            $summary[] = [
+                'item_type'   => 'part',
+                'description' => __('messages.parts'),
+                'quantity'    => 1,
+                'unit_price'  => (float) $ticket->parts_cost,
+                'discount_amount' => 0,
+            ];
+        }
+        if (empty($summary) && (float) ($ticket->total_cost ?? 0) > 0) {
+            $summary[] = [
+                'item_type'   => 'repair',
+                'description' => __('messages.repair_ticket') . ' ' . $ticket->ticket_number,
+                'quantity'    => 1,
+                'unit_price'  => (float) $ticket->total_cost,
+                'discount_amount' => 0,
+            ];
+        }
+
+        return $summary;
     }
 
     private static function ensureProductIdNullable(): void

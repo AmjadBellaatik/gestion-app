@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+use App\Models\RepairTicket;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
 use App\Models\Transaction;
@@ -23,6 +24,7 @@ class Sale extends Model
         'company_id',
         'client_id',
         'reseller_id',
+        'repair_ticket_id',
         'user_id',
         'sale_number',
         'sale_date',
@@ -209,5 +211,10 @@ class Sale extends Model
     {
         return $this->hasMany(StockMovement::class, 'reference_id')
             ->where('reference_type', self::class);
+    }
+
+    public function repairTicket()
+    {
+        return $this->belongsTo(RepairTicket::class);
     }
 }

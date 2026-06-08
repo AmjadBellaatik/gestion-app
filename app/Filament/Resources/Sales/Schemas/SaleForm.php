@@ -9,11 +9,15 @@ use App\Models\DocumentType;
 use App\Models\MotorcycleUnit;
 use App\Models\Product;
 use App\Models\Reseller;
+use App\Models\RepairTicket;
+use App\Models\Sale;
+use App\Models\Scopes\CompanyScope;
 
 use App\Filament\Resources\Sales\SaleResource;
 
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -320,6 +324,22 @@ class SaleForm
 
                                     ]),
 
+                                Placeholder::make('chassis_number_display')
+                                    ->label(__('messages.chassis_number'))
+                                    ->content(function (callable $get): string {
+                                        $unitId = $get('motorcycle_unit_id');
+                                        if (! $unitId) {
+                                            return '—';
+                                        }
+                                        $unit = MotorcycleUnit::query()->find((int) $unitId);
+                                        return $unit?->chassis_number ?? '—';
+                                    })
+                                    ->visible(fn (callable $get): bool =>
+                                        $get('item_type') === 'motorcycle'
+                                        && filled($get('motorcycle_unit_id'))
+                                    )
+                                    ->columnSpanFull(),
+
                                 Grid::make(5)
 
                                     ->schema([
@@ -384,21 +404,105 @@ class SaleForm
                     ])
                     ->columnSpanFull(),
 
+                /*
+                |--------------------------------------------------------------------------
+                | LINKED REPAIR TICKET
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make(__('messages.linked_repair_ticket'))
+                    ->icon('heroicon-o-wrench-screwdriver')
+                    ->collapsible()
+                    ->schema([
+
+                        Hidden::make('repair_total')
+                            ->default(0),
+
+                        Select::make('repair_ticket_id')
+                            ->label(__('messages.select_repair_ticket'))
+                            ->options(function (): array {
+                                $linkedIds = Sale::withoutGlobalScope(CompanyScope::class)
+                                    ->whereNotNull('repair_ticket_id')
+                                    ->pluck('repair_ticket_id')
+                                    ->filter()
+                                    ->values()
+                                    ->toArray();
+
+                                return RepairTicket::query()
+                                    ->whereIn('status', ['completed', 'delivered'])
+                                    ->when($linkedIds, fn ($q) => $q->whereNotIn('id', $linkedIds))
+                                    ->with('client')
+                                    ->get()
+                                    ->mapWithKeys(fn (RepairTicket $t) => [
+                                        $t->id => $t->ticket_number
+                                            . ' — '
+                                            . ($t->client?->display_name ?? ''),
+                                    ])
+                                    ->toArray();
+                            })
+                            ->searchable()
+                            ->nullable()
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $get, callable $set): void {
+                                if (! $state) {
+                                    $set('repair_total', 0);
+                                } else {
+                                    $ticket = RepairTicket::find((int) $state);
+                                    $set('repair_total', (float) ($ticket?->total_cost ?? 0));
+                                }
+                                self::syncPaidAmount($get, $set, 'paid_amount', 'saleItems');
+                            })
+                            ->columnSpanFull(),
+
+                        Placeholder::make('repair_details_preview')
+                            ->label(__('messages.repair_total'))
+                            ->content(function (callable $get): string {
+                                $ticketId = $get('repair_ticket_id');
+                                if (! $ticketId) {
+                                    return '—';
+                                }
+                                $ticket = RepairTicket::find((int) $ticketId);
+                                if (! $ticket) {
+                                    return '—';
+                                }
+                                return sprintf(
+                                    '%s — %s: %s MAD | %s: %s MAD | %s: %s MAD',
+                                    $ticket->ticket_number,
+                                    __('messages.labor'),
+                                    number_format((float) $ticket->labor_cost, 2),
+                                    __('messages.parts'),
+                                    number_format((float) $ticket->parts_cost, 2),
+                                    __('messages.total'),
+                                    number_format((float) $ticket->total_cost, 2),
+                                );
+                            })
+                            ->visible(fn (callable $get): bool => filled($get('repair_ticket_id')))
+                            ->columnSpanFull(),
+
+                    ])
+                    ->columnSpanFull(),
+
                 Section::make('Live total')
                     ->icon('heroicon-o-calculator')
                     ->schema([
 
-                        Grid::make(5)
+                        Grid::make(6)
                             ->schema([
 
                                 Placeholder::make('items_total_preview')
-                                    ->label(__('messages.total_before_reduction'))
+                                    ->label(__('messages.products_total'))
                                     ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['gross']))
                                     ->columnSpan(1),
 
                                 Placeholder::make('discount_preview')
                                     ->label(__('messages.discount_amount'))
                                     ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['discount']))
+                                    ->columnSpan(1),
+
+                                Placeholder::make('repair_total_preview')
+                                    ->label(__('messages.repair_total'))
+                                    ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['repair_total']))
+                                    ->visible(fn ($get): bool => self::calculateSaleTotals($get)['repair_total'] > 0)
                                     ->columnSpan(1),
 
                                 Placeholder::make('ht_preview')
@@ -414,7 +518,7 @@ class SaleForm
                                     ->columnSpan(1),
 
                                 Placeholder::make('final_total_preview')
-                                    ->label(__('messages.final_price_ttc'))
+                                    ->label(__('messages.grand_total'))
                                     ->content(fn ($get): string => self::formatMoney(self::calculateSaleTotals($get)['net']))
                                     ->columnSpan(1),
 
@@ -467,8 +571,8 @@ class SaleForm
 
                                 TextInput::make('reference')
                                     ->label(__('messages.reference'))
-                                    ->visible(fn ($get) => ! \in_array($get('payment_method'), ['cash', 'cheque'], true))
-                                    ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
+                                    ->visible(fn ($get) => $get('payment_method') === 'card')
+                                    ->required(fn ($get) => $get('payment_method') === 'card')
                                     ->maxLength(100)
                                     ->columnSpan(1),
 
@@ -546,17 +650,20 @@ class SaleForm
 
                                 TextInput::make('bank_name')
                                     ->label(__('messages.bank_name'))
+                                    ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
                                     ->maxLength(150)
                                     ->columnSpan(1),
 
                                 TextInput::make('transfer_reference')
                                     ->label(__('messages.reference_number'))
+                                    ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
                                     ->maxLength(100)
                                     ->columnSpan(1),
 
                                 \Filament\Forms\Components\DatePicker::make('transfer_date')
                                     ->label(__('messages.transfer_date'))
                                     ->default(today())
+                                    ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
                                     ->columnSpan(1),
 
                             ]),
@@ -679,18 +786,20 @@ class SaleForm
             collect($items)->sum(fn (array $item) => max(0.0, (float) ($item['discount'] ?? 0))),
             $gross
         );
-        $net  = max(0.0, $gross - $discount);
+        $repairTotal = max(0.0, (float) ($get('repair_total') ?? 0));
+        $net  = max(0.0, $gross - $discount) + $repairTotal;
         $tax  = round($net * (20 / 120), 2);
         $ht   = round($net - $tax, 2);
         $paid = max(0.0, (float) ($get($paidAmountPath) ?? 0));
 
         return [
-            'gross'     => round($gross, 2),
-            'discount'  => round($discount, 2),
-            'ht'        => $ht,
-            'tax'       => $tax,
-            'net'       => round($net, 2),
-            'remaining' => round(max(0.0, $net - $paid), 2),
+            'gross'        => round($gross, 2),
+            'discount'     => round($discount, 2),
+            'repair_total' => round($repairTotal, 2),
+            'ht'           => $ht,
+            'tax'          => $tax,
+            'net'          => round($net, 2),
+            'remaining'    => round(max(0.0, $net - $paid), 2),
         ];
     }
 

@@ -41,7 +41,9 @@ class ProductForm
                     ->label(
                         __('messages.sku')
                     )
-                    ->placeholder('Auto'),
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->helperText(__('messages.sku_managed_by_system')),
 
                 TextInput::make('barcode')
 
