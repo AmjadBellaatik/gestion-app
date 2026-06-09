@@ -16,10 +16,10 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Get;
 
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class RepairTicketForm
@@ -47,14 +47,33 @@ class RepairTicketForm
                         ->live()
                         ->dehydrated(false)
                         ->afterStateUpdated(function (string $state, callable $set) {
+                            // Always reflect is_foreign_vehicle flag
                             $set('is_foreign_vehicle', $state === 'foreign');
+
                             if ($state === 'sale') {
+                                // Clear stock unit — will be auto-populated via sale selection
                                 $set('motorcycle_unit_id', null);
                             } elseif ($state === 'stock') {
+                                // Clear sale and all auto-populated foreign fields
                                 $set('sale_id', null);
+                                $set('client_id', null);
+                                $set('foreign_brand', null);
+                                $set('foreign_model', null);
+                                $set('foreign_chassis', null);
+                                $set('foreign_year', null);
+                                $set('foreign_color', null);
+                                $set('mileage', null);
                             } else {
+                                // foreign — clear everything
                                 $set('sale_id', null);
                                 $set('motorcycle_unit_id', null);
+                                $set('foreign_brand', null);
+                                $set('foreign_model', null);
+                                $set('foreign_chassis', null);
+                                $set('foreign_year', null);
+                                $set('foreign_color', null);
+                                $set('mileage', null);
+                                $set('client_id', null);
                             }
                         }),
                 ]),
@@ -68,42 +87,120 @@ class RepairTicketForm
             Section::make(__('messages.vehicle_information'))
                 ->schema([
 
-                    // Mode: Linked to a sale
+                    // ── Mode: Linked to a sale ──────────────────────────────
                     Select::make('sale_id')
                         ->label(__('messages.sale'))
-                        ->options(fn () => Sale::query()
-                            ->with('client')
-                            ->orderByDesc('id')
-                            ->get()
-                            ->mapWithKeys(fn (Sale $sale) => [
-                                $sale->id => ($sale->sale_number ?: 'SALE-' . $sale->id)
-                                    . ' — ' . ($sale->client?->display_name ?? '-'),
-                            ])
-                            ->toArray())
                         ->searchable()
                         ->preload()
                         ->live()
                         ->required(fn (Get $get): bool => $get('_repair_source') === 'sale')
-                        ->visible(fn ($get) => $get('_repair_source') === 'sale')
+                        ->visible(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                        ->getSearchResultsUsing(function (string $search) {
+                            return Sale::query()
+                                ->with(['client', 'items.motorcycleUnit.motorcycleModel'])
+                                ->where(function ($query) use ($search) {
+                                    $query->where('sale_number', 'like', "%{$search}%")
+                                        ->orWhereHas('client', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
+                                })
+                                ->orderByDesc('id')
+                                ->limit(50)
+                                ->get()
+                                ->mapWithKeys(function (Sale $sale) {
+                                    $unit  = $sale->items
+                                        ->whereNotNull('motorcycle_unit_id')
+                                        ->first()
+                                        ?->motorcycleUnit;
+                                    $brand = $unit?->motorcycleModel?->marque ?? null;
+                                    $model = $unit?->motorcycleModel?->modele ?? null;
+
+                                    $label = ($sale->sale_number ?: 'SALE-' . $sale->id)
+                                        . ' — ' . ($sale->client?->display_name ?? '-');
+
+                                    if ($brand || $model) {
+                                        $label .= ' — ' . implode(' ', array_filter([$brand, $model]));
+                                    }
+
+                                    return [$sale->id => $label];
+                                })
+                                ->toArray();
+                        })
+                        ->getOptionLabelUsing(function ($value) {
+                            if (! $value) {
+                                return null;
+                            }
+                            $sale = Sale::with(['client', 'items.motorcycleUnit.motorcycleModel'])->find($value);
+                            if (! $sale) {
+                                return null;
+                            }
+                            $unit  = $sale->items
+                                ->whereNotNull('motorcycle_unit_id')
+                                ->first()
+                                ?->motorcycleUnit;
+                            $brand = $unit?->motorcycleModel?->marque ?? null;
+                            $model = $unit?->motorcycleModel?->modele ?? null;
+
+                            $label = ($sale->sale_number ?: 'SALE-' . $sale->id)
+                                . ' — ' . ($sale->client?->display_name ?? '-');
+
+                            if ($brand || $model) {
+                                $label .= ' — ' . implode(' ', array_filter([$brand, $model]));
+                            }
+
+                            return $label;
+                        })
                         ->afterStateUpdated(function ($state, callable $set) {
                             if (! $state) {
+                                // Sale de-selected — clear everything
+                                $set('client_id', null);
+                                $set('motorcycle_unit_id', null);
+                                $set('foreign_brand', null);
+                                $set('foreign_model', null);
+                                $set('foreign_chassis', null);
+                                $set('foreign_year', null);
+                                $set('foreign_color', null);
+                                $set('mileage', null);
                                 return;
                             }
-                            $sale = Sale::query()->with(['client', 'items.motorcycleUnit'])->where('id', $state)->first();
+
+                            $sale = Sale::with(['client', 'items.motorcycleUnit.motorcycleModel'])->find($state);
                             if (! $sale) {
                                 return;
                             }
+
+                            // Auto-fill client from sale
                             $set('client_id', $sale->client_id);
-                            $unitId = $sale->items
+
+                            // Resolve motorcycle unit via the first sale item that has one
+                            $saleItem = $sale->items
                                 ->whereNotNull('motorcycle_unit_id')
-                                ->first()
-                                ?->motorcycle_unit_id;
-                            if ($unitId) {
-                                $set('motorcycle_unit_id', $unitId);
+                                ->first();
+
+                            $unit = $saleItem?->motorcycleUnit;
+
+                            if ($unit) {
+                                $set('motorcycle_unit_id', $unit->id);
+
+                                // Populate display fields from MotorcycleUnit + MotorcycleModel
+                                // Path: Sale → items → first item with unit → motorcycleUnit → motorcycleModel
+                                $motoModel = $unit->motorcycleModel;
+                                $set('foreign_brand',   $motoModel?->marque      ?? null);
+                                $set('foreign_model',   $motoModel?->modele      ?? null);
+                                $set('foreign_chassis', $unit->chassis_number    ?? null);
+                                $set('foreign_color',   $unit->color             ?? null);
+                                // foreign_year is NOT set here: MotorcycleUnit has no year column.
+                                // The user can enter the year manually even in sale mode.
+                                $set('mileage',         $unit->mileage           ?? null);
+                            } else {
+                                $set('motorcycle_unit_id', null);
+                                $set('foreign_brand', null);
+                                $set('foreign_model', null);
+                                $set('foreign_chassis', null);
+                                $set('foreign_color', null);
+                                $set('mileage', null);
                             }
                         }),
 
-                    // Mode: In-stock inventory vehicle
+                    // ── Mode: In-stock inventory vehicle ───────────────────
                     Select::make('motorcycle_unit_id')
                         ->label(__('messages.motorcycle_unit'))
                         ->options(fn () => MotorcycleUnit::query()
@@ -113,7 +210,7 @@ class RepairTicketForm
                             ->mapWithKeys(fn (MotorcycleUnit $u) => [
                                 $u->id => implode(' — ', array_filter([
                                     $u->chassis_number,
-                                    $u->motorcycleModel?->name,
+                                    $u->motorcycleModel?->modele,
                                 ])),
                             ])
                             ->toArray())
@@ -121,7 +218,7 @@ class RepairTicketForm
                         ->preload()
                         ->live()
                         ->required(fn (Get $get): bool => $get('_repair_source') === 'stock')
-                        ->visible(fn ($get) => $get('_repair_source') === 'stock')
+                        ->visible(fn (Get $get): bool => $get('_repair_source') === 'stock')
                         ->afterStateUpdated(function ($state, callable $set) {
                             if (! $state) {
                                 return;
@@ -132,38 +229,57 @@ class RepairTicketForm
                             }
                         }),
 
-                    // Mode: Foreign / non-inventory vehicle
+                    // ── Mode: Foreign / non-inventory vehicle ──────────────
+                    // Also shown in 'sale' mode so auto-populated values are visible.
                     Grid::make(3)
                         ->schema([
                             TextInput::make('foreign_brand')
                                 ->label(__('messages.brand'))
-                                ->maxLength(100),
+                                ->maxLength(100)
+                                ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->dehydrated(true),
+
                             TextInput::make('foreign_model')
                                 ->label(__('messages.model'))
-                                ->maxLength(100),
+                                ->maxLength(100)
+                                ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->dehydrated(true),
+
                             TextInput::make('foreign_chassis')
                                 ->label(__('messages.chassis_number'))
-                                ->maxLength(50),
+                                ->maxLength(50)
+                                ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->dehydrated(true),
+
+                            // MotorcycleUnit has no year column — always user-editable
+                            // regardless of repair source; dehydrated so it persists on save.
                             TextInput::make('foreign_year')
                                 ->label(__('messages.year'))
                                 ->numeric()
                                 ->minValue(1900)
-                                ->maxValue((int) date('Y') + 2),
+                                ->maxValue((int) date('Y') + 2)
+                                ->dehydrated(true),
+
                             TextInput::make('foreign_color')
                                 ->label(__('messages.color'))
-                                ->maxLength(50),
+                                ->maxLength(50)
+                                ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->dehydrated(true),
                         ])
-                        ->visible(fn ($get) => $get('_repair_source') === 'foreign'),
+                        ->visible(fn (Get $get): bool => in_array($get('_repair_source'), ['foreign', 'sale'], true)),
 
                     // Controlled by _repair_source — stored on the model
                     Hidden::make('is_foreign_vehicle')->default(false),
 
-                    // Single reception mileage field — common to all vehicle types
+                    // Reception mileage — always user-editable so the technician can
+                    // record the actual odometer reading at drop-off, regardless of source.
+                    // (The sale afterStateUpdated pre-fills it from unit->mileage as a default.)
                     TextInput::make('mileage')
                         ->label(__('messages.mileage_at_reception'))
                         ->numeric()
                         ->default(0)
-                        ->suffix('km'),
+                        ->suffix('km')
+                        ->dehydrated(true),
 
                 ]),
 
@@ -190,6 +306,8 @@ class RepairTicketForm
                             ->preload()
                             ->live()
                             ->required()
+                            ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                            ->dehydrated(true)
                             ->createOptionForm([
                                 Select::make('client_type')
                                     ->label(__('messages.client_type'))
@@ -395,7 +513,7 @@ class RepairTicketForm
                             ->default('open')
                             ->required()
                             ->disabled(fn () => ! self::isAdmin())
-                        ->dehydrated(fn () => self::isAdmin()),
+                            ->dehydrated(fn () => self::isAdmin()),
 
                         // payment_status is derived from payments — display only
                         Select::make('payment_status')
