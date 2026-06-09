@@ -431,12 +431,23 @@ class PaymentService
                 );
             }
 
-            $locked->update([
+            $update = [
                 'paid_amount'      => $totalPaid,
                 'remaining_amount' => $newRemaining,
                 'payment_status'   => $newStatus,
                 'paid_at'          => $newStatus === 'paid' ? now() : null,
-            ]);
+            ];
+
+            // Auto-advance repair status to 'completed' when fully paid
+            if ($newStatus === 'paid'
+                && ! in_array($locked->status, ['completed', 'delivered', 'closed', 'cancelled'], true)
+                && ! in_array($locked->repair_type, ['warranty', 'internal'], true)
+            ) {
+                $update['status']       = 'completed';
+                $update['completed_at'] = now();
+            }
+
+            $locked->update($update);
 
             if ($newStatus === 'paid' && $locked->invoice_document_id) {
                 \App\Models\Document::where('id', $locked->invoice_document_id)

@@ -39,6 +39,7 @@ class DocumentForm
                             ->label(__('messages.document_type'))
                             ->options(fn () => DocumentType::query()
                                 ->where('is_active', true)
+                                ->where('code', '!=', DocumentType::REPAIR_INVOICE)
                                 ->orderBy('name')
                                 ->pluck('name', 'id')
                                 ->toArray())
@@ -46,6 +47,18 @@ class DocumentForm
                             ->preload()
                             ->live()
                             ->required(),
+
+                        Select::make('invoice_source')
+                            ->label(__('messages.invoice_source'))
+                            ->options([
+                                'sale'     => __('messages.invoice_source_sale'),
+                                'repair'   => __('messages.invoice_source_repair'),
+                                'combined' => __('messages.invoice_source_combined'),
+                            ])
+                            ->default('sale')
+                            ->visible(fn ($get) => self::isInvoiceDocument($get))
+                            ->required(fn ($get) => self::isInvoiceDocument($get))
+                            ->live(),
 
                         DatePicker::make('document_date')
                             ->label(__('messages.document_date'))
@@ -125,7 +138,9 @@ class DocumentForm
                             ->visible(fn ($get) => self::isRepairInvoiceDocument($get)
                                 || self::isInvoiceDocument($get)
                                 || self::isDeliveryNoteDocument($get))
-                            ->required(fn ($get) => self::isRepairInvoiceDocument($get))
+                            ->required(fn ($get) => self::isRepairInvoiceDocument($get)
+                                || (self::isInvoiceDocument($get)
+                                    && in_array($get('invoice_source'), ['repair', 'combined'], true)))
                             ->afterStateUpdated(function ($state, callable $set, callable $get): void {
                                 if (! $state) {
                                     return;

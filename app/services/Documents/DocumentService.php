@@ -380,7 +380,9 @@ class DocumentService
             $view = 'documents.pdf.ownership-prsk';
         }
 
-        if ($document->documentType?->code === DocumentType::REPAIR_INVOICE) {
+        if ($document->documentType?->code === DocumentType::REPAIR_INVOICE
+            || ($document->documentType?->code === DocumentType::INVOICE && $document->invoice_source === 'repair')
+        ) {
             $view = 'documents.pdf.repair-invoice';
         }
 

@@ -505,7 +505,7 @@ class RepairTicketForm
 
             Section::make(__('messages.financials'))
                 ->schema([
-                    Grid::make(3)->schema([
+                    Grid::make(4)->schema([
                         TextInput::make('labor_cost')
                             ->label(__('messages.labor_cost'))
                             ->numeric()
@@ -514,10 +514,10 @@ class RepairTicketForm
                             ->required()
                             ->live()
                             ->afterStateUpdated(function ($state, Get $get, callable $set) {
-                                // Recompute parts_cost from raw item fields (not stale DB state)
-                                $partsCost = self::computePartsCost($get('parts') ?? [], $get('consumables') ?? []);
+                                $partsCost      = self::computePartsCost($get('parts') ?? [], $get('consumables') ?? []);
+                                $globalDiscount = max(0, (float) ($get('discount_amount') ?? 0));
                                 $set('parts_cost', $partsCost);
-                                $set('total_cost', round($partsCost + max(0, (float) $state), 2));
+                                $set('total_cost', round(max(0, $partsCost + max(0, (float) $state) - $globalDiscount), 2));
                             }),
                         TextInput::make('parts_cost')
                             ->label(__('messages.parts_cost'))
@@ -525,6 +525,19 @@ class RepairTicketForm
                             ->prefix('DH')
                             ->disabled()
                             ->dehydrated(),
+                        TextInput::make('discount_amount')
+                            ->label(__('messages.discount_amount'))
+                            ->numeric()
+                            ->default(0)
+                            ->prefix('DH')
+                            ->live()
+                            ->helperText(__('messages.discount_requires_validation'))
+                            ->afterStateUpdated(function ($state, Get $get, callable $set) {
+                                $partsCost = self::computePartsCost($get('parts') ?? [], $get('consumables') ?? []);
+                                $laborCost = max(0, (float) ($get('labor_cost') ?? 0));
+                                $set('parts_cost', $partsCost);
+                                $set('total_cost', round(max(0, $partsCost + $laborCost - max(0, (float) $state)), 2));
+                            }),
                         TextInput::make('total_cost')
                             ->label(__('messages.total_cost'))
                             ->numeric()
@@ -532,13 +545,7 @@ class RepairTicketForm
                             ->disabled()
                             ->dehydrated(),
                     ]),
-                    Grid::make(2)->schema([
-                        TextInput::make('discount_amount')
-                            ->label(__('messages.discount_amount'))
-                            ->numeric()
-                            ->default(0)
-                            ->prefix('DH')
-                            ->helperText(__('messages.discount_requires_validation')),
+                    Grid::make(1)->schema([
                         Textarea::make('discount_note')
                             ->label(__('messages.discount_note'))
                             ->rows(2),
@@ -651,8 +658,8 @@ class RepairTicketForm
         return [
             Hidden::make('item_type')->default($type),
 
-            // Compact table row: all fields on one line
-            Grid::make(6)->schema([
+            // Compact table row — 12 columns so each field has room to breathe
+            Grid::make(12)->schema([
 
                 Select::make('product_id')
                     ->label($label)
@@ -706,7 +713,7 @@ class RepairTicketForm
 
                         self::recalculateParentTotals($get, $set);
                     })
-                    ->columnSpan(2),
+                    ->columnSpan(4),
 
                 TextInput::make('quantity')
                     ->label(__('messages.quantity'))
@@ -716,9 +723,6 @@ class RepairTicketForm
                     ->maxValue(fn (Get $get): float => filled($get('product_id'))
                         ? max(0.01, (float) (Product::find($get('product_id'))?->current_stock ?? 9999))
                         : 9999)
-                    ->suffix(fn (Get $get): string => filled($get('product_id'))
-                        ? '/ ' . (int) (Product::find($get('product_id'))?->current_stock ?? 0)
-                        : '')
                     ->live()
                     ->afterStateUpdated(function ($state, Get $get, callable $set) {
                         $productId = $get('product_id');
@@ -731,7 +735,7 @@ class RepairTicketForm
                         $set('total', round(max(0, $qty * $price - $discount), 2));
                         self::recalculateParentTotals($get, $set);
                     })
-                    ->columnSpan(1),
+                    ->columnSpan(2),
 
                 TextInput::make('unit_price')
                     ->label(__('messages.unit_price'))
@@ -745,7 +749,7 @@ class RepairTicketForm
                         $set('total', round(max(0, $qty * $price - $discount), 2));
                         self::recalculateParentTotals($get, $set);
                     })
-                    ->columnSpan(1),
+                    ->columnSpan(2),
 
                 TextInput::make('discount_amount')
                     ->label(__('messages.discount_amount'))
@@ -760,7 +764,7 @@ class RepairTicketForm
                         $set('total', round(max(0, $qty * $price - $discount), 2));
                         self::recalculateParentTotals($get, $set);
                     })
-                    ->columnSpan(1),
+                    ->columnSpan(2),
 
                 TextInput::make('total')
                     ->label(__('messages.subtotal'))
@@ -768,7 +772,7 @@ class RepairTicketForm
                     ->prefix('DH')
                     ->disabled()
                     ->dehydrated()
-                    ->columnSpan(1),
+                    ->columnSpan(2),
 
             ]),
         ];
@@ -788,15 +792,15 @@ class RepairTicketForm
 
     private static function recalculateParentTotals(Get $get, callable $set): void
     {
-        // Compute from raw item fields so stale `total` DB values don't corrupt the result.
-        $partsCost = self::computePartsCost(
+        $partsCost      = self::computePartsCost(
             $get('../../parts') ?? [],
             $get('../../consumables') ?? []
         );
-        $laborCost = (float) ($get('../../labor_cost') ?? 0);
+        $laborCost      = max(0, (float) ($get('../../labor_cost') ?? 0));
+        $globalDiscount = max(0, (float) ($get('../../discount_amount') ?? 0));
 
         $set('../../parts_cost', $partsCost);
-        $set('../../total_cost', round($partsCost + $laborCost, 2));
+        $set('../../total_cost', round(max(0, $partsCost + $laborCost - $globalDiscount), 2));
     }
 
     private static function statusOptions(): array

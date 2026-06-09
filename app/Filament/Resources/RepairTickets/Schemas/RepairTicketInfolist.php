@@ -6,6 +6,7 @@ use App\Models\RepairTicket;
 
 use App\Filament\Resources\Sales\SaleResource;
 use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -162,7 +163,7 @@ class RepairTicketInfolist
 
             Section::make(__('messages.financials'))
                 ->schema([
-                    Grid::make(4)->schema([
+                    Grid::make(5)->schema([
                         TextEntry::make('labor_cost')
                             ->label(__('messages.labor_cost'))
                             ->money('MAD'),
@@ -176,17 +177,27 @@ class RepairTicketInfolist
                             ->label(__('messages.total_cost'))
                             ->money('MAD')
                             ->weight('bold'),
+                        TextEntry::make('remaining_amount')
+                            ->label(__('messages.remaining_amount'))
+                            ->money('MAD')
+                            ->color(fn (RepairTicket $record) => (float) $record->remaining_amount > 0 ? 'danger' : 'success')
+                            ->weight('bold'),
                     ]),
                     Grid::make(3)->schema([
+                        TextEntry::make('payment_status')
+                            ->label(__('messages.payment_status'))
+                            ->badge()
+                            ->color(fn ($state) => match ($state) {
+                                'paid'    => 'success',
+                                'partial' => 'warning',
+                                default   => 'danger',
+                            })
+                            ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'unpaid'))),
                         IconEntry::make('discount_validated')
                             ->label(__('messages.discount_validated'))
                             ->boolean(),
                         TextEntry::make('discountValidator.name')
                             ->label(__('messages.validated_by'))
-                            ->placeholder('-'),
-                        TextEntry::make('discount_validated_at')
-                            ->label(__('messages.validated_at'))
-                            ->dateTime()
                             ->placeholder('-'),
                     ]),
                     TextEntry::make('discount_note')
@@ -194,6 +205,64 @@ class RepairTicketInfolist
                         ->placeholder('-')
                         ->columnSpanFull(),
                 ]),
+
+            /*
+            |------------------------------------------------------------------
+            | Payment History
+            |------------------------------------------------------------------
+            */
+
+            Section::make(__('messages.payments'))
+                ->schema([
+                    RepeatableEntry::make('payments')
+                        ->label('')
+                        ->schema([
+                            Grid::make(5)->schema([
+                                TextEntry::make('created_at')
+                                    ->label(__('messages.date'))
+                                    ->date(),
+                                TextEntry::make('amount')
+                                    ->label(__('messages.amount'))
+                                    ->money('MAD')
+                                    ->weight('bold'),
+                                TextEntry::make('payment_method')
+                                    ->label(__('messages.payment_method'))
+                                    ->formatStateUsing(fn ($state) => match ($state) {
+                                        'cash'          => __('messages.cash'),
+                                        'card'          => __('messages.card'),
+                                        'cheque'        => __('messages.cheque'),
+                                        'bank_transfer' => __('messages.bank_transfer'),
+                                        default         => $state,
+                                    })
+                                    ->badge()
+                                    ->color(fn ($state) => match ($state) {
+                                        'cash'          => 'success',
+                                        'card'          => 'info',
+                                        'cheque'        => 'warning',
+                                        'bank_transfer' => 'primary',
+                                        default         => 'gray',
+                                    }),
+                                TextEntry::make('status')
+                                    ->label(__('messages.status'))
+                                    ->badge()
+                                    ->color(fn ($state) => match ($state) {
+                                        'paid'               => 'success',
+                                        'pending_validation' => 'warning',
+                                        'pending'            => 'warning',
+                                        'bounced'            => 'danger',
+                                        'cancelled'          => 'danger',
+                                        'rejected'           => 'danger',
+                                        default              => 'gray',
+                                    })
+                                    ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'pending'))),
+                                TextEntry::make('reference')
+                                    ->label(__('messages.reference'))
+                                    ->placeholder('-'),
+                            ]),
+                        ])
+                        ->columnSpanFull(),
+                ])
+                ->visible(fn (RepairTicket $record) => $record->payments()->exists()),
 
             /*
             |------------------------------------------------------------------

@@ -27,16 +27,18 @@ class DocumentNumberService
      *   appear in this scan.  We also filter by prefix+year pattern to avoid
      *   parsing numbers from a different type/year with the same type_id.
      *
-     * Step 3 — Upsert the sequence row, syncing the counter UP only.
-     *   We use max(maxActive, current_number) and NEVER plain maxActive.
-     *   Moving the counter down would open a race window where a concurrent
-     *   request could reclaim an already-issued number:
-     *     • A increments to N, releases savepoint (locks still held by outer TX),
-     *       INSERT pending.
-     *     • B arrives, waits for A's lock.  After A commits, B sees maxActive=N.
-     *       Correct: B computes N+1.  ← desired behaviour
-     *     • But if the counter were allowed to retreat to maxActive=N-1 while
-     *       A's INSERT was still uncommitted, B would issue N again.
+     * Step 3 — Upsert the sequence row, syncing the counter to maxActive.
+     *   We always set current_number = maxActive (syncs DOWN as well as up)
+     *   so that orphaned counters left by deleted test documents are corrected
+     *   on the next generate() call — deleted numbers do not permanently
+     *   reserve slots.
+     *
+     *   Concurrency safety: lockForUpdate() on the sequence row serialises
+     *   all concurrent generate() calls.  B cannot acquire the lock until
+     *   A's outer transaction (which includes the document INSERT) commits.
+     *   By the time B reads maxActive, A's document is already visible, so
+     *   B naturally computes maxActive+1.  The do-while in Step 4 is the
+     *   true uniqueness safety net for any residual edge case.
      *
      *   First-row race condition:
      *   When the first document of a type+year is being created, two concurrent
@@ -183,10 +185,12 @@ class DocumentNumberService
 
             // ── Step 4: increment and guarantee uniqueness ────────────────────
             //
-            // withTrashed() in the uniqueness check covers legacy soft-deleted
-            // rows that were NOT mangled (pre-dates the __VOID__ observer).
-            // Those rows still hold their original number and the DB unique
-            // constraint blocks any new document from reusing it.
+            // Only active (non-deleted) documents block a number.  Soft-deleted
+            // documents have their document_number mangled to
+            // "PREFIX-YEAR-NNNN__VOID_..." by the Document::deleting observer,
+            // so they never match an exact number lookup.  Checking only active
+            // rows means deleted test documents do not permanently consume
+            // sequence slots — the counter resets to reality on the next call.
             //
             // Under normal operation the loop body executes exactly once.
             do {
@@ -199,7 +203,7 @@ class DocumentNumberService
 
             } while (
                 Document::withoutGlobalScopes()
-                    ->withTrashed()                         // covers un-mangled legacy rows
+                    ->whereNull('deleted_at')
                     ->where('company_id', $document->company_id)
                     ->where('document_number', $number)
                     ->lockForUpdate()

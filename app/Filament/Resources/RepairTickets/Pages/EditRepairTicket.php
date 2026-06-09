@@ -173,10 +173,7 @@ class EditRepairTicket extends EditRecord
                 ->action(function (RepairTicket $record): void {
                     $record->recalculateCosts();
 
-                    $documentTypeId = DocumentType::query()
-                        ->where('code', 'REPAIR_INVOICE')
-                        ->orWhere('code', 'INVOICE')
-                        ->value('id');
+                    $documentTypeId = DocumentType::where('code', DocumentType::INVOICE)->value('id');
 
                     if (! $documentTypeId) {
                         Notification::make()->title(__('messages.invoice_type_not_found'))->warning()->send();
@@ -185,6 +182,7 @@ class EditRepairTicket extends EditRecord
 
                     $document = DocumentService::generate([
                         'document_type_id' => $documentTypeId,
+                        'invoice_source'   => 'repair',
                         'client_id'        => $record->client_id,
                         'repair_ticket_id' => $record->getKey(),
                         'language'         => app()->getLocale(),

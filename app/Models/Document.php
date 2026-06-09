@@ -26,6 +26,7 @@ class Document extends Model
         'reseller_id',
         'sale_id',
         'repair_ticket_id',
+        'invoice_source',
         'uuid',
         'verification_url',
         'document_number',
