@@ -476,7 +476,12 @@ class RepairTicketForm
                             ->numeric()
                             ->default(0)
                             ->prefix('DH')
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, Get $get, callable $set) {
+                                $partsCost = (float) ($get('parts_cost') ?? 0);
+                                $set('total_cost', round($partsCost + max(0, (float) $state), 2));
+                            }),
                         TextInput::make('parts_cost')
                             ->label(__('messages.parts_cost'))
                             ->numeric()
@@ -678,14 +683,36 @@ class RepairTicketForm
                     })
                     ->searchable()
                     ->live()
-                    ->afterStateUpdated(function ($state, callable $set) {
+                    ->afterStateUpdated(function ($state, Get $get, callable $set) {
                         if (! $state) {
+                            $set('unit_price', 0);
+                            $set('total', 0);
                             return;
                         }
+
                         $product = Product::find($state);
-                        if ($product) {
-                            $set('unit_price', (float) $product->selling_price);
+                        if (! $product) {
+                            return;
                         }
+
+                        // Resolve price based on client type (reseller vs normal)
+                        $clientId = $get('../../client_id');
+                        $isReseller = $clientId && \App\Models\Client::withoutGlobalScopes()
+                            ->where('id', $clientId)
+                            ->whereNotNull('reseller_id')
+                            ->exists();
+                        $price = ($isReseller && (float) $product->reseller_price > 0)
+                            ? (float) $product->reseller_price
+                            : (float) $product->selling_price;
+
+                        $set('unit_price', $price);
+
+                        // Recompute subtotal
+                        $qty      = max(0.01, (float) ($get('quantity') ?? 1));
+                        $discount = (float) ($get('discount_amount') ?? 0);
+                        $set('total', round(max(0, $qty * $price - $discount), 2));
+
+                        self::recalculateParentTotals($get, $set);
                     })
                     ->columnSpan(2),
 
@@ -694,7 +721,25 @@ class RepairTicketForm
                     ->numeric()
                     ->default(1)
                     ->minValue(0.01)
+                    ->maxValue(fn (Get $get): float => filled($get('product_id'))
+                        ? max(0.01, (float) (Product::find($get('product_id'))?->current_stock ?? 9999))
+                        : 9999)
+                    ->hint(fn (Get $get): string => filled($get('product_id'))
+                        ? __('messages.stock') . ': ' . (int) (Product::find($get('product_id'))?->current_stock ?? 0)
+                        : '')
                     ->live()
+                    ->afterStateUpdated(function ($state, Get $get, callable $set) {
+                        // Enforce stock ceiling
+                        $productId = $get('product_id');
+                        $maxStock  = $productId
+                            ? max(0.01, (float) (Product::find($productId)?->current_stock ?? 9999))
+                            : 9999;
+                        $qty      = min(max(0, (float) $state), $maxStock);
+                        $price    = (float) ($get('unit_price') ?? 0);
+                        $discount = (float) ($get('discount_amount') ?? 0);
+                        $set('total', round(max(0, $qty * $price - $discount), 2));
+                        self::recalculateParentTotals($get, $set);
+                    })
                     ->columnSpan(1),
 
                 TextInput::make('unit_price')
@@ -702,6 +747,13 @@ class RepairTicketForm
                     ->numeric()
                     ->prefix('DH')
                     ->live()
+                    ->afterStateUpdated(function ($state, Get $get, callable $set) {
+                        $qty      = max(0, (float) ($get('quantity') ?? 1));
+                        $price    = max(0, (float) $state);
+                        $discount = (float) ($get('discount_amount') ?? 0);
+                        $set('total', round(max(0, $qty * $price - $discount), 2));
+                        self::recalculateParentTotals($get, $set);
+                    })
                     ->columnSpan(1),
             ]),
 
@@ -710,7 +762,15 @@ class RepairTicketForm
                     ->label(__('messages.discount_amount'))
                     ->numeric()
                     ->default(0)
-                    ->prefix('DH'),
+                    ->prefix('DH')
+                    ->live()
+                    ->afterStateUpdated(function ($state, Get $get, callable $set) {
+                        $qty      = max(0, (float) ($get('quantity') ?? 1));
+                        $price    = (float) ($get('unit_price') ?? 0);
+                        $discount = max(0, (float) $state);
+                        $set('total', round(max(0, $qty * $price - $discount), 2));
+                        self::recalculateParentTotals($get, $set);
+                    }),
                 TextInput::make('total')
                     ->label(__('messages.subtotal'))
                     ->numeric()
@@ -724,6 +784,19 @@ class RepairTicketForm
                 ->rows(1)
                 ->columnSpanFull(),
         ];
+    }
+
+    private static function recalculateParentTotals(Get $get, callable $set): void
+    {
+        $partsTotal = collect($get('../../parts') ?? [])
+            ->sum(fn ($item) => (float) ($item['total'] ?? 0));
+        $consumablesTotal = collect($get('../../consumables') ?? [])
+            ->sum(fn ($item) => (float) ($item['total'] ?? 0));
+        $partsCost = round($partsTotal + $consumablesTotal, 2);
+        $laborCost = (float) ($get('../../labor_cost') ?? 0);
+
+        $set('../../parts_cost', $partsCost);
+        $set('../../total_cost', round($partsCost + $laborCost, 2));
     }
 
     private static function statusOptions(): array
