@@ -24,7 +24,7 @@ class DocumentService
 {
     public function create(array $data): Document
     {
-        return DB::transaction(function () use ($data) {
+        $document = DB::transaction(function () use ($data) {
             $type = DocumentType::findOrFail($data['document_type_id']);
             $template = $this->resolveTemplate($type, $data['language'] ?? null);
             $sale = filled($data['sale_id'] ?? null)
@@ -76,10 +76,15 @@ class DocumentService
             }
 
             $this->applySaleReturn($document);
-            $this->storePdf($document);
 
             return $document->refresh();
         });
+
+        // PDF rendering, file I/O, and checksum computation run outside the
+        // transaction so they do not hold row locks during expensive operations.
+        $this->storePdf($document);
+
+        return $document->refresh();
     }
 
     private function applySaleReturn(Document $document): void

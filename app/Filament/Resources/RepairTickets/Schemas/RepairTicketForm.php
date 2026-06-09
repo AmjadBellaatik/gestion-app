@@ -100,7 +100,11 @@ class RepairTicketForm
                                 ->with(['client', 'items.motorcycleUnit.motorcycleModel'])
                                 ->where(function ($query) use ($search) {
                                     $query->where('sale_number', 'like', "%{$search}%")
-                                        ->orWhereHas('client', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
+                                        ->orWhereHas('client', fn ($q) => $q
+                                            ->where('first_name', 'like', "%{$search}%")
+                                            ->orWhere('last_name', 'like', "%{$search}%")
+                                            ->orWhere('company_name', 'like', "%{$search}%")
+                                            ->orWhere('administration_name', 'like', "%{$search}%"));
                                 })
                                 ->orderByDesc('id')
                                 ->limit(50)
@@ -219,6 +223,7 @@ class RepairTicketForm
                         ->live()
                         ->required(fn (Get $get): bool => $get('_repair_source') === 'stock')
                         ->visible(fn (Get $get): bool => $get('_repair_source') === 'stock')
+                        ->dehydrated(true)
                         ->afterStateUpdated(function ($state, callable $set) {
                             if (! $state) {
                                 return;

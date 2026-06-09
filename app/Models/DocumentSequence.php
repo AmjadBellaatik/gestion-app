@@ -34,10 +34,12 @@ class DocumentSequence extends Model
 
         static::creating(function ($model) {
 
-            if (session()->has('company_id')) {
+            if (
+                empty($model->company_id)
+                && session()->has('company_id')
+            ) {
 
-                $model->company_id =
-                    session('company_id');
+                $model->company_id = session('company_id');
 
             }
 

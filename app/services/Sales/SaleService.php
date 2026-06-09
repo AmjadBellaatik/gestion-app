@@ -616,32 +616,6 @@ class SaleService
     | → DocumentService::generate().
     */
 
-    /** @deprecated — conformity is now generated via DocumentService::generate() */
-    protected static function generateConformity(
-        Sale $sale,
-        object $motorcycle
-    ): void {
-
-        Document::create([
-
-            'company_id' => session('company_id'),
-
-            'client_id' => $sale->client_id,
-
-            'motorcycle_id' => $motorcycle->id,
-
-            'number' => 'CONF-'.$sale->sale_number,
-
-            'status' => 'validated',
-
-            'total' => 0,
-
-            'notes' => 'Conformity document',
-
-        ]);
-
-    }
-
     /*
     |--------------------------------------------------------------------------
     | SALE NUMBER
