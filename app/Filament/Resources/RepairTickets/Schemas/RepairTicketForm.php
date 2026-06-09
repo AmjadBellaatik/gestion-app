@@ -667,10 +667,10 @@ class RepairTicketForm
 
                         return Product::query()
                             ->whereIn('type', $types)
-                            ->where('current_stock', '>', 0)
                             ->whereNotIn('id', $selectedIds)
                             ->orderBy('name')
                             ->get()
+                            ->filter(fn ($p) => $p->current_stock > 0)
                             ->mapWithKeys(fn ($p) => [
                                 $p->id => $p->name . ' (' . __('messages.stock') . ': ' . (int) $p->current_stock . ')',
                             ])

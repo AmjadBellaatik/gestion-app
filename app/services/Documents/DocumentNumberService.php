@@ -162,12 +162,17 @@ class DocumentNumberService
                         ->firstOrFail();
                 }
             } else {
-                // The sequence row exists.  Sync the counter UP to close any gap
-                // introduced by out-of-band inserts (data migrations, imports).
-                // NEVER sync down — that would let a concurrent caller reclaim a
-                // number that has already been issued but whose document INSERT
-                // has not committed yet.
-                $syncedBase = max($maxActive, (int) $sequence->current_number);
+                // Sync the counter to the actual maximum in the documents table.
+                // We allow syncing DOWN so that orphaned counters (left by deleted
+                // test documents) do not persist forever.
+                //
+                // Safety: lockForUpdate() on the sequence row serialises all
+                // concurrent generate() calls — B cannot acquire the lock until
+                // A's outer transaction (which includes the document INSERT)
+                // commits.  By the time B reads maxActive, A's document is
+                // already visible.  The do-while in Step 4 is the true uniqueness
+                // safety net and handles any residual edge case.
+                $syncedBase = $maxActive;
 
                 if ((int) $sequence->current_number !== $syncedBase || $sequence->prefix !== $prefix) {
                     $sequence->current_number = $syncedBase;
