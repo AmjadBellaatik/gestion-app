@@ -185,12 +185,25 @@ class DocumentNumberService
 
             // ── Step 4: increment and guarantee uniqueness ────────────────────
             //
-            // Only active (non-deleted) documents block a number.  Soft-deleted
-            // documents have their document_number mangled to
-            // "PREFIX-YEAR-NNNN__VOID_..." by the Document::deleting observer,
-            // so they never match an exact number lookup.  Checking only active
-            // rows means deleted test documents do not permanently consume
-            // sequence slots — the counter resets to reality on the next call.
+            // withTrashed() guards against two distinct scenarios:
+            //
+            //   (a) Active document already has this number (normal case).
+            //
+            //   (b) A soft-deleted document still holds the ORIGINAL number
+            //       (legacy rows deleted before the __VOID__ observer was
+            //       deployed).  Their document_number was never mangled, so
+            //       the DB UNIQUE(company_id, document_number) constraint
+            //       would fire if we tried to reuse the same number.
+            //
+            // Properly deleted documents are mangled by Document::deleting to
+            // "PREFIX-YEAR-NNNN__VOID_TIMESTAMP_ID", which can never match an
+            // exact lookup for a plain number like "BL-2026-0001".  Those rows
+            // therefore never contribute to the skip count.
+            //
+            // Run `php artisan documents:rebuild-sequences --mangle-deleted`
+            // to one-time-mangle any legacy unmangled soft-deleted docs.
+            // After that command has run, the withTrashed() check becomes a
+            // true no-op for all normally-managed soft-deleted records.
             //
             // Under normal operation the loop body executes exactly once.
             do {
@@ -203,7 +216,7 @@ class DocumentNumberService
 
             } while (
                 Document::withoutGlobalScopes()
-                    ->whereNull('deleted_at')
+                    ->withTrashed()
                     ->where('company_id', $document->company_id)
                     ->where('document_number', $number)
                     ->lockForUpdate()

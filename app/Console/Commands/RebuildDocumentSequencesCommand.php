@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Company;
 use App\Models\Document;
 use App\Models\DocumentSequence;
 use App\Models\DocumentType;
@@ -12,15 +11,22 @@ use Illuminate\Support\Facades\DB;
 class RebuildDocumentSequencesCommand extends Command
 {
     protected $signature = 'documents:rebuild-sequences
-                            {--company= : Limit rebuild to a specific company_id}
-                            {--dry-run  : Show what would change without writing}';
+                            {--company=      : Limit rebuild to a specific company_id}
+                            {--dry-run       : Show what would change without writing}
+                            {--mangle-deleted : Mangle soft-deleted docs that still hold their original number (legacy cleanup)}';
 
     protected $description = 'Sync document_sequences.current_number to the actual max document number in the documents table. Orphaned counters (from deleted test documents) are reduced to reality.';
 
     public function handle(): int
     {
-        $dryRun    = $this->option('dry-run');
-        $companyId = $this->option('company');
+        $dryRun        = $this->option('dry-run');
+        $companyId     = $this->option('company');
+        $mangleDeleted = $this->option('mangle-deleted');
+
+        if ($mangleDeleted) {
+            $this->mangleLegacyDeletedDocs($companyId, $dryRun);
+            $this->newLine();
+        }
 
         // Collect all (company_id, document_type_id, year) triples that have
         // at least one active document, so we can create missing sequence rows.
@@ -149,5 +155,52 @@ class RebuildDocumentSequencesCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function mangleLegacyDeletedDocs(?string $companyId, bool $dryRun): void
+    {
+        // Find soft-deleted documents whose document_number was NOT mangled
+        // (pre-dates the __VOID__ observer). These rows hold their original
+        // number and block the DB unique constraint from reuse.
+        $legacy = Document::withoutGlobalScopes()
+            ->withTrashed()
+            ->whereNotNull('deleted_at')
+            ->whereNotNull('document_number')
+            ->where('document_number', 'not like', '%__VOID_%')
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->get(['id', 'company_id', 'document_number', 'deleted_at', 'metadata']);
+
+        if ($legacy->isEmpty()) {
+            $this->info('No unmangled soft-deleted documents found — nothing to mangle.');
+            return;
+        }
+
+        $this->info("Found {$legacy->count()} unmangled soft-deleted document(s):");
+
+        $rows = [];
+        foreach ($legacy as $doc) {
+            $original = (string) $doc->document_number;
+            $void     = $original . '__VOID_' . $doc->deleted_at->format('YmdHis') . '_' . $doc->id;
+            $meta     = array_merge((array) ($doc->metadata ?? []), ['original_document_number' => $original]);
+
+            $rows[] = [$doc->id, $doc->company_id, $original, $void];
+
+            if (! $dryRun) {
+                DB::table('documents')
+                    ->where('id', $doc->id)
+                    ->update([
+                        'document_number' => $void,
+                        'metadata'        => json_encode($meta),
+                    ]);
+            }
+        }
+
+        $this->table(['ID', 'Company', 'Original Number', 'Mangled To'], $rows);
+
+        if ($dryRun) {
+            $this->warn("{$legacy->count()} document(s) would be mangled (dry run — no changes made).");
+        } else {
+            $this->info("{$legacy->count()} document(s) mangled. Those numbers are now free for reuse.");
+        }
     }
 }
