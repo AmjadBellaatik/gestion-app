@@ -366,6 +366,43 @@ class RepairTicketForm
                             )->id),
 
                     ]),
+
+                    // Additional team members — admin only
+                    Repeater::make('assignedTechnicians')
+                        ->relationship('assignedTechnicians')
+                        ->label(__('messages.assigned_technicians'))
+                        ->visible(fn () => self::isAdmin())
+                        ->schema([
+                            Grid::make(2)->schema([
+                                Select::make('technician_id')
+                                    ->label(__('messages.technician'))
+                                    ->options(fn () => Technician::query()
+                                        ->where('is_active', true)
+                                        ->pluck('name', 'id')
+                                        ->toArray())
+                                    ->searchable()
+                                    ->required()
+                                    ->createOptionForm([
+                                        TextInput::make('name')->label(__('messages.name'))->required(),
+                                        TextInput::make('phone')->label(__('messages.phone'))->tel(),
+                                        TextInput::make('speciality')->label(__('messages.speciality')),
+                                    ])
+                                    ->createOptionUsing(fn (array $data) => Technician::create(
+                                        array_merge(['is_active' => true], $data)
+                                    )->id),
+                                Select::make('permission')
+                                    ->label(__('messages.permission'))
+                                    ->options([
+                                        'view'   => __('messages.view_only'),
+                                        'modify' => __('messages.can_modify'),
+                                    ])
+                                    ->default('modify')
+                                    ->required(),
+                            ]),
+                        ])
+                        ->addActionLabel(__('messages.add_technician'))
+                        ->defaultItems(0)
+                        ->reorderable(false),
                 ]),
 
             /*
@@ -446,8 +483,7 @@ class RepairTicketForm
                         ->schema(self::itemSchema('part', 'parts'))
                         ->addActionLabel(__('messages.add_part'))
                         ->defaultItems(0)
-                        ->reorderable()
-                        ->collapsible(),
+                        ->reorderable(),
                 ]),
 
             Section::make(__('messages.consumables_used'))
@@ -458,8 +494,7 @@ class RepairTicketForm
                         ->schema(self::itemSchema('consumable', 'consumables'))
                         ->addActionLabel(__('messages.add_consumable'))
                         ->defaultItems(0)
-                        ->reorderable()
-                        ->collapsible(),
+                        ->reorderable(),
                 ]),
 
             /*
@@ -479,7 +514,9 @@ class RepairTicketForm
                             ->required()
                             ->live()
                             ->afterStateUpdated(function ($state, Get $get, callable $set) {
-                                $partsCost = (float) ($get('parts_cost') ?? 0);
+                                // Recompute parts_cost from raw item fields (not stale DB state)
+                                $partsCost = self::computePartsCost($get('parts') ?? [], $get('consumables') ?? []);
+                                $set('parts_cost', $partsCost);
                                 $set('total_cost', round($partsCost + max(0, (float) $state), 2));
                             }),
                         TextInput::make('parts_cost')
@@ -597,51 +634,6 @@ class RepairTicketForm
                         ->collapsible(),
                 ]),
 
-            /*
-            |------------------------------------------------------------------
-            | Assigned Technicians — admin / super admin only
-            |------------------------------------------------------------------
-            */
-
-            Section::make(__('messages.assigned_technicians'))
-                ->visible(fn () => self::isAdmin())
-                ->schema([
-                    Repeater::make('assignedTechnicians')
-                        ->relationship('assignedTechnicians')
-                        ->label('')
-                        ->schema([
-                            Grid::make(2)->schema([
-                                Select::make('technician_id')
-                                    ->label(__('messages.technician'))
-                                    ->options(fn () => Technician::query()
-                                        ->where('is_active', true)
-                                        ->pluck('name', 'id')
-                                        ->toArray())
-                                    ->searchable()
-                                    ->required()
-                                    ->createOptionForm([
-                                        TextInput::make('name')->label(__('messages.name'))->required(),
-                                        TextInput::make('phone')->label(__('messages.phone'))->tel(),
-                                        TextInput::make('speciality')->label(__('messages.speciality')),
-                                    ])
-                                    ->createOptionUsing(fn (array $data) => Technician::create(
-                                        array_merge(['is_active' => true], $data)
-                                    )->id),
-                                Select::make('permission')
-                                    ->label(__('messages.permission'))
-                                    ->options([
-                                        'view'   => __('messages.view_only'),
-                                        'modify' => __('messages.can_modify'),
-                                    ])
-                                    ->default('modify')
-                                    ->required(),
-                            ]),
-                        ])
-                        ->addActionLabel(__('messages.add_technician'))
-                        ->defaultItems(0)
-                        ->collapsible(),
-                ]),
-
         ]);
     }
 
@@ -659,7 +651,9 @@ class RepairTicketForm
         return [
             Hidden::make('item_type')->default($type),
 
-            Grid::make(4)->schema([
+            // Compact table row: all fields on one line
+            Grid::make(6)->schema([
+
                 Select::make('product_id')
                     ->label($label)
                     ->options(function (Get $get, $state) use ($types, $repeaterKey) {
@@ -695,8 +689,7 @@ class RepairTicketForm
                             return;
                         }
 
-                        // Resolve price based on client type (reseller vs normal)
-                        $clientId = $get('../../client_id');
+                        $clientId   = $get('../../client_id');
                         $isReseller = $clientId && \App\Models\Client::withoutGlobalScopes()
                             ->where('id', $clientId)
                             ->whereNotNull('reseller_id')
@@ -707,7 +700,6 @@ class RepairTicketForm
 
                         $set('unit_price', $price);
 
-                        // Recompute subtotal
                         $qty      = max(0.01, (float) ($get('quantity') ?? 1));
                         $discount = (float) ($get('discount_amount') ?? 0);
                         $set('total', round(max(0, $qty * $price - $discount), 2));
@@ -724,12 +716,11 @@ class RepairTicketForm
                     ->maxValue(fn (Get $get): float => filled($get('product_id'))
                         ? max(0.01, (float) (Product::find($get('product_id'))?->current_stock ?? 9999))
                         : 9999)
-                    ->hint(fn (Get $get): string => filled($get('product_id'))
-                        ? __('messages.stock') . ': ' . (int) (Product::find($get('product_id'))?->current_stock ?? 0)
+                    ->suffix(fn (Get $get): string => filled($get('product_id'))
+                        ? '/ ' . (int) (Product::find($get('product_id'))?->current_stock ?? 0)
                         : '')
                     ->live()
                     ->afterStateUpdated(function ($state, Get $get, callable $set) {
-                        // Enforce stock ceiling
                         $productId = $get('product_id');
                         $maxStock  = $productId
                             ? max(0.01, (float) (Product::find($productId)?->current_stock ?? 9999))
@@ -755,9 +746,7 @@ class RepairTicketForm
                         self::recalculateParentTotals($get, $set);
                     })
                     ->columnSpan(1),
-            ]),
 
-            Grid::make(2)->schema([
                 TextInput::make('discount_amount')
                     ->label(__('messages.discount_amount'))
                     ->numeric()
@@ -770,29 +759,40 @@ class RepairTicketForm
                         $discount = max(0, (float) $state);
                         $set('total', round(max(0, $qty * $price - $discount), 2));
                         self::recalculateParentTotals($get, $set);
-                    }),
+                    })
+                    ->columnSpan(1),
+
                 TextInput::make('total')
                     ->label(__('messages.subtotal'))
                     ->numeric()
                     ->prefix('DH')
                     ->disabled()
-                    ->dehydrated(),
-            ]),
+                    ->dehydrated()
+                    ->columnSpan(1),
 
-            Textarea::make('item_description')
-                ->label(__('messages.description'))
-                ->rows(1)
-                ->columnSpanFull(),
+            ]),
         ];
+    }
+
+    private static function computePartsCost(array $parts, array $consumables): float
+    {
+        $sum = fn (array $items): float => collect($items)->sum(function ($item): float {
+            $qty      = max(0, (float) ($item['quantity'] ?? 0));
+            $price    = max(0, (float) ($item['unit_price'] ?? 0));
+            $discount = max(0, (float) ($item['discount_amount'] ?? 0));
+            return max(0, $qty * $price - $discount);
+        });
+
+        return round($sum($parts) + $sum($consumables), 2);
     }
 
     private static function recalculateParentTotals(Get $get, callable $set): void
     {
-        $partsTotal = collect($get('../../parts') ?? [])
-            ->sum(fn ($item) => (float) ($item['total'] ?? 0));
-        $consumablesTotal = collect($get('../../consumables') ?? [])
-            ->sum(fn ($item) => (float) ($item['total'] ?? 0));
-        $partsCost = round($partsTotal + $consumablesTotal, 2);
+        // Compute from raw item fields so stale `total` DB values don't corrupt the result.
+        $partsCost = self::computePartsCost(
+            $get('../../parts') ?? [],
+            $get('../../consumables') ?? []
+        );
         $laborCost = (float) ($get('../../labor_cost') ?? 0);
 
         $set('../../parts_cost', $partsCost);
