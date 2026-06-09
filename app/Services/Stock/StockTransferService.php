@@ -3,7 +3,7 @@
 namespace App\Services\Stock;
 
 use App\Models\StockTransfer;
-use App\Models\StockMovement;
+use App\Services\Stock\StockService;
 
 use Illuminate\Support\Facades\DB;
 
@@ -65,36 +65,15 @@ class StockTransferService
                     |--------------------------------------------------------------------------
                     */
 
-                    StockMovement::create([
-
-                        'company_id' =>
-
-                            $transfer->company_id,
-
-                        'warehouse_id' =>
-
-                            $transfer->from_warehouse_id,
-
-                        'product_id' =>
-
-                            $item->product_id,
-
+                    StockService::movement([
+                        'company_id'    => $transfer->company_id,
+                        'warehouse_id'  => $transfer->from_warehouse_id,
+                        'product_id'    => $item->product_id,
                         'movement_type' => 'transfer',
-
-                        'type' => 'exit',
-
-                        'quantity' =>
-
-                            $item->quantity,
-
-                        'reference' =>
-
-                            $transfer->reference,
-
-                        'notes' =>
-
-                            'Warehouse transfer OUT',
-
+                        'type'          => 'exit',
+                        'quantity'      => $item->quantity,
+                        'reference'     => $transfer->reference,
+                        'notes'         => 'Warehouse transfer OUT',
                     ]);
 
                     /*
@@ -103,36 +82,15 @@ class StockTransferService
                     |--------------------------------------------------------------------------
                     */
 
-                    StockMovement::create([
-
-                        'company_id' =>
-
-                            $transfer->company_id,
-
-                        'warehouse_id' =>
-
-                            $transfer->to_warehouse_id,
-
-                        'product_id' =>
-
-                            $item->product_id,
-
+                    StockService::movement([
+                        'company_id'    => $transfer->company_id,
+                        'warehouse_id'  => $transfer->to_warehouse_id,
+                        'product_id'    => $item->product_id,
                         'movement_type' => 'transfer',
-
-                        'type' => 'entry',
-
-                        'quantity' =>
-
-                            $item->quantity,
-
-                        'reference' =>
-
-                            $transfer->reference,
-
-                        'notes' =>
-
-                            'Warehouse transfer IN',
-
+                        'type'          => 'entry',
+                        'quantity'      => $item->quantity,
+                        'reference'     => $transfer->reference,
+                        'notes'         => 'Warehouse transfer IN',
                     ]);
                 }
 
@@ -147,30 +105,30 @@ class StockTransferService
                     $item->motorcycle_unit_id
 
                 ) {
-                    StockMovement::create([
-                        'company_id' => $transfer->company_id,
-                        'warehouse_id' => $transfer->from_warehouse_id,
+                    StockService::movement([
+                        'company_id'         => $transfer->company_id,
+                        'warehouse_id'       => $transfer->from_warehouse_id,
                         'motorcycle_unit_id' => $item->motorcycle_unit_id,
-                        'movement_type' => 'transfer',
-                        'type' => 'exit',
-                        'quantity' => 1,
-                        'reference' => $transfer->reference,
-                        'reference_type' => StockTransfer::class,
-                        'reference_id' => $transfer->id,
-                        'notes' => 'Warehouse transfer OUT',
+                        'movement_type'      => 'transfer',
+                        'type'               => 'exit',
+                        'quantity'           => 1,
+                        'reference'          => $transfer->reference,
+                        'reference_type'     => StockTransfer::class,
+                        'reference_id'       => $transfer->id,
+                        'notes'              => 'Warehouse transfer OUT',
                     ]);
 
-                    StockMovement::create([
-                        'company_id' => $transfer->company_id,
-                        'warehouse_id' => $transfer->to_warehouse_id,
+                    StockService::movement([
+                        'company_id'         => $transfer->company_id,
+                        'warehouse_id'       => $transfer->to_warehouse_id,
                         'motorcycle_unit_id' => $item->motorcycle_unit_id,
-                        'movement_type' => 'transfer',
-                        'type' => 'entry',
-                        'quantity' => 1,
-                        'reference' => $transfer->reference,
-                        'reference_type' => StockTransfer::class,
-                        'reference_id' => $transfer->id,
-                        'notes' => 'Warehouse transfer IN',
+                        'movement_type'      => 'transfer',
+                        'type'               => 'entry',
+                        'quantity'           => 1,
+                        'reference'          => $transfer->reference,
+                        'reference_type'     => StockTransfer::class,
+                        'reference_id'       => $transfer->id,
+                        'notes'              => 'Warehouse transfer IN',
                     ]);
 
                     $item

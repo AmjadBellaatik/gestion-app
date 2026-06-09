@@ -189,12 +189,15 @@ class MotorcycleModelForm
                             ->label(__('messages.reseller_price'))
                             ->numeric()
                             ->default(0)
+                            ->required()
                             ->prefix('MAD'),
 
                         Forms\Components\TextInput::make('stock_alert')
                             ->label(__('messages.stock_alert'))
                             ->numeric()
-                            ->default(0),
+                            ->default(0)
+                            ->required()
+                            ->minValue(0),
 
                     ])
                     ->columns(3),

@@ -352,10 +352,13 @@ class PaymentService
                 ->sum('amount');
             $newRemaining = max(0, (float) $locked->total - $totalPaid);
 
+            $newPaymentStatus = $newRemaining <= 0 ? 'paid' : 'partial';
+
             $locked->update([
                 'paid_amount'      => $totalPaid,
                 'remaining_amount' => $newRemaining,
-                'payment_status'   => $newRemaining <= 0 ? 'paid' : 'partial',
+                'payment_status'   => $newPaymentStatus,
+                'status'           => self::deriveSaleStatus($newPaymentStatus, $locked->status),
             ]);
         });
     }
@@ -370,12 +373,38 @@ class PaymentService
                 ->sum('amount');
             $newRemaining = max(0, (float) $locked->total - $totalPaid);
 
+            $newPaymentStatus = $totalPaid <= 0 ? 'unpaid' : ($newRemaining <= 0 ? 'paid' : 'partial');
+
             $locked->update([
                 'paid_amount'      => $totalPaid,
                 'remaining_amount' => $newRemaining,
-                'payment_status'   => $totalPaid <= 0 ? 'unpaid' : ($newRemaining <= 0 ? 'paid' : 'partial'),
+                'payment_status'   => $newPaymentStatus,
+                'status'           => self::deriveSaleStatus($newPaymentStatus, $locked->status),
             ]);
         });
+    }
+
+    /**
+     * Derive the canonical sale status from its payment_status.
+     * payment_status is the source of truth; sale status mirrors it.
+     * Immutable terminal states (returned, partially_returned, cancelled) are preserved.
+     */
+    private static function deriveSaleStatus(string $paymentStatus, ?string $currentSaleStatus = null): string
+    {
+        // Never overwrite terminal states set by return/cancel flows.
+        if (\in_array($currentSaleStatus, ['returned', 'partially_returned', 'cancelled'], true)) {
+            return $currentSaleStatus;
+        }
+
+        return match ($paymentStatus) {
+            'paid'               => 'paid',
+            'partial'            => 'partially_paid',
+            'unpaid'             => 'pending',
+            'returned'           => 'returned',
+            'partially_returned' => 'partially_returned',
+            'cancelled'          => 'cancelled',
+            default              => 'pending',
+        };
     }
 
     /*

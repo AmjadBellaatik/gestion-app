@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\StockMovements\Schemas;
 
 use App\Models\Product;
+use App\Models\Warehouse;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -19,6 +20,18 @@ class StockMovementForm
 
         return $schema
             ->components([
+
+                Select::make('warehouse_id')
+                    ->label(__('messages.warehouse'))
+                    ->options(function (): array {
+                        $user = auth()->user();
+                        if ($user?->hasAnyRole(['Super Admin', 'Admin'])) {
+                            return Warehouse::where('is_active', true)->orderBy('name')->pluck('name', 'id')->toArray();
+                        }
+                        return $user?->warehouses()->where('is_active', true)->pluck('name', 'warehouses.id')->toArray() ?? [];
+                    })
+                    ->searchable()
+                    ->required(),
 
                 Grid::make(2)
                     ->schema([

@@ -19,7 +19,7 @@ class WarrantyService
     |   - products with has_warranty = true
     |   - products of types: trotinette, velo_electrique, velo_normal
     |
-    | start_date = sale creation date
+    | start_date = sale_date (user-entered purchase date — mandatory, never created_at)
     | end_date   = start_date + warranty_duration from sale item (default 1 year)
     | status     = auto-derived by Warranty::getStatusAttribute from end_date
     |
@@ -27,13 +27,18 @@ class WarrantyService
 
     public static function activateFromSale(Sale $sale): void
     {
+        if (! $sale->sale_date) {
+            throw new \InvalidArgumentException(
+                "Sale #{$sale->id} is missing sale_date. Warranty activation requires a user-entered purchase date."
+            );
+        }
+
         $sale->loadMissing([
             'items.product',
             'items.motorcycleUnit.motorcycleModel',
         ]);
 
-        // Use the actual sale date as the warranty start.
-        $startDate = Carbon::parse($sale->created_at)->startOfDay();
+        $startDate = Carbon::parse($sale->sale_date)->startOfDay();
 
         foreach ($sale->items as $item) {
             if (! self::itemRequiresWarranty($item)) {
@@ -72,7 +77,13 @@ class WarrantyService
 
     public static function activate(Sale $sale, $subject): Warranty
     {
-        $startDate = Carbon::parse($sale->created_at)->startOfDay();
+        if (! $sale->sale_date) {
+            throw new \InvalidArgumentException(
+                "Sale #{$sale->id} is missing sale_date. Warranty activation requires a user-entered purchase date."
+            );
+        }
+
+        $startDate = Carbon::parse($sale->sale_date)->startOfDay();
 
         return Warranty::firstOrCreate(
             [

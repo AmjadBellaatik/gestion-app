@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Models\Product;
+use App\Models\Warehouse;
 use Filament\Actions\Action;
 use Filament\Forms;
 
@@ -155,6 +156,15 @@ class ProductForm
 
                     ->dehydrated(false)
 
+                    ->visible(fn ($record): bool => $record === null),
+
+                Select::make('initial_warehouse_id')
+                    ->label(__('messages.warehouse'))
+                    ->options(fn () => Warehouse::active()->orderBy('name')->pluck('name', 'id')->toArray())
+                    ->searchable()
+                    ->preload()
+                    ->required()
+                    ->dehydrated(false)
                     ->visible(fn ($record): bool => $record === null),
 
                 TextInput::make('stock_alert')

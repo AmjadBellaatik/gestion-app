@@ -8,9 +8,15 @@ class StockService
 {
     public static function movement(array $data): StockMovement
     {
+        if (empty($data['warehouse_id'])) {
+            throw new \InvalidArgumentException(
+                'StockMovement requires a warehouse_id. Provide one before calling StockService::movement().'
+            );
+        }
+
         return StockMovement::create([
             'company_id'         => $data['company_id'],
-            'warehouse_id'       => $data['warehouse_id'] ?? null,
+            'warehouse_id'       => $data['warehouse_id'],
             'product_id'         => $data['product_id'] ?? null,
             'motorcycle_unit_id' => $data['motorcycle_unit_id'] ?? null,
             'type'               => $data['type'],

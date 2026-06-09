@@ -13,6 +13,7 @@ use App\Models\MotorcycleUnit;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
+use App\Services\Stock\StockService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -129,20 +130,42 @@ class DocumentService
                 'discount_amount' => round($discountPerUnit * $quantity, 2),
             ]);
 
-            StockMovement::create([
-                'company_id' => $document->company_id,
-                'product_id' => $item->product_id,
+            // Resolve the warehouse from the original outbound movement for this item.
+            // DocumentItem.warehouse_id is null for return docs created via the form
+            // because resolveReturnableSaleItems() does not carry it over.
+            $warehouseId = $item->warehouse_id;
+            if (! $warehouseId && $document->sale_id) {
+                $warehouseId = StockMovement::withoutGlobalScopes()
+                    ->where('reference_type', Sale::class)
+                    ->where('reference_id', $document->sale_id)
+                    ->when($item->product_id, fn ($q) => $q->where('product_id', $item->product_id))
+                    ->when($item->motorcycle_unit_id, fn ($q) => $q->where('motorcycle_unit_id', $item->motorcycle_unit_id))
+                    ->whereNotNull('warehouse_id')
+                    ->value('warehouse_id');
+            }
+
+            if (! $warehouseId) {
+                throw new \InvalidArgumentException(
+                    'Cannot create return StockMovement: no warehouse_id for '
+                    . ($item->product_id ? "product #{$item->product_id}" : "unit #{$item->motorcycle_unit_id}")
+                    . " on document {$document->document_number}."
+                );
+            }
+
+            StockService::movement([
+                'company_id'         => $document->company_id,
+                'product_id'         => $item->product_id,
                 'motorcycle_unit_id' => $item->motorcycle_unit_id,
-                'warehouse_id' => $item->warehouse_id,
-                'movement_type' => 'return',
-                'type' => 'entry',
-                'quantity' => $quantity,
-                'unit_cost' => 0,
-                'reference' => $document->document_number,
-                'reference_type' => Document::class,
-                'reference_id' => $document->id,
-                'notes' => 'Return document '.$document->document_number,
-                'user_id' => auth()->id(),
+                'warehouse_id'       => $warehouseId,
+                'movement_type'      => 'return',
+                'type'               => 'entry',
+                'quantity'           => $quantity,
+                'unit_cost'          => 0,
+                'reference'          => $document->document_number,
+                'reference_type'     => Document::class,
+                'reference_id'       => $document->id,
+                'notes'              => 'Return document ' . $document->document_number,
+                'user_id'            => auth()->id(),
             ]);
 
             if ($item->motorcycle_unit_id) {

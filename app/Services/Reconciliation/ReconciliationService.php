@@ -8,7 +8,6 @@ use App\Models\SaleItem;
 use App\Models\StockMovement;
 use App\Models\Transaction;
 use App\Models\Warranty;
-use App\Services\Warranty\WarrantyService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -272,7 +271,13 @@ class ReconciliationService
 
     private function createWarrantiesForSale(Sale $sale, int $companyId): void
     {
-        $startDate = Carbon::parse($sale->created_at)->startOfDay();
+        // Warranty start must use the user-entered sale date.
+        // Skip rather than silently fall back to created_at on historical records.
+        if (! $sale->sale_date) {
+            return;
+        }
+
+        $startDate = Carbon::parse($sale->sale_date)->startOfDay();
 
         foreach ($sale->items as $item) {
             if (! $this->itemNeedsWarranty($item)) {

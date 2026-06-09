@@ -5,8 +5,8 @@ namespace App\Filament\Resources\Stock\Support;
 use App\Models\Product;
 use App\Models\MotorcycleModel;
 use App\Models\MotorcycleUnit;
-use App\Models\StockMovement;
 use App\Models\Warehouse;
+use App\Services\Stock\StockService;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -37,7 +37,8 @@ class StockActions
                 ->label(__('messages.warehouse'))
                 ->options(fn () => Warehouse::active()->orderBy('name')->pluck('name', 'id')->toArray())
                 ->searchable()
-                ->preload(),
+                ->preload()
+                ->required(),
 
             TextInput::make('quantity')
                 ->label(__('messages.quantity'))
@@ -60,7 +61,8 @@ class StockActions
                 ->label(__('messages.warehouse'))
                 ->options(fn () => Warehouse::active()->orderBy('name')->pluck('name', 'id')->toArray())
                 ->searchable()
-                ->preload(),
+                ->preload()
+                ->required(),
 
             TextInput::make('quantity')
                 ->label(__('messages.new_quantity'))
@@ -83,7 +85,8 @@ class StockActions
                 ->label(__('messages.warehouse'))
                 ->options(fn () => Warehouse::active()->orderBy('name')->pluck('name', 'id')->toArray())
                 ->searchable()
-                ->preload(),
+                ->preload()
+                ->required(),
 
             TextInput::make('chassis_number')
                 ->label(__('messages.chassis_number'))
@@ -100,19 +103,22 @@ class StockActions
 
     public static function addProductStock(array $data): void
     {
+        if (empty($data['warehouse_id'])) {
+            throw new \InvalidArgumentException('warehouse_id is required to add product stock.');
+        }
+
         $product = Product::query()->findOrFail($data['product_id']);
 
-        StockMovement::create([
-            'company_id' => $product->company_id,
-            'product_id' => $product->id,
-            'warehouse_id' => $data['warehouse_id'] ?? null,
+        StockService::movement([
+            'company_id'    => $product->company_id,
+            'product_id'    => $product->id,
+            'warehouse_id'  => $data['warehouse_id'],
             'movement_type' => 'purchase',
-            'type' => 'entry',
-            'quantity' => (float) $data['quantity'],
-            'unit_cost' => 0,
-            'reference' => 'STK-IN-'.now()->format('YmdHis'),
-            'notes' => $data['notes'] ?? __('messages.stock_entry'),
-            'user_id' => auth()->id(),
+            'type'          => 'entry',
+            'quantity'      => (float) $data['quantity'],
+            'unit_cost'     => 0,
+            'reference'     => 'STK-IN-' . now()->format('YmdHis'),
+            'notes'         => $data['notes'] ?? __('messages.stock_entry'),
         ]);
 
         Notification::make()
@@ -123,8 +129,12 @@ class StockActions
 
     public static function adjustProductStock(array $data): void
     {
+        if (empty($data['warehouse_id'])) {
+            throw new \InvalidArgumentException('warehouse_id is required to adjust product stock.');
+        }
+
         $product = Product::query()->findOrFail($data['product_id']);
-        $warehouseId = $data['warehouse_id'] ?? null;
+        $warehouseId = $data['warehouse_id'];
         $targetQuantity = (float) $data['quantity'];
         $currentQuantity = self::currentProductQuantity($product, $warehouseId);
         $delta = round($targetQuantity - $currentQuantity, 2);
@@ -138,17 +148,16 @@ class StockActions
             return;
         }
 
-        StockMovement::create([
-            'company_id' => $product->company_id,
-            'product_id' => $product->id,
-            'warehouse_id' => $warehouseId,
+        StockService::movement([
+            'company_id'    => $product->company_id,
+            'product_id'    => $product->id,
+            'warehouse_id'  => $warehouseId,
             'movement_type' => 'adjustment',
-            'type' => $delta > 0 ? 'entry' : 'exit',
-            'quantity' => abs($delta),
-            'unit_cost' => 0,
-            'reference' => 'STK-ADJ-'.now()->format('YmdHis'),
-            'notes' => $data['notes'] ?? __('messages.adjustment'),
-            'user_id' => auth()->id(),
+            'type'          => $delta > 0 ? 'entry' : 'exit',
+            'quantity'      => abs($delta),
+            'unit_cost'     => 0,
+            'reference'     => 'STK-ADJ-' . now()->format('YmdHis'),
+            'notes'         => $data['notes'] ?? __('messages.adjustment'),
         ]);
 
         Notification::make()
@@ -159,11 +168,15 @@ class StockActions
 
     public static function addMotorcycleStock(array $data): void
     {
+        if (empty($data['warehouse_id'])) {
+            throw new \InvalidArgumentException('warehouse_id is required to add motorcycle stock.');
+        }
+
         $model = MotorcycleModel::query()->findOrFail($data['motorcycle_model_id']);
 
         $unit = MotorcycleUnit::create([
             'company_id' => session('company_id'),
-            'warehouse_id' => $data['warehouse_id'] ?? null,
+            'warehouse_id' => $data['warehouse_id'],
             'motorcycle_model_id' => $model->id,
             'chassis_number' => $data['chassis_number'],
             'fabrication_number' => $data['fabrication_number'] ?? null,
@@ -171,17 +184,16 @@ class StockActions
             'purchase_date' => now()->toDateString(),
         ]);
 
-        StockMovement::create([
-            'company_id' => $unit->company_id,
+        StockService::movement([
+            'company_id'         => $unit->company_id,
             'motorcycle_unit_id' => $unit->id,
-            'warehouse_id' => $unit->warehouse_id,
-            'movement_type' => 'purchase',
-            'type' => 'entry',
-            'quantity' => 1,
-            'unit_cost' => 0,
-            'reference' => 'MOTO-IN-'.now()->format('YmdHis'),
-            'notes' => $data['notes'] ?? __('messages.stock_entry'),
-            'user_id' => auth()->id(),
+            'warehouse_id'       => $unit->warehouse_id,
+            'movement_type'      => 'purchase',
+            'type'               => 'entry',
+            'quantity'           => 1,
+            'unit_cost'          => 0,
+            'reference'          => 'MOTO-IN-' . now()->format('YmdHis'),
+            'notes'              => $data['notes'] ?? __('messages.stock_entry'),
         ]);
 
         Notification::make()

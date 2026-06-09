@@ -122,9 +122,11 @@ class DocumentForm
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->visible(fn ($get) => self::isRepairInvoiceDocument($get))
+                            ->visible(fn ($get) => self::isRepairInvoiceDocument($get)
+                                || self::isInvoiceDocument($get)
+                                || self::isDeliveryNoteDocument($get))
                             ->required(fn ($get) => self::isRepairInvoiceDocument($get))
-                            ->afterStateUpdated(function ($state, callable $set): void {
+                            ->afterStateUpdated(function ($state, callable $set, callable $get): void {
                                 if (! $state) {
                                     return;
                                 }
@@ -137,9 +139,7 @@ class DocumentForm
                                     return;
                                 }
 
-                                $set('client_id', $ticket->client_id);
-
-                                $items = $ticket->items
+                                $repairItems = $ticket->items
                                     ->map(function (RepairItem $repairItem): array {
                                         $itemType = in_array($repairItem->item_type, ['part', 'accessory', 'consumable'], true)
                                             ? ($repairItem->product_id ? 'product' : 'service')
@@ -158,7 +158,7 @@ class DocumentForm
                                     ->all();
 
                                 if ((float) $ticket->labor_cost > 0) {
-                                    $items[] = [
+                                    $repairItems[] = [
                                         'item_type'       => 'service',
                                         'product_id'      => null,
                                         'description'     => __('messages.labor_cost'),
@@ -168,8 +168,21 @@ class DocumentForm
                                     ];
                                 }
 
-                                if ($items !== []) {
-                                    $set('items', $items);
+                                if ($repairItems === []) {
+                                    return;
+                                }
+
+                                $saleId = $get('sale_id');
+
+                                if ((self::isInvoiceDocument($get) || self::isDeliveryNoteDocument($get))
+                                    && filled($saleId)
+                                ) {
+                                    // Combined mode: append repair items after existing sale items
+                                    $set('items', array_merge($get('items') ?: [], $repairItems));
+                                } else {
+                                    // Repair-only or REPAIR_INVOICE: set client and replace items
+                                    $set('client_id', $ticket->client_id);
+                                    $set('items', $repairItems);
                                 }
                             }),
 
@@ -791,8 +804,9 @@ class DocumentForm
 
     private static function requiresSaleLinking(callable $get): bool
     {
-        return self::isInvoiceDocument($get)
-            || self::isWarrantyContract($get)
+        // INVOICE intentionally excluded — sale is optional; supports A) sale-only
+        // B) repair-only and C) combined modes.
+        return self::isWarrantyContract($get)
             || self::isConformityDocument($get)
             || self::isDeliveryNoteDocument($get)
             || self::isSaleReturnDocument($get);
@@ -800,7 +814,19 @@ class DocumentForm
 
     private static function isImportedFromRecord(callable $get): bool
     {
-        return self::requiresSaleLinking($get) || self::isRepairInvoiceDocument($get);
+        if (self::requiresSaleLinking($get) || self::isRepairInvoiceDocument($get)) {
+            return true;
+        }
+
+        // For INVOICE: lock items once a sale or repair ticket is linked
+        if (self::isInvoiceDocument($get)) {
+            $saleId   = $get('../../sale_id')            ?: $get('sale_id');
+            $repairId = $get('../../repair_ticket_id')   ?: $get('repair_ticket_id');
+
+            return filled($saleId) || filled($repairId);
+        }
+
+        return false;
     }
 
     private static function resolveReturnableSaleItems(Sale $sale): array

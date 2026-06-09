@@ -91,13 +91,14 @@ class RepairTicketForm
                     Select::make('sale_id')
                         ->label(__('messages.sale'))
                         ->searchable()
-                        ->preload()
                         ->live()
                         ->required(fn (Get $get): bool => $get('_repair_source') === 'sale')
                         ->visible(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                        ->helperText(__('messages.type_to_search_sale'))
                         ->getSearchResultsUsing(function (string $search) {
                             return Sale::query()
                                 ->with(['client', 'items.motorcycleUnit.motorcycleModel'])
+                                ->whereNotIn('status', ['cancelled', 'returned'])
                                 ->where(function ($query) use ($search) {
                                     $query->where('sale_number', 'like', "%{$search}%")
                                         ->orWhereHas('client', fn ($q) => $q
@@ -442,7 +443,7 @@ class RepairTicketForm
                     Repeater::make('parts')
                         ->relationship('parts')
                         ->label('')
-                        ->schema(self::itemSchema('part'))
+                        ->schema(self::itemSchema('part', 'parts'))
                         ->addActionLabel(__('messages.add_part'))
                         ->defaultItems(0)
                         ->reorderable()
@@ -454,7 +455,7 @@ class RepairTicketForm
                     Repeater::make('consumables')
                         ->relationship('consumables')
                         ->label('')
-                        ->schema(self::itemSchema('consumable'))
+                        ->schema(self::itemSchema('consumable', 'consumables'))
                         ->addActionLabel(__('messages.add_consumable'))
                         ->defaultItems(0)
                         ->reorderable()
@@ -645,7 +646,7 @@ class RepairTicketForm
     |------------------------------------------------------------------
     */
 
-    private static function itemSchema(string $type): array
+    private static function itemSchema(string $type, string $repeaterKey): array
     {
         $types = $type === 'part' ? ['part', 'accessory'] : ['consumable'];
         $label = $type === 'part' ? __('messages.part') : __('messages.consumable');
@@ -656,14 +657,25 @@ class RepairTicketForm
             Grid::make(4)->schema([
                 Select::make('product_id')
                     ->label($label)
-                    ->options(fn () => Product::query()
-                        ->whereIn('type', $types)
-                        ->orderBy('name')
-                        ->get()
-                        ->mapWithKeys(fn ($p) => [
-                            $p->id => $p->name . ' (' . __('messages.stock') . ': ' . (int) $p->current_stock . ')',
-                        ])
-                        ->toArray())
+                    ->options(function (Get $get, $state) use ($types, $repeaterKey) {
+                        $selectedIds = collect($get('../../' . $repeaterKey))
+                            ->pluck('product_id')
+                            ->filter()
+                            ->reject(fn ($id) => $id == $state)
+                            ->values()
+                            ->toArray();
+
+                        return Product::query()
+                            ->whereIn('type', $types)
+                            ->where('current_stock', '>', 0)
+                            ->whereNotIn('id', $selectedIds)
+                            ->orderBy('name')
+                            ->get()
+                            ->mapWithKeys(fn ($p) => [
+                                $p->id => $p->name . ' (' . __('messages.stock') . ': ' . (int) $p->current_stock . ')',
+                            ])
+                            ->toArray();
+                    })
                     ->searchable()
                     ->live()
                     ->afterStateUpdated(function ($state, callable $set) {

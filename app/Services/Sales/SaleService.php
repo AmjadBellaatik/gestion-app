@@ -25,6 +25,7 @@ use App\Models\BankTransferPayment;
 use App\Services\Documents\DocumentService;
 use App\Services\Warranty\WarrantyService;
 use App\Services\Accounting\AccountingService;
+use App\Services\Stock\StockService;
 use Illuminate\Support\Facades\Schema;
 
 class SaleService
@@ -243,7 +244,9 @@ class SaleService
 
                 'payment_status' => 'unpaid',
 
-                'status' => 'completed',
+                // Initial status is pending; PaymentService::updateSaleBalance() transitions
+                // this to partially_paid / paid as payments are applied.
+                'status' => 'pending',
 
                 'notes' => $data['notes'] ?? null,
 
@@ -350,32 +353,25 @@ class SaleService
 
                 static::ensureProductIdNullable();
 
-                StockMovement::create([
+                // Resolve warehouse from the unit's stored warehouse or the product's last entry.
+                $itemWarehouseId = ! empty($item['motorcycle_unit_id'])
+                    ? MotorcycleUnit::withoutGlobalScopes()->find((int) $item['motorcycle_unit_id'])?->warehouse_id
+                    : static::resolveProductWarehouse((int) ($item['product_id'] ?? 0));
 
+                StockService::movement([
                     'company_id'         => session('company_id'),
-
                     'product_id'         => $item['product_id'] ?? null,
-
                     'motorcycle_unit_id' => $item['motorcycle_unit_id'] ?? null,
-
+                    'warehouse_id'       => $itemWarehouseId,
                     'movement_type'      => 'sale',
-
                     'type'               => 'exit',
-
                     'quantity'           => ! empty($item['motorcycle_unit_id']) ? 1 : $item['quantity'],
-
                     'unit_cost'          => $unitPrice,
-
                     'reference'          => $sale->sale_number,
-
                     'reference_type'     => Sale::class,
-
                     'reference_id'       => $sale->id,
-
-                    'notes'              => 'Sale #'.$sale->sale_number,
-
+                    'notes'              => 'Sale #' . $sale->sale_number,
                     'user_id'            => auth()->id(),
-
                 ]);
 
                 /*
@@ -584,21 +580,9 @@ class SaleService
             |--------------------------------------------------------------------------
             */
 
-            /*
-            |--------------------------------------------------------------------------
-            | 12 — STATUS AUTOMATION
-            |--------------------------------------------------------------------------
-            */
-
-            $sale->update([
-
-                'status' => 'completed',
-
-            ]);
-
-            // NOTE: payment_status / paid_amount / remaining_amount are managed
+            // payment_status / paid_amount / remaining_amount / status are managed
             // exclusively by the Payment model observer (PaymentService::applyPayment).
-            // Do NOT override them here to prevent double-counting.
+            // Do NOT override them here to prevent double-counting or status regression.
 
             return $sale;
 
@@ -625,6 +609,25 @@ class SaleService
     protected static function generateSaleNumber(): string
     {
         return 'SAL-'.now()->format('YmdHis');
+    }
+
+    /**
+     * Resolve the warehouse for a product's sale exit by looking at its most recent
+     * entry stock movement. Used to satisfy the warehouse_id NOT NULL constraint.
+     */
+    private static function resolveProductWarehouse(int $productId): ?int
+    {
+        if ($productId <= 0) {
+            return null;
+        }
+
+        return StockMovement::withoutGlobalScopes()
+            ->where('product_id', $productId)
+            ->whereIn('type', ['entry', 'in'])
+            ->whereIn('movement_type', ['purchase', 'return', 'adjustment', 'transfer'])
+            ->whereNotNull('warehouse_id')
+            ->orderByDesc('id')
+            ->value('warehouse_id');
     }
 
     protected static function handleMotorcycleUnitSale(

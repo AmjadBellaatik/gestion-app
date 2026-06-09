@@ -100,7 +100,9 @@ class MotorcycleUnitForm
 
                     ->searchable()
 
-                    ->preload(),
+                    ->preload()
+
+                    ->required(),
 
                 Forms\Components\TextInput::make(
                     'chassis_number'
