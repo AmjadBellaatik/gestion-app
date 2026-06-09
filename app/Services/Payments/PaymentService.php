@@ -146,10 +146,18 @@ class PaymentService
                 }
             }
 
-            // --- 2. Reverse ledger transaction ---
+            // --- 2. Reverse repair ticket balance ---
+            if ($payment->repair_ticket_id) {
+                $ticket = RepairTicket::withoutGlobalScopes()->find($payment->repair_ticket_id);
+                if ($ticket) {
+                    $this->reverseRepairBalance($ticket);
+                }
+            }
+
+            // --- 3. Reverse ledger transaction ---
             $payment->transaction()->delete();
 
-            // --- 3. Reverse treasury entry ---
+            // --- 4. Reverse treasury entry ---
             TreasuryTransaction::where('payment_id', $payment->id)->delete();
         });
     }
@@ -281,10 +289,11 @@ class PaymentService
     public static function createFromRepair(RepairTicket $ticket, string $paymentMethod = 'cash'): Payment
     {
         return DB::transaction(function () use ($ticket, $paymentMethod) {
-            $amount = (float) ($ticket->total_cost ?? 0);
+            $remaining = (float) ($ticket->remaining_amount ?? 0);
+            $amount    = $remaining > 0 ? $remaining : (float) ($ticket->total_cost ?? 0);
 
-            if ($amount <= 0) {
-                throw new \InvalidArgumentException('Cannot create a payment with zero amount.');
+            if ($amount <= 0.00) {
+                throw new \RuntimeException('Repair ticket has no outstanding balance.');
             }
 
             return Payment::create([
@@ -385,14 +394,51 @@ class PaymentService
                 ->whereNotIn('status', self::TERMINAL_STATUSES)
                 ->sum('amount');
             $newRemaining = max(0, $total - $totalPaid);
+            $newStatus    = $newRemaining <= 0 ? 'paid' : 'partial';
 
-            $data = ['payment_status' => $newRemaining <= 0 ? 'paid' : 'partial'];
-
-            if ($newRemaining <= 0 && ! $locked->paid_at) {
-                $data['paid_at'] = now();
+            if ($totalPaid > ($total + 0.01)) {
+                throw new \RuntimeException(
+                    sprintf('Payment exceeds repair total cost of %s.', $locked->total_cost)
+                );
             }
 
-            $locked->update($data);
+            $locked->update([
+                'paid_amount'      => $totalPaid,
+                'remaining_amount' => $newRemaining,
+                'payment_status'   => $newStatus,
+                'paid_at'          => $newStatus === 'paid' ? now() : null,
+            ]);
+
+            if ($newStatus === 'paid' && $locked->invoice_document_id) {
+                \App\Models\Document::where('id', $locked->invoice_document_id)
+                    ->update(['status' => 'paid']);
+            }
+        });
+    }
+
+    private function reverseRepairBalance(RepairTicket $ticket): void
+    {
+        DB::transaction(function () use ($ticket) {
+            $locked = RepairTicket::withoutGlobalScopes()->lockForUpdate()->findOrFail($ticket->id);
+
+            $total        = (float) ($locked->total_cost ?? 0);
+            $totalPaid    = (float) $locked->payments()
+                ->whereNotIn('status', self::TERMINAL_STATUSES)
+                ->sum('amount');
+            $newRemaining = max(0, $total - $totalPaid);
+            $newStatus    = $totalPaid <= 0 ? 'unpaid' : ($newRemaining <= 0 ? 'paid' : 'partial');
+
+            $locked->update([
+                'paid_amount'      => $totalPaid,
+                'remaining_amount' => $newRemaining,
+                'payment_status'   => $newStatus,
+                'paid_at'          => $newStatus === 'paid' ? now() : null,
+            ]);
+
+            if ($newStatus !== 'paid' && $locked->invoice_document_id) {
+                \App\Models\Document::where('id', $locked->invoice_document_id)
+                    ->update(['status' => 'generated']);
+            }
         });
     }
 

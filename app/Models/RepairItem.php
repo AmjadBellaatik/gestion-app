@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\StockMovement;
+use App\Services\Stock\StockService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -20,9 +20,9 @@ class RepairItem extends Model
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
-        'unit_price' => 'decimal:2',
-        'total' => 'decimal:2',
+        'quantity'        => 'decimal:2',
+        'unit_price'      => 'decimal:2',
+        'total'           => 'decimal:2',
         'discount_amount' => 'decimal:2',
     ];
 
@@ -35,30 +35,67 @@ class RepairItem extends Model
             );
         });
 
+        // Deduct stock when a part/consumable is added to a repair ticket
         static::created(function (RepairItem $item) {
             if (! $item->product_id) {
                 return;
             }
-
-            if (! \in_array($item->item_type, ['part', 'accessory', 'consumable'], true)) {
+            if (! in_array($item->item_type, ['part', 'accessory', 'consumable'], true)) {
                 return;
             }
 
             $ticket = $item->repairTicket;
 
-            StockMovement::create([
-                'company_id'    => session('company_id'),
-                'product_id'    => $item->product_id,
-                'movement_type' => 'repair',
-                'type'          => 'exit',
-                'quantity'      => (float) $item->quantity,
-                'unit_cost'     => (float) $item->unit_price,
-                'reference'     => $ticket?->ticket_number ?? ('RT-' . $item->repair_ticket_id),
-                'reference_type' => RepairTicket::class,
-                'reference_id'  => $item->repair_ticket_id,
-                'notes'         => 'Repair ticket ' . ($ticket?->ticket_number ?? $item->repair_ticket_id),
-                'user_id'       => auth()->id(),
-            ]);
+            try {
+                StockService::movement([
+                    'company_id'         => $ticket?->company_id ?? session('company_id'),
+                    'warehouse_id'       => $ticket?->warehouse_id ?? null,
+                    'product_id'         => $item->product_id,
+                    'motorcycle_unit_id' => $ticket?->motorcycle_unit_id ?? null,
+                    'type'               => 'exit',
+                    'movement_type'      => 'repair',
+                    'quantity'           => (float) $item->quantity,
+                    'unit_cost'          => (float) $item->unit_price,
+                    'reference'          => $ticket?->ticket_number ?? ('RT-' . $item->repair_ticket_id),
+                    'reference_type'     => RepairTicket::class,
+                    'reference_id'       => $item->repair_ticket_id,
+                    'notes'              => 'Repair ticket ' . ($ticket?->ticket_number ?? $item->repair_ticket_id),
+                    'user_id'            => auth()->user()?->getAuthIdentifier(),
+                ]);
+            } catch (\Throwable) {
+                // Stock failures must not block item creation
+            }
+        });
+
+        // Restore stock when a part/consumable is removed from a repair ticket
+        static::deleted(function (RepairItem $item) {
+            if (! $item->product_id) {
+                return;
+            }
+            if (! in_array($item->item_type, ['part', 'accessory', 'consumable'], true)) {
+                return;
+            }
+
+            $ticket = $item->repairTicket;
+
+            try {
+                StockService::movement([
+                    'company_id'         => $ticket?->company_id ?? session('company_id'),
+                    'warehouse_id'       => $ticket?->warehouse_id ?? null,
+                    'product_id'         => $item->product_id,
+                    'motorcycle_unit_id' => $ticket?->motorcycle_unit_id ?? null,
+                    'type'               => 'entry',
+                    'movement_type'      => 'repair_return',
+                    'quantity'           => (float) $item->quantity,
+                    'reference'          => $ticket?->ticket_number ?? ('RT-' . $item->repair_ticket_id),
+                    'reference_type'     => RepairTicket::class,
+                    'reference_id'       => $item->repair_ticket_id,
+                    'notes'              => 'Stock restored: item removed from repair ' . ($ticket?->ticket_number ?? ''),
+                    'user_id'            => auth()->user()?->getAuthIdentifier(),
+                ]);
+            } catch (\Throwable) {
+                //
+            }
         });
     }
 

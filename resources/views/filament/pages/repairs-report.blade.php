@@ -92,12 +92,14 @@
                     @foreach ($repairs as $repair)
                     @php
                         $statusClass = match($repair->status) {
-                            'completed', 'delivered' => 'rpt-badge-em',
-                            'in_progress'            => 'rpt-badge-bl',
-                            'open', 'assigned'       => 'rpt-badge-am',
-                            'diagnostic'             => 'rpt-badge-cy',
-                            'cancelled'              => 'rpt-badge-re',
-                            default                  => 'rpt-badge-gr',
+                            'completed', 'delivered', 'closed' => 'rpt-badge-em',
+                            'in_progress'                      => 'rpt-badge-bl',
+                            'approved'                         => 'rpt-badge-bl',
+                            'open'                             => 'rpt-badge-am',
+                            'waiting_approval', 'waiting_parts' => 'rpt-badge-am',
+                            'diagnostic'                       => 'rpt-badge-cy',
+                            'cancelled'                        => 'rpt-badge-re',
+                            default                            => 'rpt-badge-gr',
                         };
                         $priorityClass = match($repair->priority ?? 'normal') {
                             'urgent' => 'rpt-badge-re',

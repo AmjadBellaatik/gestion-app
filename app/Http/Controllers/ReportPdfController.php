@@ -180,8 +180,8 @@ class ReportPdfController extends Controller
     {
         $repairs        = RepairTicket::with(['client', 'technician', 'motorcycleUnit.motorcycleModel'])->whereBetween('created_at', [$from, $to])->latest()->get();
         $totalRepairs   = $repairs->count();
-        $openCount      = $repairs->whereIn('status', ['open', 'diagnostic', 'assigned', 'in_progress'])->count();
-        $completedCount = $repairs->whereIn('status', ['completed', 'delivered'])->count();
+        $openCount      = $repairs->whereIn('status', ['open', 'diagnostic', 'waiting_approval', 'approved', 'waiting_parts', 'in_progress'])->count();
+        $completedCount = $repairs->whereIn('status', ['completed', 'delivered', 'closed'])->count();
         $warrantyCount  = $repairs->where('is_warranty', true)->count();
         $cancelledCount = $repairs->where('status', 'cancelled')->count();
         $totalRevenue   = $repairs->sum('total_cost');

@@ -507,7 +507,7 @@
                 <tbody>
                 @foreach($repairs as $repair)
                 @php
-                    $sc = match($repair->status){ 'completed','delivered'=>'rpt-badge-em','in_progress'=>'rpt-badge-bl','open','assigned'=>'rpt-badge-am','diagnostic'=>'rpt-badge-cy','cancelled'=>'rpt-badge-re',default=>'rpt-badge-gr' };
+                    $sc = match($repair->status){ 'completed','delivered','closed'=>'rpt-badge-em','in_progress','approved'=>'rpt-badge-bl','open','waiting_approval','waiting_parts'=>'rpt-badge-am','diagnostic'=>'rpt-badge-cy','cancelled'=>'rpt-badge-re',default=>'rpt-badge-gr' };
                     $pc = match($repair->priority ?? 'normal'){ 'urgent'=>'rpt-badge-re','high'=>'rpt-badge-am','normal'=>'rpt-badge-bl',default=>'rpt-badge-gr' };
                 @endphp
                 <tr>

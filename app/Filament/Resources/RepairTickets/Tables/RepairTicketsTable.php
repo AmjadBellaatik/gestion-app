@@ -16,7 +16,6 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
-
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 
@@ -53,11 +52,6 @@ class RepairTicketsTable
                     ->searchable(false)
                     ->placeholder('-'),
 
-                IconColumn::make('is_foreign_vehicle')
-                    ->label(__('messages.foreign_vehicle'))
-                    ->boolean()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
                 TextColumn::make('technician.name')
                     ->label(__('messages.technician'))
                     ->searchable()
@@ -69,25 +63,27 @@ class RepairTicketsTable
                     ->badge()
                     ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'paid')))
                     ->color(fn ($state) => match ($state) {
-                        'warranty'      => 'warning',
-                        'paid'          => 'success',
-                        'internal'      => 'info',
-                        'reimbursement' => 'danger',
-                        default         => 'gray',
+                        'warranty' => 'warning',
+                        'paid'     => 'success',
+                        'internal' => 'info',
+                        default    => 'gray',
                     }),
 
                 TextColumn::make('status')
                     ->label(__('messages.status'))
                     ->badge()
                     ->color(fn ($state) => match ($state) {
-                        'open'        => 'gray',
-                        'diagnostic'  => 'warning',
-                        'assigned'    => 'info',
-                        'in_progress' => 'primary',
-                        'completed'   => 'success',
-                        'delivered'   => 'success',
-                        'cancelled'   => 'danger',
-                        default       => 'gray',
+                        'open'             => 'gray',
+                        'diagnostic'       => 'warning',
+                        'waiting_approval' => 'warning',
+                        'approved'         => 'info',
+                        'waiting_parts'    => 'info',
+                        'in_progress'      => 'primary',
+                        'completed'        => 'success',
+                        'delivered'        => 'success',
+                        'closed'           => 'success',
+                        'cancelled'        => 'danger',
+                        default            => 'gray',
                     })
                     ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'open'))),
 
@@ -111,6 +107,32 @@ class RepairTicketsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                TextColumn::make('total_cost')
+                    ->label(__('messages.total_cost'))
+                    ->money('MAD')
+                    ->sortable()
+                    ->weight('bold'),
+
+                TextColumn::make('payment_status')
+                    ->label(__('messages.payment_status'))
+                    ->badge()
+                    ->color(fn ($state) => match ($state) {
+                        'paid'    => 'success',
+                        'partial' => 'warning',
+                        default   => 'gray',
+                    })
+                    ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'unpaid'))),
+
+                IconColumn::make('is_foreign_vehicle')
+                    ->label(__('messages.foreign_vehicle'))
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                IconColumn::make('is_warranty')
+                    ->label(__('messages.is_warranty'))
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('labor_cost')
                     ->label(__('messages.labor_cost'))
                     ->money('MAD')
@@ -122,38 +144,6 @@ class RepairTicketsTable
                     ->money('MAD')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('discount_amount')
-                    ->label(__('messages.discount_amount'))
-                    ->money('MAD')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('total_cost')
-                    ->label(__('messages.total_cost'))
-                    ->money('MAD')
-                    ->sortable()
-                    ->weight('bold'),
-
-                IconColumn::make('discount_validated')
-                    ->label(__('messages.discount_validated'))
-                    ->boolean()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                IconColumn::make('is_warranty')
-                    ->label(__('messages.is_warranty'))
-                    ->boolean()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('payment_status')
-                    ->label(__('messages.payment_status'))
-                    ->badge()
-                    ->color(fn ($state) => match ($state) {
-                        'paid'    => 'success',
-                        'partial' => 'warning',
-                        default   => 'gray',
-                    })
-                    ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'unpaid'))),
 
                 TextColumn::make('opened_at')
                     ->label(__('messages.opened_at'))
@@ -179,22 +169,24 @@ class RepairTicketsTable
                 SelectFilter::make('status')
                     ->label(__('messages.status'))
                     ->options([
-                        'open'        => __('messages.open'),
-                        'diagnostic'  => __('messages.diagnostic'),
-                        'assigned'    => __('messages.assigned'),
-                        'in_progress' => __('messages.in_progress'),
-                        'completed'   => __('messages.completed'),
-                        'delivered'   => __('messages.delivered'),
-                        'cancelled'   => __('messages.cancelled'),
+                        'open'             => __('messages.open'),
+                        'diagnostic'       => __('messages.diagnostic'),
+                        'waiting_approval' => __('messages.waiting_approval'),
+                        'approved'         => __('messages.approved'),
+                        'waiting_parts'    => __('messages.waiting_parts'),
+                        'in_progress'      => __('messages.in_progress'),
+                        'completed'        => __('messages.completed'),
+                        'delivered'        => __('messages.delivered'),
+                        'closed'           => __('messages.closed'),
+                        'cancelled'        => __('messages.cancelled'),
                     ]),
 
                 SelectFilter::make('repair_type')
                     ->label(__('messages.repair_type'))
                     ->options([
-                        'warranty'      => __('messages.warranty'),
-                        'paid'          => __('messages.paid'),
-                        'internal'      => __('messages.internal'),
-                        'reimbursement' => __('messages.reimbursement'),
+                        'warranty' => __('messages.warranty'),
+                        'paid'     => __('messages.paid'),
+                        'internal' => __('messages.internal'),
                     ]),
 
                 SelectFilter::make('payment_status')
@@ -235,13 +227,16 @@ class RepairTicketsTable
                     ->visible(fn () => ! self::isAdminUser())
                     ->requiresConfirmation()
                     ->action(function (RepairTicket $record) {
-                        $admins = User::role(['Admin', 'Super Admin'])->where('status', true)->get();
+                        $admins       = User::role(['Admin', 'Super Admin'])->where('status', true)->get();
                         $notification = new GenericNotification(
                             __('messages.request_deletion'),
                             'Ticket #' . ($record->ticket_number ?? $record->id) . ' — ' . __('messages.request_deletion')
                         );
                         foreach ($admins as $admin) {
-                            try { $admin->notify($notification); } catch (\Throwable) {}
+                            try {
+                                $admin->notify($notification);
+                            } catch (\Throwable) {
+                            }
                         }
                         Notification::make()->title(__('messages.deletion_requested'))->success()->send();
                     }),
@@ -268,13 +263,16 @@ class RepairTicketsTable
                         ->visible(fn () => ! self::isAdminUser())
                         ->requiresConfirmation()
                         ->action(function (Collection $records) {
-                            $admins = User::role(['Admin', 'Super Admin'])->where('status', true)->get();
+                            $admins       = User::role(['Admin', 'Super Admin'])->where('status', true)->get();
                             $notification = new GenericNotification(
                                 __('messages.request_deletion'),
                                 'Bulk deletion requested for ' . $records->count() . ' repair ticket(s).'
                             );
                             foreach ($admins as $admin) {
-                                try { $admin->notify($notification); } catch (\Throwable) {}
+                                try {
+                                    $admin->notify($notification);
+                                } catch (\Throwable) {
+                                }
                             }
                             Notification::make()->title(__('messages.deletion_requested'))->success()->send();
                         }),

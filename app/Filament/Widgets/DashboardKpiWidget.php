@@ -56,7 +56,7 @@ class DashboardKpiWidget extends StatsOverviewWidget
         $profitChart   = array_map(fn ($r, $e) => $r - $e, $revenueChart, $expenseChart);
 
         // ── Active Repair Tickets ─────────────────────────────────────────────
-        $activeTickets = RepairTicket::whereIn('status', ['open', 'diagnostic', 'assigned', 'in_progress'])->count();
+        $activeTickets = RepairTicket::whereIn('status', ['open', 'diagnostic', 'waiting_approval', 'approved', 'waiting_parts', 'in_progress'])->count();
         $activeChart   = $this->monthlyTotals(
             fn ($m, $y) => RepairTicket::whereYear('created_at', $y)->whereMonth('created_at', $m)->count()
         );

@@ -5,13 +5,17 @@ namespace App\Filament\Resources\RepairTickets\Pages;
 use App\Filament\Resources\RepairTickets\RepairTicketResource;
 use App\Models\DocumentType;
 use App\Models\RepairTicket;
+use App\Models\User;
 use App\Services\Documents\DocumentService;
+use App\Services\Workshop\RepairWorkflowService;
 
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
@@ -19,13 +23,116 @@ class EditRepairTicket extends EditRecord
 {
     protected static string $resource = RepairTicketResource::class;
 
+    /*
+    |------------------------------------------------------------------
+    | Pre-fill the virtual _repair_source field so the form shows the
+    | correct vehicle section when editing an existing record.
+    |------------------------------------------------------------------
+    */
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        if (! empty($data['sale_id'])) {
+            $data['_repair_source'] = 'sale';
+        } elseif (! empty($data['is_foreign_vehicle'])) {
+            $data['_repair_source'] = 'foreign';
+        } else {
+            $data['_repair_source'] = 'stock';
+        }
+
+        return $data;
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        unset($data['_repair_source']);
+        return $data;
+    }
+
+    protected function afterSave(): void
+    {
+        $this->record->recalculateCosts();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
 
             /*
             |------------------------------------------------------------------
-            | Generate Repair Report (PDF for client)
+            | Advance workflow (non-admin one-step forward)
+            |------------------------------------------------------------------
+            */
+
+            Action::make('advance_status')
+                ->label(__('messages.advance_status'))
+                ->icon('heroicon-o-arrow-right-circle')
+                ->color('primary')
+                ->visible(fn (RepairTicket $record) => $this->canAdvance($record))
+                ->schema([
+                    Textarea::make('notes')->label(__('messages.notes'))->rows(2),
+                ])
+                ->action(function (RepairTicket $record, array $data): void {
+                    $next = $this->nextStatus($record->status);
+                    if (! $next) {
+                        return;
+                    }
+
+                    $userId = self::currentUserId();
+                    $ok     = RepairWorkflowService::changeStatus($record, $next, $userId, $data['notes'] ?? null);
+
+                    Notification::make()
+                        ->title($ok ? __('messages.status_updated') : __('messages.status_transition_invalid'))
+                        ->{$ok ? 'success' : 'warning'}()
+                        ->send();
+
+                    $this->refreshFormData(['status', 'payment_status']);
+                }),
+
+            /*
+            |------------------------------------------------------------------
+            | Admin force-override status
+            |------------------------------------------------------------------
+            */
+
+            Action::make('force_status')
+                ->label(__('messages.force_status'))
+                ->icon('heroicon-o-cog-6-tooth')
+                ->color('warning')
+                ->visible(fn () => self::isAdminUser())
+                ->schema([
+                    Select::make('new_status')
+                        ->label(__('messages.status'))
+                        ->options([
+                            'open'             => __('messages.open'),
+                            'diagnostic'       => __('messages.diagnostic'),
+                            'waiting_approval' => __('messages.waiting_approval'),
+                            'approved'         => __('messages.approved'),
+                            'waiting_parts'    => __('messages.waiting_parts'),
+                            'in_progress'      => __('messages.in_progress'),
+                            'completed'        => __('messages.completed'),
+                            'delivered'        => __('messages.delivered'),
+                            'closed'           => __('messages.closed'),
+                            'cancelled'        => __('messages.cancelled'),
+                        ])
+                        ->required(),
+                    Textarea::make('notes')->label(__('messages.notes'))->rows(2),
+                ])
+                ->action(function (RepairTicket $record, array $data): void {
+                    RepairWorkflowService::forceStatus(
+                        $record,
+                        $data['new_status'],
+                        self::currentUserId(),
+                        $data['notes'] ?? null
+                    );
+
+                    Notification::make()->title(__('messages.status_updated'))->success()->send();
+                    $this->refreshFormData(['status', 'payment_status']);
+                }),
+
+            /*
+            |------------------------------------------------------------------
+            | Generate Repair Report (PDF)
             |------------------------------------------------------------------
             */
 
@@ -33,17 +140,17 @@ class EditRepairTicket extends EditRecord
                 ->label(__('messages.generate_repair_report'))
                 ->icon('heroicon-o-document-text')
                 ->color('info')
-                ->visible(fn (RepairTicket $record) => in_array($record->status, ['in_progress', 'completed', 'delivered']))
+                ->visible(fn (RepairTicket $record) => in_array($record->status, [
+                    'in_progress', 'completed', 'delivered', 'closed',
+                ]))
                 ->action(function (RepairTicket $record): void {
-                    // The RepairPrintController handles the actual PDF; this triggers generation
-                    // and updates report_path on the record.
                     $url = route('repairs.print-order', $record);
                     Notification::make()
                         ->title(__('messages.repair_report_ready'))
                         ->body(__('messages.open_report_link'))
                         ->success()
                         ->actions([
-                            \Filament\Notifications\Actions\Action::make('open')
+                            NotificationAction::make('open')
                                 ->label(__('messages.open'))
                                 ->url($url)
                                 ->openUrlInNewTab(),
@@ -53,7 +160,7 @@ class EditRepairTicket extends EditRecord
 
             /*
             |------------------------------------------------------------------
-            | Generate Invoice (via Document system)
+            | Generate Invoice
             |------------------------------------------------------------------
             */
 
@@ -61,29 +168,25 @@ class EditRepairTicket extends EditRecord
                 ->label(__('messages.generate_invoice'))
                 ->icon('heroicon-o-document-currency-dollar')
                 ->color('success')
-                ->visible(fn (RepairTicket $record) => in_array($record->status, ['completed', 'delivered'])
+                ->visible(fn (RepairTicket $record) => in_array($record->status, ['completed', 'delivered', 'closed'])
                     && ! $record->invoice_document_id)
                 ->action(function (RepairTicket $record): void {
-
                     $record->recalculateCosts();
 
                     $documentTypeId = DocumentType::query()
-                        ->where('code', 'INVOICE')
-                        ->orWhere('code', 'REPAIR_INVOICE')
+                        ->where('code', 'REPAIR_INVOICE')
+                        ->orWhere('code', 'INVOICE')
                         ->value('id');
 
                     if (! $documentTypeId) {
-                        Notification::make()
-                            ->title(__('messages.invoice_type_not_found'))
-                            ->warning()
-                            ->send();
+                        Notification::make()->title(__('messages.invoice_type_not_found'))->warning()->send();
                         return;
                     }
 
                     $document = DocumentService::generate([
                         'document_type_id' => $documentTypeId,
                         'client_id'        => $record->client_id,
-                        'repair_ticket_id' => $record->id,
+                        'repair_ticket_id' => $record->getKey(),
                         'language'         => app()->getLocale(),
                         'status'           => 'generated',
                         'subtotal'         => (float) $record->total_cost,
@@ -96,10 +199,7 @@ class EditRepairTicket extends EditRecord
                         $record->update(['invoice_document_id' => $document->id]);
                     }
 
-                    Notification::make()
-                        ->title(__('messages.invoice_generated'))
-                        ->success()
-                        ->send();
+                    Notification::make()->title(__('messages.invoice_generated'))->success()->send();
                 }),
 
             /*
@@ -112,27 +212,21 @@ class EditRepairTicket extends EditRecord
                 ->label(__('messages.validate_discount'))
                 ->icon('heroicon-o-check-badge')
                 ->color('warning')
-                ->visible(fn (RepairTicket $record) => (auth()->user()?->hasAnyRole(['Super Admin', 'Admin']) ?? false)
+                ->visible(fn (RepairTicket $record) => self::isAdminUser()
                     && (float) $record->discount_amount > 0
                     && ! $record->discount_validated)
-                ->form([
-                    Textarea::make('validation_note')
-                        ->label(__('messages.validation_note'))
-                        ->rows(2),
+                ->schema([
+                    Textarea::make('validation_note')->label(__('messages.validation_note'))->rows(2),
                 ])
                 ->action(function (RepairTicket $record, array $data): void {
                     $record->update([
                         'discount_validated'    => true,
-                        'discount_validated_by' => auth()->id(),
+                        'discount_validated_by' => self::currentUserId(),
                         'discount_validated_at' => now(),
                         'discount_note'         => $data['validation_note'] ?? $record->discount_note,
                     ]);
                     $record->recalculateCosts();
-
-                    Notification::make()
-                        ->title(__('messages.discount_validated'))
-                        ->success()
-                        ->send();
+                    Notification::make()->title(__('messages.discount_validated'))->success()->send();
                 }),
 
             /*
@@ -148,11 +242,7 @@ class EditRepairTicket extends EditRecord
                 ->action(function (RepairTicket $record): void {
                     $record->recalculateCosts();
                     $this->refreshFormData(['parts_cost', 'total_cost']);
-
-                    Notification::make()
-                        ->title(__('messages.costs_recalculated'))
-                        ->success()
-                        ->send();
+                    Notification::make()->title(__('messages.costs_recalculated'))->success()->send();
                 }),
 
             DeleteAction::make(),
@@ -161,14 +251,44 @@ class EditRepairTicket extends EditRecord
         ];
     }
 
-    protected function mutateFormDataBeforeSave(array $data): array
+    /*
+    |------------------------------------------------------------------
+    | Helpers
+    |------------------------------------------------------------------
+    */
+
+    private function canAdvance(RepairTicket $record): bool
     {
-        unset($data['_linked_to_sale']);
-        return $data;
+        return $this->nextStatus($record->status) !== null && ! self::isAdminUser();
     }
 
-    protected function afterSave(): void
+    private function nextStatus(string $current): ?string
     {
-        $this->record->recalculateCosts();
+        return match ($current) {
+            'open'             => 'diagnostic',
+            'diagnostic'       => 'waiting_approval',
+            'waiting_approval' => 'approved',
+            'approved'         => 'in_progress',
+            'waiting_parts'    => 'in_progress',
+            'in_progress'      => 'completed',
+            'completed'        => 'delivered',
+            'delivered'        => 'closed',
+            default            => null,
+        };
+    }
+
+    private static function isAdminUser(): bool
+    {
+        $user = request()->user();
+        return $user instanceof User && $user->hasAnyRole(['Admin', 'Super Admin']);
+    }
+
+    private static function currentUserId(): ?int
+    {
+        $user = request()->user();
+        if ($user === null) {
+            return null;
+        }
+        return (int) $user->getAuthIdentifier();
     }
 }

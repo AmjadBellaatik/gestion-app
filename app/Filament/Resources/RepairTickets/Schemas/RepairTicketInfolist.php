@@ -29,10 +29,18 @@ class RepairTicketInfolist
                         TextEntry::make('ticket_number')
                             ->label(__('messages.ticket_number'))
                             ->weight('bold'),
+
                         TextEntry::make('repair_type')
                             ->label(__('messages.repair_type'))
                             ->badge()
-                            ->formatStateUsing(fn ($state) => __('messages.' . $state)),
+                            ->color(fn ($state) => match ($state) {
+                                'warranty' => 'warning',
+                                'paid'     => 'success',
+                                'internal' => 'info',
+                                default    => 'gray',
+                            })
+                            ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'paid'))),
+
                         TextEntry::make('priority')
                             ->label(__('messages.priority'))
                             ->badge()
@@ -42,19 +50,23 @@ class RepairTicketInfolist
                                 'normal' => 'info',
                                 default  => 'gray',
                             })
-                            ->formatStateUsing(fn ($state) => __('messages.' . $state)),
+                            ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'normal'))),
+
                         TextEntry::make('status')
                             ->label(__('messages.status'))
                             ->badge()
                             ->color(fn ($state) => match ($state) {
-                                'open'        => 'gray',
-                                'diagnostic'  => 'warning',
-                                'assigned'    => 'info',
-                                'in_progress' => 'primary',
-                                'completed'   => 'success',
-                                'delivered'   => 'success',
-                                'cancelled'   => 'danger',
-                                default       => 'gray',
+                                'open'             => 'gray',
+                                'diagnostic'       => 'warning',
+                                'waiting_approval' => 'warning',
+                                'approved'         => 'info',
+                                'waiting_parts'    => 'info',
+                                'in_progress'      => 'primary',
+                                'completed'        => 'success',
+                                'delivered'        => 'success',
+                                'closed'           => 'success',
+                                'cancelled'        => 'danger',
+                                default            => 'gray',
                             })
                             ->formatStateUsing(fn ($state) => __('messages.' . ($state ?? 'open'))),
                     ]),

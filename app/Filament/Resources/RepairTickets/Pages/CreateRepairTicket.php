@@ -5,6 +5,7 @@ namespace App\Filament\Resources\RepairTickets\Pages;
 use App\Filament\Resources\RepairTickets\RepairTicketResource;
 use App\Models\DocumentType;
 use App\Services\Documents\DocumentService;
+use App\Services\Workshop\RepairWorkflowService;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateRepairTicket extends CreateRecord
@@ -13,8 +14,8 @@ class CreateRepairTicket extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // ticket_number is auto-generated in the model's creating hook
-        unset($data['ticket_number'], $data['_linked_to_sale']);
+        // Remove virtual fields — not persisted on the model
+        unset($data['ticket_number'], $data['_repair_source']);
 
         return $data;
     }
@@ -34,7 +35,7 @@ class CreateRepairTicket extends CreateRecord
             DocumentService::generate([
                 'document_type_id' => $documentTypeId,
                 'client_id'        => $record->client_id,
-                'repair_ticket_id' => $record->id,
+                'repair_ticket_id' => $record->getKey(),
                 'language'         => app()->getLocale(),
                 'status'           => 'generated',
                 'subtotal'         => 0,
@@ -45,5 +46,12 @@ class CreateRepairTicket extends CreateRecord
         }
 
         $record->recalculateCosts();
+
+        RepairWorkflowService::recordInitialStatus($record, self::currentUserId());
+    }
+
+    private static function currentUserId(): ?int
+    {
+        return (int)(request()->user()?->getAuthIdentifier() ?? 0) ?: null;
     }
 }

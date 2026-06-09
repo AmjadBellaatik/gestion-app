@@ -19,17 +19,19 @@ class RepairTicket extends Model
     public const REPAIR_TYPES = [
         'warranty',
         'paid',
-        'reimbursement',
         'internal',
     ];
 
     public const STATUSES = [
         'open',
         'diagnostic',
-        'assigned',
+        'waiting_approval',
+        'approved',
+        'waiting_parts',
         'in_progress',
         'completed',
         'delivered',
+        'closed',
         'cancelled',
     ];
 
@@ -78,8 +80,9 @@ class RepairTicket extends Model
         'foreign_chassis',
         'foreign_year',
         'foreign_color',
-        'foreign_mileage',
         'payment_status',
+        'paid_amount',
+        'remaining_amount',
         'opened_at',
         'started_at',
         'diagnostic_at',
@@ -87,25 +90,31 @@ class RepairTicket extends Model
         'finished_at',
         'completed_at',
         'delivered_at',
+        'closed_at',
         'paid_at',
+        'cancelled_at',
     ];
 
     protected $casts = [
-        'is_warranty' => 'boolean',
-        'is_foreign_vehicle' => 'boolean',
-        'discount_validated' => 'boolean',
-        'labor_cost' => 'decimal:2',
-        'parts_cost' => 'decimal:2',
-        'total_cost' => 'decimal:2',
-        'discount_amount' => 'decimal:2',
-        'opened_at' => 'datetime',
-        'started_at' => 'datetime',
-        'diagnostic_at' => 'datetime',
-        'assigned_at' => 'datetime',
-        'finished_at' => 'datetime',
-        'completed_at' => 'datetime',
-        'delivered_at' => 'datetime',
-        'paid_at' => 'datetime',
+        'is_warranty'           => 'boolean',
+        'is_foreign_vehicle'    => 'boolean',
+        'discount_validated'    => 'boolean',
+        'labor_cost'            => 'decimal:2',
+        'parts_cost'            => 'decimal:2',
+        'total_cost'            => 'decimal:2',
+        'discount_amount'       => 'decimal:2',
+        'paid_amount'           => 'decimal:2',
+        'remaining_amount'      => 'decimal:2',
+        'opened_at'             => 'datetime',
+        'started_at'            => 'datetime',
+        'diagnostic_at'         => 'datetime',
+        'assigned_at'           => 'datetime',
+        'finished_at'           => 'datetime',
+        'completed_at'          => 'datetime',
+        'delivered_at'          => 'datetime',
+        'closed_at'             => 'datetime',
+        'paid_at'               => 'datetime',
+        'cancelled_at'          => 'datetime',
         'discount_validated_at' => 'datetime',
     ];
 
@@ -114,16 +123,15 @@ class RepairTicket extends Model
         static::addGlobalScope(new CompanyScope);
 
         static::creating(function (RepairTicket $model) {
-
             if (session()->has('company_id')) {
                 $model->company_id = session('company_id');
             }
 
-            $model->created_by ??= auth()->id();
-            $model->status ??= 'open';
-            $model->priority ??= 'normal';
+            $model->created_by    ??= auth()->id();
+            $model->status        ??= 'open';
+            $model->priority      ??= 'normal';
             $model->payment_status ??= 'unpaid';
-            $model->opened_at ??= now();
+            $model->opened_at     ??= now();
 
             if (empty($model->ticket_number)) {
                 $model->ticket_number = self::generateTicketNumber();
@@ -137,26 +145,33 @@ class RepairTicket extends Model
         });
 
         static::updating(function (RepairTicket $model) {
-            if ($model->isDirty('status') && $model->motorcycle_unit_id && ! $model->is_foreign_vehicle) {
-                if (in_array($model->status, ['completed', 'delivered'])) {
-                    $unit = MotorcycleUnit::withoutGlobalScopes()->find($model->motorcycle_unit_id);
-                    if ($unit) {
-                        $unit->update(['status' => $unit->client_id ? 'sold' : 'available']);
-                    }
-                } elseif ($model->status === 'cancelled') {
-                    MotorcycleUnit::withoutGlobalScopes()
-                        ->where('id', $model->motorcycle_unit_id)
-                        ->update(['status' => 'available']);
+            if (! $model->isDirty('status') || ! $model->motorcycle_unit_id || $model->is_foreign_vehicle) {
+                return;
+            }
+
+            if (in_array($model->status, ['completed', 'delivered', 'closed'])) {
+                $unit = MotorcycleUnit::withoutGlobalScopes()->find($model->motorcycle_unit_id);
+                if ($unit) {
+                    $unit->update(['status' => $unit->client_id ? 'sold' : 'available']);
                 }
+            } elseif ($model->status === 'cancelled') {
+                MotorcycleUnit::withoutGlobalScopes()
+                    ->where('id', $model->motorcycle_unit_id)
+                    ->update(['status' => 'available']);
+
+                // Restore stock for all items still on the ticket.
+                // This is the sole stock-restoration path for cancellation —
+                // RepairWorkflowService no longer calls RepairService::restoreStockForCancellation().
+                self::restoreItemsStock($model);
             }
         });
 
         static::updated(function (RepairTicket $model) {
-            // Auto-create payment when a paid repair ticket has no existing payment
+            // Auto-create payment when repair is marked paid (for non-warranty, non-internal)
             if (
                 $model->wasChanged('payment_status')
                 && $model->payment_status === 'paid'
-                && $model->repair_type !== 'warranty'
+                && ! in_array($model->repair_type, ['warranty', 'internal'])
                 && ! Payment::where('repair_ticket_id', $model->id)->exists()
             ) {
                 try {
@@ -173,13 +188,11 @@ class RepairTicket extends Model
             $oldStatus = $model->getOriginal('status');
             $newStatus = $model->status;
 
-            // Notify the creator
             $usersToNotify = collect();
             if ($model->creator && $model->creator->status) {
                 $usersToNotify->push($model->creator);
             }
 
-            // Notify all assigned technicians who have a User account
             $model->assignedTechnicians->each(function ($assignment) use (&$usersToNotify) {
                 $user = User::find($assignment->technician?->user_id ?? null);
                 if ($user && $user->status && ! $usersToNotify->contains('id', $user->id)) {
@@ -198,13 +211,50 @@ class RepairTicket extends Model
         });
     }
 
+    private static function restoreItemsStock(RepairTicket $model): void
+    {
+        // Only restore if items exist — avoids import of StockService creating a circular dep
+        $ticketId = $model->getKey();
+
+        if ($model->relationLoaded('items')) {
+            $items = $model->items;
+        } else {
+            $items = RepairItem::where('repair_ticket_id', $ticketId)->get();
+        }
+
+        foreach ($items as $item) {
+            if (! $item->product_id) {
+                continue;
+            }
+            if (! in_array($item->item_type, ['part', 'accessory', 'consumable'], true)) {
+                continue;
+            }
+            try {
+                \App\Services\Stock\StockService::movement([
+                    'company_id'         => $model->company_id,
+                    'warehouse_id'       => $model->warehouse_id ?? null,
+                    'product_id'         => $item->product_id,
+                    'motorcycle_unit_id' => $model->motorcycle_unit_id ?? null,
+                    'type'               => 'entry',
+                    'movement_type'      => 'repair_cancel',
+                    'quantity'           => (float) $item->quantity,
+                    'reference'          => $model->ticket_number,
+                    'reference_type'     => self::class,
+                    'reference_id'       => $ticketId,
+                    'notes'              => 'Stock restored: repair ' . $model->ticket_number . ' cancelled',
+                    'user_id'            => auth()->user()?->getAuthIdentifier(),
+                ]);
+            } catch (\Throwable) {
+                //
+            }
+        }
+    }
+
     public static function generateTicketNumber(): string
     {
         $year      = now()->format('Y');
         $companyId = (int) (session('company_id') ?? 0);
 
-        // Advisory lock serializes concurrent ticket creation within the same company+year
-        // so two requests never read the same "last number" and generate a collision.
         DB::select('SELECT GET_LOCK(?, 10) AS locked', ["rep_seq_{$companyId}_{$year}"]);
 
         try {
@@ -289,6 +339,11 @@ class RepairTicket extends Model
     public function assignedTechnicians(): HasMany
     {
         return $this->hasMany(RepairTicketTechnician::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     public function creator(): BelongsTo

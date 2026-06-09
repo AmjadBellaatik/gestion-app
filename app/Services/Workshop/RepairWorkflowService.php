@@ -2,88 +2,172 @@
 
 namespace App\Services\Workshop;
 
-use App\Models\RepairTicket;
 use App\Models\RepairStatusHistory;
-
-use App\Services\Workshop\RepairService;
+use App\Models\RepairTicket;
+use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class RepairWorkflowService
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Allowed automatic transitions per status.
+    | Admin/SuperAdmin may bypass these via forceStatus().
+    |--------------------------------------------------------------------------
+    */
+
+    private const TRANSITIONS = [
+        'open'             => ['diagnostic', 'cancelled'],
+        'diagnostic'       => ['waiting_approval', 'cancelled'],
+        'waiting_approval' => ['approved', 'cancelled'],
+        'approved'         => ['waiting_parts', 'in_progress', 'cancelled'],
+        'waiting_parts'    => ['in_progress', 'cancelled'],
+        'in_progress'      => ['completed', 'cancelled'],
+        'completed'        => ['delivered'],
+        'delivered'        => ['closed'],
+        'closed'           => [],
+        'cancelled'        => [],
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Timestamp fields set when entering each status
+    |--------------------------------------------------------------------------
+    */
+
+    private const TIMESTAMPS = [
+        'diagnostic'       => 'diagnostic_at',
+        'approved'         => 'assigned_at',
+        'in_progress'      => 'started_at',
+        'completed'        => ['finished_at', 'completed_at'],
+        'delivered'        => 'delivered_at',
+        'closed'           => 'closed_at',
+        'cancelled'        => 'cancelled_at',
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Advance status via the normal workflow (enforces allowed transitions).
+    | Returns true on success, false if the transition is not allowed.
+    |--------------------------------------------------------------------------
+    */
+
     public static function changeStatus(
         RepairTicket $ticket,
-        string $status,
+        string $newStatus,
+        ?int $userId = null,
+        ?string $notes = null
+    ): bool {
+        $oldStatus = $ticket->status;
+        $allowed   = self::TRANSITIONS[$oldStatus] ?? [];
+
+        if (! in_array($newStatus, $allowed, true)) {
+            return false;
+        }
+
+        self::applyTransition($ticket, $oldStatus, $newStatus, $userId, $notes, false);
+
+        return true;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin/SuperAdmin force override — skips allowed-transition check.
+    | The override is logged with a marker in the notes.
+    |--------------------------------------------------------------------------
+    */
+
+    public static function forceStatus(
+        RepairTicket $ticket,
+        string $newStatus,
         ?int $userId = null,
         ?string $notes = null
     ): void {
+        $user = request()->user();
 
-        $oldStatus =
-            $ticket->status;
+        if (! ($user instanceof User) || ! $user->hasAnyRole(['Admin', 'Super Admin'])) {
+            throw new AuthorizationException('Only admins can force repair status.');
+        }
 
-        $ticket->update([
+        $oldStatus    = $ticket->status;
+        $overrideNote = '[MANUAL OVERRIDE] ' . ($notes ?? '');
 
-            'status' => $status,
+        self::applyTransition($ticket, $oldStatus, $newStatus, $userId, $overrideNote, true);
+    }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Record the initial status when a ticket is first created.
+    |--------------------------------------------------------------------------
+    */
+
+    public static function recordInitialStatus(RepairTicket $ticket, ?int $userId = null): void
+    {
+        RepairStatusHistory::create([
+            'repair_ticket_id' => $ticket->getKey(),
+            'old_status'       => null,
+            'new_status'       => $ticket->status,
+            'changed_by'       => $userId,
+            'notes'            => 'Ticket created',
         ]);
+    }
 
-        match ($status) {
+    /*
+    |--------------------------------------------------------------------------
+    | Internal: apply the transition, set timestamps, call service hooks.
+    |--------------------------------------------------------------------------
+    */
 
-            'diagnostic' =>
+    private static function applyTransition(
+        RepairTicket $ticket,
+        string $oldStatus,
+        string $newStatus,
+        ?int $userId,
+        ?string $notes,
+        bool $isOverride
+    ): void {
+        $updates = ['status' => $newStatus];
 
-                $ticket->update([
-                    'diagnostic_at' => now(),
-                ]),
+        $tsField = self::TIMESTAMPS[$newStatus] ?? null;
+        if ($tsField) {
+            foreach ((array) $tsField as $field) {
+                $updates[$field] = now();
+            }
+        }
 
-            'assigned' =>
+        $ticket->update($updates);
 
-                $ticket->update([
-                    'assigned_at' => now(),
-                ]),
-
-            'finished' =>
-
-                $ticket->update([
-                    'finished_at' => now(),
-                ]),
-
-            'completed' => [
-
-                $ticket->update([
-                    'finished_at' => now(),
-                ]),
-
-                RepairService::complete(
-                    $ticket
-                )
-
-            ],
-
-            'paid' =>
-
-                $ticket->update([
-                    'paid_at' => now(),
-                    'payment_status' => 'paid',
-                ]),
-
-            default => null,
-        };
+        if ($newStatus === 'completed') {
+            RepairService::complete($ticket);
+        }
 
         RepairStatusHistory::create([
-
-            'repair_ticket_id' =>
-                $ticket->id,
-
-            'old_status' =>
-                $oldStatus,
-
-            'new_status' =>
-                $status,
-
-            'changed_by' =>
-                $userId,
-
-            'notes' =>
-                $notes,
-
+            'repair_ticket_id' => $ticket->getKey(),
+            'old_status'       => $oldStatus,
+            'new_status'       => $newStatus,
+            'changed_by'       => $userId,
+            'notes'            => $notes,
         ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Auto-transition triggered by step activity (called from RepairStep model)
+    |--------------------------------------------------------------------------
+    */
+
+    public static function onStepStarted(RepairTicket $ticket): void
+    {
+        // Allow starting work from waiting_parts as well as approved
+        if (in_array($ticket->status, ['approved', 'waiting_parts'], true)) {
+            self::changeStatus($ticket, 'in_progress', null, 'Auto: first step started');
+        }
+    }
+
+    public static function onAllStepsCompleted(RepairTicket $ticket): void
+    {
+        if ($ticket->status === 'in_progress') {
+            self::changeStatus($ticket, 'completed', null, 'Auto: all steps done');
+        }
     }
 }

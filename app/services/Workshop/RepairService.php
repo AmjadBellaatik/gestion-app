@@ -2,120 +2,42 @@
 
 namespace App\Services\Workshop;
 
-use App\Models\Product;
-use App\Models\RepairItem;
 use App\Models\RepairTicket;
-use App\Models\StockMovement;
-
 use App\Services\Accounting\AccountingService;
 
 class RepairService
 {
     /*
     |--------------------------------------------------------------------------
-    | CONSUME PARTS
+    | Recalculate ticket totals from line items
     |--------------------------------------------------------------------------
     */
 
-    public static function consumeParts(
-        RepairTicket $ticket
-    ): void {
-
-        foreach (
-
-            $ticket->items
-
-            as $item
-
-        ) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | CREATE STOCK MOVEMENT
-            |--------------------------------------------------------------------------
-            */
-
-            StockMovement::create([
-                'company_id'     => $ticket->company_id,
-                'product_id'     => $item->product_id,
-                'type'           => 'exit',
-                'movement_type'  => 'repair',
-                'quantity'       => $item->quantity,
-                'reference_type' => RepairTicket::class,
-                'reference_id'   => $ticket->id,
-                'notes'          => 'Repair Ticket: ' . $ticket->ticket_number,
-                'created_by'     => auth()?->id(),
-            ]);
-
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CALCULATE TOTALS
-    |--------------------------------------------------------------------------
-    */
-
-    public static function calculateTotals(
-        RepairTicket $ticket
-    ): void {
-
-        $partsCost =
-
-            $ticket->items()
-
-                ->sum('total');
+    public static function calculateTotals(RepairTicket $ticket): void
+    {
+        $partsCost = $ticket->items()->sum('total');
+        $discount  = (float) $ticket->discount_amount;
 
         $ticket->update([
-
-            'parts_cost' =>
-
-                $partsCost,
-
-            'total_cost' =>
-
-                $partsCost
-
-                + $ticket->labor_cost,
-
+            'parts_cost' => $partsCost,
+            'total_cost' => round((float) $ticket->labor_cost + $partsCost - $discount, 2),
         ]);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | COMPLETE REPAIR
+    | Complete a repair — finalize costs and create the accounting entry.
+    | Stock is NOT consumed here; parts are deducted via RepairItem::created
+    | observer when each item is added to the ticket.
     |--------------------------------------------------------------------------
     */
 
-    public static function complete(
-        RepairTicket $ticket
-    ): void {
+    public static function complete(RepairTicket $ticket): void
+    {
+        self::calculateTotals($ticket);
 
-        /*
-        |--------------------------------------------------------------------------
-        | STOCK MOVEMENTS
-        |--------------------------------------------------------------------------
-        */
-
-        self::consumeParts(
-            $ticket
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | CALCULATE TOTALS
-        |--------------------------------------------------------------------------
-        */
-
-        self::calculateTotals(
-            $ticket
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | ACCOUNTING AUTOMATION
-        |--------------------------------------------------------------------------
-        */
+        // Refresh after calculateTotals saved
+        $ticket->refresh();
 
         try {
             AccountingService::createEntry([
@@ -123,25 +45,18 @@ class RepairService
                 'reference'   => $ticket->ticket_number,
                 'description' => 'Repair Ticket ' . $ticket->ticket_number,
                 'lines'       => [
-                    ['account_code' => '531100', 'debit' => (float) $ticket->total_cost, 'credit' => 0],
-                    ['account_code' => '706100', 'debit' => 0, 'credit' => (float) $ticket->total_cost],
+                    ['account_code' => '411100', 'debit'  => (float) $ticket->total_cost, 'credit' => 0],
+                    ['account_code' => '706100', 'debit'  => 0, 'credit' => (float) $ticket->total_cost],
                 ],
             ]);
         } catch (\Throwable) {
-            // Accounting failures must never block repair completion.
+            // Accounting failures must never block repair completion
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE STATUS
-        |--------------------------------------------------------------------------
-        */
-
         $ticket->update([
-
-            'status' => 'completed',
-
+            'status'       => 'completed',
+            'completed_at' => now(),
+            'finished_at'  => now(),
         ]);
-
     }
 }

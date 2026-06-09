@@ -110,7 +110,7 @@ class Dashboard extends \Filament\Pages\Dashboard
         $resellerDebts = (float) Reseller::sum('current_debt');
 
         $warrantyOpen = RepairTicket::where('is_warranty', true)
-            ->whereNotIn('status', ['completed', 'delivered', 'cancelled'])
+            ->whereNotIn('status', ['completed', 'delivered', 'closed', 'cancelled'])
             ->count();
 
         $lowStockCount = Product::where('stock_alert', '>', 0)
@@ -163,10 +163,13 @@ class Dashboard extends \Filament\Pages\Dashboard
         $repairCounts = [
             RepairTicket::where('status', 'open')->count(),
             RepairTicket::where('status', 'diagnostic')->count(),
-            RepairTicket::where('status', 'assigned')->count(),
+            RepairTicket::where('status', 'waiting_approval')->count(),
+            RepairTicket::where('status', 'approved')->count(),
+            RepairTicket::where('status', 'waiting_parts')->count(),
             RepairTicket::where('status', 'in_progress')->count(),
             RepairTicket::where('status', 'completed')->count(),
             RepairTicket::where('status', 'delivered')->count(),
+            RepairTicket::where('status', 'closed')->count(),
             RepairTicket::where('status', 'cancelled')->count(),
         ];
 

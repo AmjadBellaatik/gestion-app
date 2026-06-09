@@ -28,7 +28,7 @@ class DashboardWorkshopWidget extends StatsOverviewWidget
             ->whereMonth('completed_at', $month)
             ->count();
 
-        $completedTotal = RepairTicket::whereIn('status', ['completed', 'delivered'])->count();
+        $completedTotal = RepairTicket::whereIn('status', ['completed', 'delivered', 'closed'])->count();
 
         // ── Active Technicians ────────────────────────────────────────────────
         $activeTechnicians = Technician::count();

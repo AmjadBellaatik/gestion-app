@@ -31,7 +31,7 @@ class DashboardAlertWidget extends StatsOverviewWidget
 
         // ── Open Warranty Repairs ─────────────────────────────────────────────
         $warrantyOpen = RepairTicket::where('is_warranty', true)
-            ->whereNotIn('status', ['completed', 'delivered', 'cancelled'])
+            ->whereNotIn('status', ['completed', 'delivered', 'closed', 'cancelled'])
             ->count();
 
         // ── Low Stock Products ────────────────────────────────────────────────

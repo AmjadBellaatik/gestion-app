@@ -28,10 +28,13 @@ class RepairChartWidget extends ChartWidget
         $counts = [
             RepairTicket::where('status', 'open')->count(),
             RepairTicket::where('status', 'diagnostic')->count(),
-            RepairTicket::where('status', 'assigned')->count(),
+            RepairTicket::where('status', 'waiting_approval')->count(),
+            RepairTicket::where('status', 'approved')->count(),
+            RepairTicket::where('status', 'waiting_parts')->count(),
             RepairTicket::where('status', 'in_progress')->count(),
             RepairTicket::where('status', 'completed')->count(),
             RepairTicket::where('status', 'delivered')->count(),
+            RepairTicket::where('status', 'closed')->count(),
             RepairTicket::where('status', 'cancelled')->count(),
         ];
 
@@ -39,13 +42,16 @@ class RepairChartWidget extends ChartWidget
             'datasets' => [[
                 'data'            => $counts,
                 'backgroundColor' => [
-                    '#94a3b8', // open       – slate
-                    '#f59e0b', // diagnostic – amber
-                    '#3b82f6', // assigned   – blue
-                    '#8b5cf6', // in_progress– violet
-                    '#10b981', // completed  – emerald
-                    '#06b6d4', // delivered  – cyan
-                    '#ef4444', // cancelled  – red
+                    '#94a3b8', // open             – slate
+                    '#f59e0b', // diagnostic       – amber
+                    '#fb923c', // waiting_approval – orange
+                    '#3b82f6', // approved         – blue
+                    '#a78bfa', // waiting_parts    – violet-light
+                    '#8b5cf6', // in_progress      – violet
+                    '#10b981', // completed        – emerald
+                    '#06b6d4', // delivered        – cyan
+                    '#14532d', // closed           – green-dark
+                    '#ef4444', // cancelled        – red
                 ],
                 'hoverOffset'     => 8,
                 'borderWidth'     => 2,
@@ -54,10 +60,13 @@ class RepairChartWidget extends ChartWidget
             'labels' => [
                 __('messages.open'),
                 __('messages.diagnostic'),
-                __('messages.assigned'),
+                __('messages.waiting_approval'),
+                __('messages.approved'),
+                __('messages.waiting_parts'),
                 __('messages.in_progress'),
                 __('messages.completed'),
                 __('messages.delivered'),
+                __('messages.closed'),
                 __('messages.cancelled'),
             ],
         ];
