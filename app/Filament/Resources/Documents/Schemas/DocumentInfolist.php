@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Documents\Schemas;
 
+use App\Filament\Resources\RepairTickets\RepairTicketResource;
 use App\Filament\Resources\Sales\SaleResource;
 use App\Models\Document;
 use App\Models\DocumentType;
@@ -50,6 +51,15 @@ class DocumentInfolist
                                 ? SaleResource::getUrl('view', ['record' => $record->sale_id])
                                 : null),
                     ])->hidden(fn (Document $record) => blank($record->sale_id)),
+                    Grid::make(3)->schema([
+                        TextEntry::make('repairTicket.ticket_number')
+                            ->label(__('messages.repair_ticket'))
+                            ->placeholder('-')
+                            ->color('primary')
+                            ->url(fn (Document $record) => $record->repair_ticket_id
+                                ? RepairTicketResource::getUrl('view', ['record' => $record->repair_ticket_id])
+                                : null),
+                    ])->hidden(fn (Document $record) => blank($record->repair_ticket_id)),
                 ]),
 
             Section::make(__('messages.pdf_information'))

@@ -535,15 +535,10 @@ class DocumentService
             ];
         }
 
+        // Set discount before syncItems so recalculateTotals inside syncItems uses it
+        $document->forceFill(['discount_amount' => max(0.0, (float) $ticket->discount_amount)])->save();
+
         $this->syncItems($document, $items);
-
-        $discountAmount = $ticket->discount_validated
-            ? max(0.0, (float) $ticket->discount_amount)
-            : 0.0;
-
-        $document->forceFill(['discount_amount' => $discountAmount])->save();
-
-        $this->setRepairInvoiceTotals($document, (int) $ticket->id);
 
         $document->refresh();
     }

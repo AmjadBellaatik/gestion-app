@@ -84,7 +84,7 @@ class EditSale extends EditRecord
                     'discount'                => (float) ($row['discount'] ?? 0),
                     'warranty_duration_value' => $row['warranty_duration_value'] ?? null,
                     'warranty_duration_unit'  => $row['warranty_duration_unit'] ?? null,
-                    'warranty_kilometers'     => filled($row['warranty_kilometers']) ? (int) $row['warranty_kilometers'] : null,
+                    'warranty_kilometers'     => filled($row['warranty_kilometers'] ?? null) ? (int) $row['warranty_kilometers'] : null,
                 ]);
         }
 
