@@ -35,6 +35,7 @@ class RepairTicketForm
             */
 
             Section::make(__('messages.repair_source'))
+                ->icon('heroicon-o-wrench-screwdriver')
                 ->schema([
                     Select::make('_repair_source')
                         ->label(__('messages.repair_source'))
@@ -47,14 +48,11 @@ class RepairTicketForm
                         ->live()
                         ->dehydrated(false)
                         ->afterStateUpdated(function (string $state, callable $set) {
-                            // Always reflect is_foreign_vehicle flag
                             $set('is_foreign_vehicle', $state === 'foreign');
 
                             if ($state === 'sale') {
-                                // Clear stock unit — will be auto-populated via sale selection
                                 $set('motorcycle_unit_id', null);
                             } elseif ($state === 'stock') {
-                                // Clear sale and all auto-populated foreign fields
                                 $set('sale_id', null);
                                 $set('client_id', null);
                                 $set('foreign_brand', null);
@@ -64,7 +62,6 @@ class RepairTicketForm
                                 $set('foreign_color', null);
                                 $set('mileage', null);
                             } else {
-                                // foreign — clear everything
                                 $set('sale_id', null);
                                 $set('motorcycle_unit_id', null);
                                 $set('foreign_brand', null);
@@ -85,6 +82,7 @@ class RepairTicketForm
             */
 
             Section::make(__('messages.vehicle_information'))
+                ->icon('heroicon-o-truck')
                 ->schema([
 
                     // ── Mode: Linked to a sale ──────────────────────────────
@@ -95,6 +93,7 @@ class RepairTicketForm
                         ->required(fn (Get $get): bool => $get('_repair_source') === 'sale')
                         ->visible(fn (Get $get): bool => $get('_repair_source') === 'sale')
                         ->helperText(__('messages.type_to_search_sale'))
+                        ->columnSpanFull()
                         ->getSearchResultsUsing(function (string $search) {
                             return Sale::query()
                                 ->with(['client', 'items.motorcycleUnit.motorcycleModel'])
@@ -155,7 +154,6 @@ class RepairTicketForm
                         })
                         ->afterStateUpdated(function ($state, callable $set) {
                             if (! $state) {
-                                // Sale de-selected — clear everything
                                 $set('client_id', null);
                                 $set('motorcycle_unit_id', null);
                                 $set('foreign_brand', null);
@@ -172,10 +170,8 @@ class RepairTicketForm
                                 return;
                             }
 
-                            // Auto-fill client from sale
                             $set('client_id', $sale->client_id);
 
-                            // Resolve motorcycle unit via the first sale item that has one
                             $saleItem = $sale->items
                                 ->whereNotNull('motorcycle_unit_id')
                                 ->first();
@@ -185,15 +181,11 @@ class RepairTicketForm
                             if ($unit) {
                                 $set('motorcycle_unit_id', $unit->id);
 
-                                // Populate display fields from MotorcycleUnit + MotorcycleModel
-                                // Path: Sale → items → first item with unit → motorcycleUnit → motorcycleModel
                                 $motoModel = $unit->motorcycleModel;
                                 $set('foreign_brand',   $motoModel?->marque      ?? null);
                                 $set('foreign_model',   $motoModel?->modele      ?? null);
                                 $set('foreign_chassis', $unit->chassis_number    ?? null);
                                 $set('foreign_color',   $unit->color             ?? null);
-                                // foreign_year is NOT set here: MotorcycleUnit has no year column.
-                                // The user can enter the year manually even in sale mode.
                                 $set('mileage',         $unit->mileage           ?? null);
                             } else {
                                 $set('motorcycle_unit_id', null);
@@ -225,6 +217,7 @@ class RepairTicketForm
                         ->required(fn (Get $get): bool => $get('_repair_source') === 'stock')
                         ->visible(fn (Get $get): bool => $get('_repair_source') === 'stock')
                         ->dehydrated(true)
+                        ->columnSpanFull()
                         ->afterStateUpdated(function ($state, callable $set) {
                             if (! $state) {
                                 return;
@@ -257,8 +250,6 @@ class RepairTicketForm
                                 ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
                                 ->dehydrated(true),
 
-                            // MotorcycleUnit has no year column — always user-editable
-                            // regardless of repair source; dehydrated so it persists on save.
                             TextInput::make('foreign_year')
                                 ->label(__('messages.year'))
                                 ->numeric()
@@ -271,21 +262,27 @@ class RepairTicketForm
                                 ->maxLength(50)
                                 ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
                                 ->dehydrated(true),
+
+                            TextInput::make('mileage')
+                                ->label(__('messages.mileage_at_reception'))
+                                ->numeric()
+                                ->default(0)
+                                ->suffix('km')
+                                ->dehydrated(true),
                         ])
                         ->visible(fn (Get $get): bool => in_array($get('_repair_source'), ['foreign', 'sale'], true)),
 
                     // Controlled by _repair_source — stored on the model
                     Hidden::make('is_foreign_vehicle')->default(false),
 
-                    // Reception mileage — always user-editable so the technician can
-                    // record the actual odometer reading at drop-off, regardless of source.
-                    // (The sale afterStateUpdated pre-fills it from unit->mileage as a default.)
+                    // Mileage for stock mode (foreign/sale modes show it inside the Grid above)
                     TextInput::make('mileage')
                         ->label(__('messages.mileage_at_reception'))
                         ->numeric()
                         ->default(0)
                         ->suffix('km')
-                        ->dehydrated(true),
+                        ->dehydrated(true)
+                        ->visible(fn (Get $get): bool => $get('_repair_source') === 'stock'),
 
                 ]),
 
@@ -296,6 +293,7 @@ class RepairTicketForm
             */
 
             Section::make(__('messages.customer_and_assignment'))
+                ->icon('heroicon-o-users')
                 ->schema([
                     Grid::make(2)->schema([
 
@@ -412,6 +410,7 @@ class RepairTicketForm
             */
 
             Section::make(__('messages.repair_details'))
+                ->icon('heroicon-o-clipboard-document-list')
                 ->schema([
                     Grid::make(3)->schema([
 
@@ -476,6 +475,7 @@ class RepairTicketForm
             */
 
             Section::make(__('messages.parts_used'))
+                ->icon('heroicon-o-cube')
                 ->schema([
                     Repeater::make('parts')
                         ->relationship('parts')
@@ -487,6 +487,7 @@ class RepairTicketForm
                 ]),
 
             Section::make(__('messages.consumables_used'))
+                ->icon('heroicon-o-beaker')
                 ->schema([
                     Repeater::make('consumables')
                         ->relationship('consumables')
@@ -504,8 +505,9 @@ class RepairTicketForm
             */
 
             Section::make(__('messages.financials'))
+                ->icon('heroicon-o-banknotes')
                 ->schema([
-                    Grid::make(4)->schema([
+                    Grid::make(2)->schema([
                         TextInput::make('labor_cost')
                             ->label(__('messages.labor_cost'))
                             ->numeric()
@@ -519,12 +521,16 @@ class RepairTicketForm
                                 $set('parts_cost', $partsCost);
                                 $set('total_cost', round(max(0, $partsCost + max(0, (float) $state) - $globalDiscount), 2));
                             }),
+
                         TextInput::make('parts_cost')
                             ->label(__('messages.parts_cost'))
                             ->numeric()
                             ->prefix('DH')
                             ->disabled()
                             ->dehydrated(),
+                    ]),
+
+                    Grid::make(2)->schema([
                         TextInput::make('discount_amount')
                             ->label(__('messages.discount_amount'))
                             ->numeric()
@@ -538,6 +544,7 @@ class RepairTicketForm
                                 $set('parts_cost', $partsCost);
                                 $set('total_cost', round(max(0, $partsCost + $laborCost - max(0, (float) $state)), 2));
                             }),
+
                         TextInput::make('total_cost')
                             ->label(__('messages.total_cost'))
                             ->numeric()
@@ -545,11 +552,11 @@ class RepairTicketForm
                             ->disabled()
                             ->dehydrated(),
                     ]),
-                    Grid::make(1)->schema([
-                        Textarea::make('discount_note')
-                            ->label(__('messages.discount_note'))
-                            ->rows(2),
-                    ]),
+
+                    Textarea::make('discount_note')
+                        ->label(__('messages.discount_note'))
+                        ->rows(2)
+                        ->columnSpanFull(),
                 ]),
 
             /*
@@ -559,9 +566,9 @@ class RepairTicketForm
             */
 
             Section::make(__('messages.status_and_notes'))
+                ->icon('heroicon-o-check-badge')
                 ->schema([
                     Grid::make(2)->schema([
-                        // Status: admins can override manually; others see it read-only
                         Select::make('status')
                             ->label(__('messages.status'))
                             ->options(self::statusOptions())
@@ -570,7 +577,6 @@ class RepairTicketForm
                             ->disabled(fn () => ! self::isAdmin())
                             ->dehydrated(fn () => self::isAdmin()),
 
-                        // payment_status is derived from payments — display only
                         Select::make('payment_status')
                             ->label(__('messages.payment_status'))
                             ->options([
@@ -596,11 +602,12 @@ class RepairTicketForm
 
             /*
             |------------------------------------------------------------------
-            | Intervention Steps
+            | Section 8 — Intervention Steps
             |------------------------------------------------------------------
             */
 
             Section::make(__('messages.intervention_steps'))
+                ->icon('heroicon-o-list-bullet')
                 ->schema([
                     Repeater::make('steps')
                         ->relationship('steps')
@@ -658,62 +665,63 @@ class RepairTicketForm
         return [
             Hidden::make('item_type')->default($type),
 
-            // Compact table row — 12 columns so each field has room to breathe
-            Grid::make(12)->schema([
+            // Row 1 — Product selection (full width for readability)
+            Select::make('product_id')
+                ->label($label)
+                ->options(function (Get $get, $state) use ($types, $repeaterKey) {
+                    $selectedIds = collect($get('../../' . $repeaterKey))
+                        ->pluck('product_id')
+                        ->filter()
+                        ->reject(fn ($id) => $id == $state)
+                        ->values()
+                        ->toArray();
 
-                Select::make('product_id')
-                    ->label($label)
-                    ->options(function (Get $get, $state) use ($types, $repeaterKey) {
-                        $selectedIds = collect($get('../../' . $repeaterKey))
-                            ->pluck('product_id')
-                            ->filter()
-                            ->reject(fn ($id) => $id == $state)
-                            ->values()
-                            ->toArray();
+                    return Product::query()
+                        ->whereIn('type', $types)
+                        ->whereNotIn('id', $selectedIds)
+                        ->orderBy('name')
+                        ->get()
+                        ->filter(fn ($p) => $p->current_stock > 0)
+                        ->mapWithKeys(fn ($p) => [
+                            $p->id => $p->name . ' (' . __('messages.stock') . ': ' . (int) $p->current_stock . ')',
+                        ])
+                        ->toArray();
+                })
+                ->searchable()
+                ->live()
+                ->columnSpanFull()
+                ->afterStateUpdated(function ($state, Get $get, callable $set) {
+                    if (! $state) {
+                        $set('unit_price', 0);
+                        $set('total', 0);
+                        return;
+                    }
 
-                        return Product::query()
-                            ->whereIn('type', $types)
-                            ->whereNotIn('id', $selectedIds)
-                            ->orderBy('name')
-                            ->get()
-                            ->filter(fn ($p) => $p->current_stock > 0)
-                            ->mapWithKeys(fn ($p) => [
-                                $p->id => $p->name . ' (' . __('messages.stock') . ': ' . (int) $p->current_stock . ')',
-                            ])
-                            ->toArray();
-                    })
-                    ->searchable()
-                    ->live()
-                    ->afterStateUpdated(function ($state, Get $get, callable $set) {
-                        if (! $state) {
-                            $set('unit_price', 0);
-                            $set('total', 0);
-                            return;
-                        }
+                    $product = Product::find($state);
+                    if (! $product) {
+                        return;
+                    }
 
-                        $product = Product::find($state);
-                        if (! $product) {
-                            return;
-                        }
+                    $clientId   = $get('../../client_id');
+                    $isReseller = $clientId && \App\Models\Client::withoutGlobalScopes()
+                        ->where('id', $clientId)
+                        ->whereNotNull('reseller_id')
+                        ->exists();
+                    $price = ($isReseller && (float) $product->reseller_price > 0)
+                        ? (float) $product->reseller_price
+                        : (float) $product->selling_price;
 
-                        $clientId   = $get('../../client_id');
-                        $isReseller = $clientId && \App\Models\Client::withoutGlobalScopes()
-                            ->where('id', $clientId)
-                            ->whereNotNull('reseller_id')
-                            ->exists();
-                        $price = ($isReseller && (float) $product->reseller_price > 0)
-                            ? (float) $product->reseller_price
-                            : (float) $product->selling_price;
+                    $set('unit_price', $price);
 
-                        $set('unit_price', $price);
+                    $qty      = max(0.01, (float) ($get('quantity') ?? 1));
+                    $discount = (float) ($get('discount_amount') ?? 0);
+                    $set('total', round(max(0, $qty * $price - $discount), 2));
 
-                        $qty      = max(0.01, (float) ($get('quantity') ?? 1));
-                        $discount = (float) ($get('discount_amount') ?? 0);
-                        $set('total', round(max(0, $qty * $price - $discount), 2));
+                    self::recalculateParentTotals($get, $set);
+                }),
 
-                        self::recalculateParentTotals($get, $set);
-                    })
-                    ->columnSpan(4),
+            // Row 2 — Qty | Unit Price | Discount | Subtotal
+            Grid::make(4)->schema([
 
                 TextInput::make('quantity')
                     ->label(__('messages.quantity'))
@@ -734,12 +742,12 @@ class RepairTicketForm
                         $discount = (float) ($get('discount_amount') ?? 0);
                         $set('total', round(max(0, $qty * $price - $discount), 2));
                         self::recalculateParentTotals($get, $set);
-                    })
-                    ->columnSpan(2),
+                    }),
 
                 TextInput::make('unit_price')
                     ->label(__('messages.unit_price'))
                     ->numeric()
+                    ->default(0)
                     ->prefix('DH')
                     ->live()
                     ->afterStateUpdated(function ($state, Get $get, callable $set) {
@@ -748,8 +756,7 @@ class RepairTicketForm
                         $discount = (float) ($get('discount_amount') ?? 0);
                         $set('total', round(max(0, $qty * $price - $discount), 2));
                         self::recalculateParentTotals($get, $set);
-                    })
-                    ->columnSpan(2),
+                    }),
 
                 TextInput::make('discount_amount')
                     ->label(__('messages.discount_amount'))
@@ -763,16 +770,14 @@ class RepairTicketForm
                         $discount = max(0, (float) $state);
                         $set('total', round(max(0, $qty * $price - $discount), 2));
                         self::recalculateParentTotals($get, $set);
-                    })
-                    ->columnSpan(2),
+                    }),
 
                 TextInput::make('total')
                     ->label(__('messages.subtotal'))
                     ->numeric()
                     ->prefix('DH')
                     ->disabled()
-                    ->dehydrated()
-                    ->columnSpan(2),
+                    ->dehydrated(),
 
             ]),
         ];
