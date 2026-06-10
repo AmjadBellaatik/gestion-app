@@ -28,7 +28,7 @@ class AuditDocumentSequencesCommand extends Command
             return self::SUCCESS;
         }
 
-        $headers = ['Company', 'Type ID', 'Year', 'Prefix', 'Seq Counter', 'Max Doc #', 'Status'];
+        $headers = ['Company', 'Type ID', 'Year', 'Prefix', 'Seq Counter', 'Max Seq#', 'Status'];
         $rows    = [];
         $issues  = 0;
 
@@ -37,20 +37,15 @@ class AuditDocumentSequencesCommand extends Command
                 ->whereNull('deleted_at')
                 ->where('company_id',       $seq->company_id)
                 ->where('document_type_id', $seq->document_type_id)
-                ->where('document_number', 'like', $seq->prefix . '-' . $seq->year . '-%')
-                ->get(['document_number'])
-                ->map(function ($d) {
-                    $pos = strrpos((string) $d->document_number, '-');
-                    return $pos !== false ? (int) substr($d->document_number, $pos + 1) : 0;
-                })
-                ->max() ?? 0;
+                ->where('document_year',    $seq->year)
+                ->max('sequence_number') ?? 0;
 
             $status = 'OK';
             if ($maxActive > (int) $seq->current_number) {
-                $status = 'COUNTER BEHIND (orphaned docs?)';
+                $status = 'COUNTER BEHIND';
                 $issues++;
             } elseif ($maxActive === 0 && (int) $seq->current_number > 0) {
-                $status = 'ORPHANED SEQUENCE (no matching docs)';
+                $status = 'ORPHANED SEQUENCE';
                 $issues++;
             }
 

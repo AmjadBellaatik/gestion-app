@@ -81,15 +81,6 @@ class DocumentTypeSeeder extends Seeder
                 'affects_stock' => true,
                 'affects_accounting' => false,
             ],
-            [
-                'name' => 'Facture réparation',
-                'code' => DocumentType::REPAIR_INVOICE,
-                'prefix' => 'FREP',
-                'category' => 'repair',
-                'blade_view' => 'documents.pdf.repair-invoice',
-                'affects_stock' => false,
-                'affects_accounting' => false,
-            ],
         ];
 
         foreach ($documents as $document) {

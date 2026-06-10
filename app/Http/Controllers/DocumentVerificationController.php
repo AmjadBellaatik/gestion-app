@@ -59,7 +59,6 @@ class DocumentVerificationController extends Controller
             'SALE_RETURN'     => 'documents.verify.sale-return',
             'PURCHASE_ORDER'  => 'documents.verify.supplier-order',
             'OWNERSHIP'       => 'documents.verify.ownership',
-            'REPAIR_INVOICE'  => 'documents.verify.repair-invoice',
             default           => 'documents.verify.generic',
         };
     }

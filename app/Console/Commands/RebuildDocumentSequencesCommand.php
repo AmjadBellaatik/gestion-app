@@ -8,128 +8,129 @@ use App\Models\DocumentType;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Rebuild document_sequences from the documents table.
+ *
+ * The documents table (specifically sequence_number + document_year) is the
+ * source of truth.  This command scans every (company_id, document_type_id,
+ * document_year) tuple with active documents, resets the cache counter to
+ * MAX(active sequence_number), and creates any missing sequence rows.
+ *
+ * --backfill   Populate sequence_number / document_year on legacy rows that
+ *              were created before the 2026_06_10_000001 migration.
+ * --dry-run    Preview changes without writing.
+ */
 class RebuildDocumentSequencesCommand extends Command
 {
     protected $signature = 'documents:rebuild-sequences
-                            {--company=      : Limit rebuild to a specific company_id}
-                            {--dry-run       : Show what would change without writing}
-                            {--mangle-deleted : Mangle soft-deleted docs that still hold their original number (legacy cleanup)}';
+                            {--company=  : Limit to a specific company_id}
+                            {--dry-run   : Preview changes without writing}
+                            {--backfill  : Populate sequence_number and document_year from legacy document_number strings}';
 
-    protected $description = 'Sync document_sequences.current_number to the actual max document number in the documents table. Orphaned counters (from deleted test documents) are reduced to reality.';
+    protected $description = 'Rebuild document_sequences counters from the documents table (source of truth).';
 
     public function handle(): int
     {
-        $dryRun        = $this->option('dry-run');
-        $companyId     = $this->option('company');
-        $mangleDeleted = $this->option('mangle-deleted');
-
-        if ($mangleDeleted) {
-            $this->mangleLegacyDeletedDocs($companyId, $dryRun);
+        if ($this->option('backfill')) {
+            $this->backfillIntegerColumns();
             $this->newLine();
         }
 
-        // Collect all (company_id, document_type_id, year) triples that have
-        // at least one active document, so we can create missing sequence rows.
-        $docGroups = Document::withoutGlobalScopes()
+        return $this->rebuildSequences();
+    }
+
+    private function rebuildSequences(): int
+    {
+        $dryRun    = $this->option('dry-run');
+        $companyId = $this->option('company');
+
+        $groups = Document::withoutGlobalScopes()
             ->whereNull('deleted_at')
-            ->whereNotNull('document_number')
+            ->whereNotNull('document_year')
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
-            ->select('company_id', 'document_type_id', DB::raw('YEAR(created_at) as year'))
+            ->select('company_id', 'document_type_id', 'document_year as year')
             ->distinct()
             ->get();
 
-        // Load existing sequence rows
         $sequences = DocumentSequence::withoutGlobalScopes()
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->get()
-            ->keyBy(fn ($s) => "{$s->company_id}_{$s->document_type_id}_{$s->year}");
+            ->keyBy(fn ($s) => "{$s->company_id}|{$s->document_type_id}|{$s->year}");
 
-        $headers  = ['Company', 'Type', 'Year', 'Prefix', 'Old Counter', 'New Counter', 'Action'];
-        $rows     = [];
-        $repaired = 0;
+        $rows    = [];
+        $changed = 0;
+        $handled = [];
 
-        // ── 1. Repair / create sequence rows for every company+type+year that
-        //       has actual documents ────────────────────────────────────────
-        foreach ($docGroups as $group) {
-            $type = DocumentType::find($group->document_type_id);
+        foreach ($groups as $g) {
+            $type   = DocumentType::find($g->document_type_id);
             $prefix = $type?->prefix ?: 'DOC';
-            $key  = "{$group->company_id}_{$group->document_type_id}_{$group->year}";
-            $seq  = $sequences->get($key);
+            $key    = "{$g->company_id}|{$g->document_type_id}|{$g->year}";
+            $handled[] = $key;
 
             $maxActive = Document::withoutGlobalScopes()
                 ->whereNull('deleted_at')
-                ->where('company_id',       $group->company_id)
-                ->where('document_type_id', $group->document_type_id)
-                ->where('document_number', 'like', $prefix . '-' . $group->year . '-%')
-                ->get(['document_number'])
-                ->map(function ($d): int {
-                    $pos = strrpos((string) $d->document_number, '-');
-                    return $pos !== false ? (int) substr($d->document_number, $pos + 1) : 0;
-                })
-                ->max() ?? 0;
+                ->where('company_id',       $g->company_id)
+                ->where('document_type_id', $g->document_type_id)
+                ->where('document_year',    $g->year)
+                ->max('sequence_number') ?? 0;
+
+            $seq = $sequences->get($key);
 
             if (! $seq) {
-                // Missing sequence row — create it
-                $action = $dryRun ? 'would create' : 'created';
-                $repaired++;
+                $changed++;
 
                 if (! $dryRun) {
                     DocumentSequence::create([
-                        'company_id'       => $group->company_id,
-                        'document_type_id' => $group->document_type_id,
-                        'year'             => $group->year,
+                        'company_id'       => $g->company_id,
+                        'document_type_id' => $g->document_type_id,
+                        'year'             => $g->year,
                         'prefix'           => $prefix,
                         'current_number'   => $maxActive,
                         'padding'          => 4,
                         'yearly_reset'     => true,
+                        'brand_id'         => null,
                     ]);
                 }
 
-                $rows[] = [$group->company_id, $group->document_type_id, $group->year, $prefix, '—', $maxActive, $action];
+                $rows[] = [$g->company_id, $type?->code ?? $g->document_type_id, $g->year, $prefix, '—', $maxActive,
+                    $dryRun ? 'would create' : 'created'];
                 continue;
             }
 
-            $oldCounter = (int) $seq->current_number;
-            $newCounter = $maxActive; // source of truth is always the documents table
+            $old = (int) $seq->current_number;
 
-            if ($oldCounter === $newCounter) {
-                $rows[] = [$group->company_id, $group->document_type_id, $group->year, $prefix, $oldCounter, $newCounter, 'ok'];
+            if ($old === $maxActive) {
+                $rows[] = [$g->company_id, $type?->code ?? $g->document_type_id, $g->year, $prefix, $old, $maxActive, 'ok'];
                 continue;
             }
 
-            $direction = $newCounter < $oldCounter ? 'reset (orphan)' : 'synced up';
-            $action    = $dryRun ? "would {$direction}" : $direction;
-            $repaired++;
+            $direction = $maxActive < $old ? 'reset↓' : 'synced↑';
+            $changed++;
 
             if (! $dryRun) {
                 DB::table('document_sequences')
                     ->where('id', $seq->id)
-                    ->update(['current_number' => $newCounter]);
+                    ->update(['current_number' => $maxActive, 'prefix' => $prefix]);
             }
 
-            $rows[] = [$group->company_id, $group->document_type_id, $group->year, $prefix, $oldCounter, $newCounter, $action];
+            $rows[] = [$g->company_id, $type?->code ?? $g->document_type_id, $g->year, $prefix, $old, $maxActive,
+                $dryRun ? "would {$direction}" : $direction];
         }
 
-        // ── 2. Also check existing sequence rows with no remaining active
-        //       documents — their counter should be reset to 0 ─────────────
         foreach ($sequences as $seq) {
-            $key = "{$seq->company_id}_{$seq->document_type_id}_{$seq->year}";
-            $alreadyHandled = $docGroups->first(
-                fn ($g) => "{$g->company_id}_{$g->document_type_id}_{$g->year}" === $key
-            );
+            $key = "{$seq->company_id}|{$seq->document_type_id}|{$seq->year}";
 
-            if ($alreadyHandled) {
+            if (in_array($key, $handled, true)) {
                 continue;
             }
 
-            $oldCounter = (int) $seq->current_number;
+            $old = (int) $seq->current_number;
 
-            if ($oldCounter === 0) {
+            if ($old === 0) {
                 continue;
             }
 
-            $action = $dryRun ? 'would reset (no docs)' : 'reset (no docs)';
-            $repaired++;
+            $changed++;
 
             if (! $dryRun) {
                 DB::table('document_sequences')
@@ -137,70 +138,64 @@ class RebuildDocumentSequencesCommand extends Command
                     ->update(['current_number' => 0]);
             }
 
-            $rows[] = [$seq->company_id, $seq->document_type_id, $seq->year, $seq->prefix, $oldCounter, 0, $action];
+            $typeName = DocumentType::find($seq->document_type_id)?->code ?? $seq->document_type_id;
+            $rows[] = [$seq->company_id, $typeName, $seq->year, $seq->prefix, $old, 0,
+                $dryRun ? 'would reset (no docs)' : 'reset (no docs)'];
         }
 
         if (empty($rows)) {
-            $this->info('All sequences are already correct.');
+            $this->info('All sequences are correct. Nothing to do.');
             return self::SUCCESS;
         }
 
-        $this->table($headers, $rows);
+        $this->table(['Company', 'Type', 'Year', 'Prefix', 'Was', 'Now', 'Action'], $rows);
         $this->newLine();
 
-        if ($dryRun) {
-            $this->info("{$repaired} sequence(s) would be updated (dry run — no changes made).");
-        } else {
-            $this->info("{$repaired} sequence(s) updated.");
-        }
+        $this->info($dryRun
+            ? "{$changed} change(s) pending (dry run — nothing written)."
+            : "{$changed} sequence(s) updated.");
 
         return self::SUCCESS;
     }
 
-    private function mangleLegacyDeletedDocs(?string $companyId, bool $dryRun): void
+    private function backfillIntegerColumns(): void
     {
-        // Find soft-deleted documents whose document_number was NOT mangled
-        // (pre-dates the __VOID__ observer). These rows hold their original
-        // number and block the DB unique constraint from reuse.
-        $legacy = Document::withoutGlobalScopes()
-            ->withTrashed()
-            ->whereNotNull('deleted_at')
-            ->whereNotNull('document_number')
-            ->where('document_number', 'not like', '%__VOID_%')
-            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
-            ->get(['id', 'company_id', 'document_number', 'deleted_at', 'metadata']);
+        $dryRun    = $this->option('dry-run');
+        $companyId = $this->option('company');
 
-        if ($legacy->isEmpty()) {
-            $this->info('No unmangled soft-deleted documents found — nothing to mangle.');
+        $count = DB::table('documents')
+            ->whereNull('deleted_at')
+            ->whereNull('sequence_number')
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->whereRaw("document_number REGEXP '^[A-Za-z]+-[0-9]{4}-[0-9]+$'")
+            ->count();
+
+        if ($count === 0) {
+            $this->info('All active documents already have sequence_number set.');
             return;
         }
 
-        $this->info("Found {$legacy->count()} unmangled soft-deleted document(s):");
+        $this->info("Backfilling sequence_number and document_year for {$count} active document(s)...");
 
-        $rows = [];
-        foreach ($legacy as $doc) {
-            $original = (string) $doc->document_number;
-            $void     = $original . '__VOID_' . $doc->deleted_at->format('YmdHis') . '_' . $doc->id;
-            $meta     = array_merge((array) ($doc->metadata ?? []), ['original_document_number' => $original]);
+        if (! $dryRun) {
+            $whereCompany = $companyId ? 'AND company_id = ?' : '';
+            $bindings     = $companyId ? [(int) $companyId] : [];
 
-            $rows[] = [$doc->id, $doc->company_id, $original, $void];
+            DB::statement(
+                "UPDATE documents
+                 SET
+                     document_year   = CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(document_number, '-', 2), '-', -1) AS UNSIGNED),
+                     sequence_number = CAST(SUBSTRING_INDEX(document_number, '-', -1) AS UNSIGNED)
+                 WHERE deleted_at IS NULL
+                   AND sequence_number IS NULL
+                   AND document_number REGEXP '^[A-Za-z]+-[0-9]{4}-[0-9]+\$'
+                   {$whereCompany}",
+                $bindings
+            );
 
-            if (! $dryRun) {
-                DB::table('documents')
-                    ->where('id', $doc->id)
-                    ->update([
-                        'document_number' => $void,
-                        'metadata'        => json_encode($meta),
-                    ]);
-            }
-        }
-
-        $this->table(['ID', 'Company', 'Original Number', 'Mangled To'], $rows);
-
-        if ($dryRun) {
-            $this->warn("{$legacy->count()} document(s) would be mangled (dry run — no changes made).");
+            $this->info("{$count} document(s) backfilled.");
         } else {
-            $this->info("{$legacy->count()} document(s) mangled. Those numbers are now free for reuse.");
+            $this->info("{$count} document(s) would be backfilled (dry run).");
         }
     }
 }

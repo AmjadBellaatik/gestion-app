@@ -108,7 +108,6 @@ class DocumentResource extends Resource
                             DocumentType::INVOICE,
                             DocumentType::QUOTATION,
                             DocumentType::SUPPLIER_ORDER,
-                            DocumentType::REPAIR_INVOICE,
                         ];
                         if (! in_array($record->documentType?->code, $priceTypes, true)) {
                             return '-';

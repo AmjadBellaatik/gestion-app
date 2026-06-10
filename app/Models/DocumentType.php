@@ -16,7 +16,6 @@ class DocumentType extends Model
     public const CONFORMITY = 'CONFORMITY';
     public const OWNERSHIP = 'OWNERSHIP';
     public const SALE_RETURN = 'SALE_RETURN';
-    public const REPAIR_INVOICE = 'REPAIR_INVOICE';
 
     protected $fillable = [
         'company_id',
@@ -80,7 +79,6 @@ class DocumentType extends Model
             self::CONFORMITY => 'documents.pdf.conformity-certificate',
             self::OWNERSHIP => 'documents.pdf.ownership-prsk',
             self::SALE_RETURN => 'documents.pdf.sale-return',
-            self::REPAIR_INVOICE => 'documents.pdf.repair-invoice',
             default => 'documents.pdf.generic-document',
         };
     }

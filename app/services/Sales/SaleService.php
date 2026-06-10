@@ -729,13 +729,14 @@ class SaleService
             }
 
             DB::transaction(function () use ($sale, $type, $code, $isConformity, $isWarranty, $warrantySaleItem, $documentItems): void {
-                $previousNumber = Document::query()
+                $previous = Document::query()
                     ->where('sale_id', $sale->id)
                     ->where('document_type_id', $type->id)
                     ->orderByDesc('id')
-                    ->value('document_number');
+                    ->first(['document_number', 'sequence_number', 'document_year']);
 
-                // forceDelete: soft-delete would keep the row and block the unique index on document_number
+                // forceDelete keeps document history clean during regeneration; soft-delete is
+                // also safe under the new live_sequence index, but forceDelete avoids orphaned rows.
                 Document::withTrashed()
                     ->where('sale_id', $sale->id)
                     ->where('document_type_id', $type->id)
@@ -746,7 +747,9 @@ class SaleService
                     'client_id' => $sale->reseller_id ? null : $sale->client_id,
                     'reseller_id' => $sale->reseller_id,
                     'sale_id' => $sale->id,
-                    'document_number' => $previousNumber,
+                    'document_number' => $previous?->document_number,
+                    'sequence_number' => $previous?->sequence_number,
+                    'document_year'   => $previous?->document_year,
                     // Sales documents carry the effective sale date, not "now".
                     'document_date' => optional($sale->sale_date)->toDateString() ?? now()->toDateString(),
                     'status' => 'generated',

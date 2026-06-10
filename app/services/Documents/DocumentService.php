@@ -52,6 +52,8 @@ class DocumentService
                 'sale_id' => $data['sale_id'] ?? null,
                 'repair_ticket_id' => $data['repair_ticket_id'] ?? null,
                 'document_number' => $data['document_number'] ?? null,
+                'sequence_number' => $data['sequence_number'] ?? null,
+                'document_year'   => $data['document_year'] ?? null,
                 'document_date' => $data['document_date'] ?? now()->toDateString(),
                 'language' => $data['language'] ?? 'fr',
                 'status' => $data['status'] ?? 'generated',
@@ -380,9 +382,7 @@ class DocumentService
             $view = 'documents.pdf.ownership-prsk';
         }
 
-        if ($document->documentType?->code === DocumentType::REPAIR_INVOICE
-            || ($document->documentType?->code === DocumentType::INVOICE && $document->invoice_source === 'repair')
-        ) {
+        if ($document->documentType?->code === DocumentType::INVOICE && $document->invoice_source === 'repair') {
             $view = 'documents.pdf.repair-invoice';
         }
 

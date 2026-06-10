@@ -7,223 +7,87 @@ use App\Models\DocumentSequence;
 use App\Models\DocumentType;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class DocumentNumberService
 {
     /**
-     * Generate the next document number for the given document.
+     * Generate the next document number for $document, write sequence_number
+     * and document_year onto the model, and return the formatted string.
      *
-     * ── Algorithm ────────────────────────────────────────────────────────────
+     * Algorithm: next = MAX(sequence_number of active docs for this company + type + year) + 1
      *
-     * Step 1 — Acquire an exclusive row-lock on the document_sequences row for
-     *   (company_id, document_type_id, year).  This is the serialisation point:
-     *   concurrent generate() calls for the same key queue here, preventing
-     *   duplicate numbers.
+     * Active     = deleted_at IS NULL.
+     * Source of truth = documents.sequence_number (integer, no string parsing).
+     * Sequence table  = named mutex + display cache only.
      *
-     * Step 2 — Compute the real maximum from active (non-deleted) documents.
-     *   Soft-deleted documents are excluded because their numbers are mangled to
-     *   "__VOID_..." strings by the Document::deleting observer, so they never
-     *   appear in this scan.  We also filter by prefix+year pattern to avoid
-     *   parsing numbers from a different type/year with the same type_id.
-     *
-     * Step 3 — Upsert the sequence row, syncing the counter to maxActive.
-     *   We always set current_number = maxActive (syncs DOWN as well as up)
-     *   so that orphaned counters left by deleted test documents are corrected
-     *   on the next generate() call — deleted numbers do not permanently
-     *   reserve slots.
-     *
-     *   Concurrency safety: lockForUpdate() on the sequence row serialises
-     *   all concurrent generate() calls.  B cannot acquire the lock until
-     *   A's outer transaction (which includes the document INSERT) commits.
-     *   By the time B reads maxActive, A's document is already visible, so
-     *   B naturally computes maxActive+1.  The do-while in Step 4 is the
-     *   true uniqueness safety net for any residual edge case.
-     *
-     *   First-row race condition:
-     *   When the first document of a type+year is being created, two concurrent
-     *   requests may BOTH find no sequence row and both attempt to INSERT one.
-     *   The UNIQUE(company_id, document_type_id, year) constraint on
-     *   document_sequences means only one INSERT wins.  The loser catches the
-     *   QueryException and recovers by re-reading the winning row under a lock,
-     *   then continues as normal.  No request ever fails due to this race.
-     *
-     * Step 4 — Increment and skip any number still held by any document
-     *   (active or soft-deleted but un-mangled via withTrashed).  Under normal
-     *   operation this loop body executes exactly once.
-     *
-     * ── Concurrency guarantees ───────────────────────────────────────────────
-     *
-     * • Two simultaneous creates: serialised by lockForUpdate() on the sequence
-     *   row — one blocks until the other's outer transaction commits.
-     * • Simultaneous delete + create: generate() reads MAX inside its lock
-     *   window; deleted numbers are mangled, so they are excluded.
-     * • First document of type+year: try/catch recovery (see Step 3 above).
-     * • Soft-delete + recreate: mangling frees the unique constraint; withTrashed
-     *   in the do-while covers un-mangled legacy rows.
-     * • Sale regeneration / repair ticket: both go through DocumentService::
-     *   generate() → DocumentService::create() → this method.
+     * Soft-deleted documents keep their original document_number and sequence_number.
+     * The DB constraint UNIQUE(company_id, document_type_id, document_year, live_sequence)
+     * enforces per-company-type-year uniqueness for active documents only
+     * (live_sequence is a generated column: NULL when deleted_at IS NOT NULL).
      */
     public static function generate(Document $document): string
     {
-        $type    = $document->documentType ?: DocumentType::find($document->document_type_id);
-        $year    = now()->year;
-        $prefix  = $type?->prefix ?: 'DOC';
-        $padding = 4;
+        $companyId = $document->company_id;
+        $typeId    = $document->document_type_id;
+        $year      = now()->year;
+        $type      = $document->documentType ?? DocumentType::find($typeId);
+        $prefix    = $type?->prefix ?: 'DOC';
 
-        return DB::transaction(function () use ($document, $type, $year, $prefix, $padding) {
-
-            // ── Step 1: acquire exclusive lock on the sequence row ────────────
-            //
-            // lockForUpdate() is the sole serialisation gate.  Every concurrent
-            // generate() call for the same (company, type, year) must pass here
-            // before computing a number.  Locks are held until the outer
-            // DB::transaction() (DocumentService::create) commits, which means
-            // the document INSERT is already in the DB before the next caller
-            // can observe maxActive.
+        return DB::transaction(function () use ($document, $companyId, $typeId, $year, $prefix) {
+            // Step 1: acquire exclusive lock on the sequence row (named mutex).
             $sequence = DocumentSequence::withoutGlobalScopes()
-                ->where('company_id',       $document->company_id)
-                ->where('document_type_id', $document->document_type_id)
+                ->where('company_id',       $companyId)
+                ->where('document_type_id', $typeId)
                 ->where('year',             $year)
                 ->lockForUpdate()
                 ->first();
 
-            // ── Step 2: compute the real maximum from active documents ────────
-            //
-            // whereNull('deleted_at') excludes soft-deleted rows: those have
-            // their document_number mangled to "PREFIX-YEAR-NNNN__VOID_..." by
-            // the Document::deleting observer, so they never produce a valid seq.
-            //
-            // lockForUpdate() forces a current read, bypassing the REPEATABLE
-            // READ snapshot, so we see the latest committed state even when
-            // called inside a nested savepoint.
-            $maxActive = Document::withoutGlobalScopes()
-                ->whereNull('deleted_at')
-                ->where('company_id',       $document->company_id)
-                ->where('document_type_id', $document->document_type_id)
-                ->whereNotNull('document_number')
-                ->where('document_number', 'like', $prefix . '-' . $year . '-%')
-                ->lockForUpdate()
-                ->get(['document_number'])
-                ->map(function ($d) {
-                    $num = (string) $d->document_number;
-                    $pos = strrpos($num, '-');
-                    if ($pos === false) {
-                        return 0;
-                    }
-                    $seq = (int) substr($num, $pos + 1);
-                    // Defensive: reject any sequence that looks like a VOID suffix
-                    return $seq > 0 && $seq < 1_000_000 ? $seq : 0;
-                })
-                ->max() ?? 0;
-
-            // ── Step 3: upsert the sequence row, synced UP only ───────────────
             if (! $sequence) {
-                // No sequence row exists yet for this (company, type, year).
-                // Two concurrent requests may both reach this branch.  We wrap
-                // the INSERT in a try/catch so the losing request recovers
-                // automatically instead of propagating a QueryException to the
-                // caller.
                 try {
                     $sequence = DocumentSequence::create([
-                        'company_id'       => $document->company_id,
-                        'brand_id'         => null,
-                        'document_type_id' => $type?->id ?? $document->document_type_id,
+                        'company_id'       => $companyId,
+                        'document_type_id' => $typeId,
                         'year'             => $year,
                         'prefix'           => $prefix,
-                        'current_number'   => $maxActive,
-                        'padding'          => $padding,
+                        'current_number'   => 0,
+                        'padding'          => 4,
                         'yearly_reset'     => true,
+                        'brand_id'         => null,
                     ]);
-
-                    Log::info(sprintf(
-                        'DocumentSequence created: company=%d type=%d year=%d prefix=%s initialised to %d.',
-                        $document->company_id,
-                        $document->document_type_id,
-                        $year,
-                        $prefix,
-                        $maxActive
-                    ));
-                } catch (QueryException $e) {
-                    // The UNIQUE(company_id, document_type_id, year) constraint
-                    // fired: a concurrent request won the INSERT race and the row
-                    // now exists.  Re-read it under a lock so we can proceed from
-                    // the correct (winner's) sequence state.
-                    Log::info(sprintf(
-                        'DocumentSequence first-row race: company=%d type=%d year=%d — recovering.',
-                        $document->company_id,
-                        $document->document_type_id,
-                        $year
-                    ));
-
+                } catch (QueryException) {
+                    // First-row race: re-read under lock.
                     $sequence = DocumentSequence::withoutGlobalScopes()
-                        ->where('company_id',       $document->company_id)
-                        ->where('document_type_id', $document->document_type_id)
+                        ->where('company_id',       $companyId)
+                        ->where('document_type_id', $typeId)
                         ->where('year',             $year)
                         ->lockForUpdate()
                         ->firstOrFail();
                 }
-            } else {
-                // Sync the counter to the actual maximum in the documents table.
-                // We allow syncing DOWN so that orphaned counters (left by deleted
-                // test documents) do not persist forever.
-                //
-                // Safety: lockForUpdate() on the sequence row serialises all
-                // concurrent generate() calls — B cannot acquire the lock until
-                // A's outer transaction (which includes the document INSERT)
-                // commits.  By the time B reads maxActive, A's document is
-                // already visible.  The do-while in Step 4 is the true uniqueness
-                // safety net and handles any residual edge case.
-                $syncedBase = $maxActive;
-
-                if ((int) $sequence->current_number !== $syncedBase || $sequence->prefix !== $prefix) {
-                    $sequence->current_number = $syncedBase;
-                    $sequence->prefix         = $prefix;
-                    $sequence->save();
-                }
             }
 
-            // ── Step 4: increment and guarantee uniqueness ────────────────────
-            //
-            // withTrashed() guards against two distinct scenarios:
-            //
-            //   (a) Active document already has this number (normal case).
-            //
-            //   (b) A soft-deleted document still holds the ORIGINAL number
-            //       (legacy rows deleted before the __VOID__ observer was
-            //       deployed).  Their document_number was never mangled, so
-            //       the DB UNIQUE(company_id, document_number) constraint
-            //       would fire if we tried to reuse the same number.
-            //
-            // Properly deleted documents are mangled by Document::deleting to
-            // "PREFIX-YEAR-NNNN__VOID_TIMESTAMP_ID", which can never match an
-            // exact lookup for a plain number like "BL-2026-0001".  Those rows
-            // therefore never contribute to the skip count.
-            //
-            // Run `php artisan documents:rebuild-sequences --mangle-deleted`
-            // to one-time-mangle any legacy unmangled soft-deleted docs.
-            // After that command has run, the withTrashed() check becomes a
-            // true no-op for all normally-managed soft-deleted records.
-            //
-            // Under normal operation the loop body executes exactly once.
-            do {
-                $sequence->increment('current_number');
-                $sequence->refresh();
+            // Step 2: MAX(sequence_number) from active documents — sole source of truth.
+            // lockForUpdate() forces a current read in REPEATABLE READ isolation.
+            $maxActive = Document::withoutGlobalScopes()
+                ->whereNull('deleted_at')
+                ->where('company_id',       $companyId)
+                ->where('document_type_id', $typeId)
+                ->where('document_year',    $year)
+                ->lockForUpdate()
+                ->max('sequence_number') ?? 0;
 
-                $number = $sequence->prefix
-                    . '-' . $year
-                    . '-' . str_pad((string) $sequence->current_number, $sequence->padding, '0', STR_PAD_LEFT);
+            $next = (int) $maxActive + 1;
 
-            } while (
-                Document::withoutGlobalScopes()
-                    ->withTrashed()
-                    ->where('company_id', $document->company_id)
-                    ->where('document_number', $number)
-                    ->lockForUpdate()
-                    ->exists()
-            );
+            // Step 3: persist integer fields onto the model so the creating observer
+            // can include them in the INSERT.
+            $document->sequence_number = $next;
+            $document->document_year   = $year;
 
-            return $number;
+            // Step 4: update the sequence cache.
+            DB::table('document_sequences')
+                ->where('id', $sequence->id)
+                ->update(['current_number' => $next, 'prefix' => $prefix]);
+
+            return $prefix . '-' . $year . '-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
         });
     }
 }

@@ -39,7 +39,6 @@ class DocumentForm
                             ->label(__('messages.document_type'))
                             ->options(fn () => DocumentType::query()
                                 ->where('is_active', true)
-                                ->where('code', '!=', DocumentType::REPAIR_INVOICE)
                                 ->orderBy('name')
                                 ->pluck('name', 'id')
                                 ->toArray())
@@ -135,12 +134,10 @@ class DocumentForm
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->visible(fn ($get) => self::isRepairInvoiceDocument($get)
-                                || self::isInvoiceDocument($get)
+                            ->visible(fn ($get) => self::isInvoiceDocument($get)
                                 || self::isDeliveryNoteDocument($get))
-                            ->required(fn ($get) => self::isRepairInvoiceDocument($get)
-                                || (self::isInvoiceDocument($get)
-                                    && in_array($get('invoice_source'), ['repair', 'combined'], true)))
+                            ->required(fn ($get) => self::isInvoiceDocument($get)
+                                && in_array($get('invoice_source'), ['repair', 'combined'], true))
                             ->afterStateUpdated(function ($state, callable $set, callable $get): void {
                                 if (! $state) {
                                     return;
@@ -195,7 +192,7 @@ class DocumentForm
                                     // Combined mode: append repair items after existing sale items
                                     $set('items', array_merge($get('items') ?: [], $repairItems));
                                 } else {
-                                    // Repair-only or REPAIR_INVOICE: set client and replace items
+                                    // Repair-only: set client and replace items
                                     $set('client_id', $ticket->client_id);
                                     $set('items', $repairItems);
                                 }
@@ -812,11 +809,6 @@ class DocumentForm
         return self::documentHasCode($get, DocumentType::DELIVERY_NOTE);
     }
 
-    private static function isRepairInvoiceDocument(callable $get): bool
-    {
-        return self::documentHasCode($get, DocumentType::REPAIR_INVOICE);
-    }
-
     private static function requiresSaleLinking(callable $get): bool
     {
         // INVOICE intentionally excluded — sale is optional; supports A) sale-only
@@ -829,7 +821,7 @@ class DocumentForm
 
     private static function isImportedFromRecord(callable $get): bool
     {
-        if (self::requiresSaleLinking($get) || self::isRepairInvoiceDocument($get)) {
+        if (self::requiresSaleLinking($get)) {
             return true;
         }
 

@@ -30,6 +30,8 @@ class Document extends Model
         'uuid',
         'verification_url',
         'document_number',
+        'document_year',
+        'sequence_number',
         'document_date',
         'language',
         'status',
@@ -93,60 +95,6 @@ class Document extends Model
             }
         });
 
-        static::deleting(function (Document $document) {
-            // On soft delete: mangle the document_number so the DB unique
-            // constraint (company_id, document_number) does not block a future
-            // document from reusing the freed number.
-            //
-            // The original number is preserved in metadata for audit purposes.
-            // Hard deletes (forceDelete) remove the row entirely, so no mangling
-            // is needed — the number is freed by the row's disappearance.
-            if ($document->isForceDeleting()) {
-                return;
-            }
-
-            $original = (string) ($document->document_number ?? '');
-
-            if ($original === '' || str_contains($original, '__VOID_')) {
-                return; // Already voided or no number assigned — nothing to do.
-            }
-
-            $void = $original . '__VOID_' . now()->format('YmdHis') . '_' . $document->id;
-
-            $document->metadata = array_merge(
-                (array) ($document->metadata ?? []),
-                ['original_document_number' => $original]
-            );
-            $document->document_number = $void;
-
-            // saveQuietly suppresses all model events so this update does not
-            // re-trigger creating/saving/deleting cycles.
-            $document->saveQuietly();
-        });
-
-        static::restoring(function (Document $document) {
-            $meta     = (array) ($document->metadata ?? []);
-            $original = $meta['original_document_number'] ?? null;
-
-            if (! $original || str_contains($original, '__VOID_')) {
-                return;
-            }
-
-            // Re-claim the original number only if no active document in the same
-            // company has already taken it (a replacement may have been issued).
-            $taken = static::withoutGlobalScope(CompanyScope::class)
-                ->where('company_id', $document->company_id)
-                ->where('document_number', $original)
-                ->whereNull('deleted_at')
-                ->exists();
-
-            if (! $taken) {
-                $document->document_number = $original;
-                unset($meta['original_document_number']);
-                $document->metadata = $meta ?: null;
-            }
-            // If taken, document keeps the __VOID_ number. Admin must reassign manually.
-        });
     }
 
     public function company(): BelongsTo
