@@ -35,7 +35,7 @@ class DocumentService
 
             // Sales documents inherit the sale's effective date unless one is given.
             if (blank($data['document_date'] ?? null) && $sale?->sale_date) {
-                $data['document_date'] = $sale->sale_date->toDateString();
+                $data['document_date'] = \Carbon\Carbon::parse($sale->sale_date)->toDateString();
             }
             $resellerId = $data['reseller_id'] ?? $sale?->reseller_id;
             $clientId = filled($resellerId)
@@ -108,8 +108,8 @@ class DocumentService
         foreach ($document->items as $item) {
             $saleItem = $document->sale->items
                 ->first(function (SaleItem $saleItem) use ($item): bool {
-                    return ((int) $saleItem->product_id > 0 && $saleItem->product_id === $item->product_id)
-                        || ((int) $saleItem->motorcycle_unit_id > 0 && $saleItem->motorcycle_unit_id === $item->motorcycle_unit_id);
+                    return (int) $saleItem->product_id > 0 && $saleItem->product_id === $item->product_id
+                        || (int) $saleItem->motorcycle_unit_id > 0 && $saleItem->motorcycle_unit_id === $item->motorcycle_unit_id;
                 });
 
             if (! $saleItem) {
@@ -364,8 +364,8 @@ class DocumentService
                     continue;
                 }
                 $saleItem = $document->sale->items->first(fn ($s) =>
-                    ((int) $s->product_id > 0 && $s->product_id === $item->product_id)
-                    || ((int) $s->motorcycle_unit_id > 0 && $s->motorcycle_unit_id === $item->motorcycle_unit_id)
+                    (int) $s->product_id > 0 && $s->product_id === $item->product_id
+                    || (int) $s->motorcycle_unit_id > 0 && $s->motorcycle_unit_id === $item->motorcycle_unit_id
                 );
                 if ($saleItem && (float) $saleItem->unit_price > 0) {
                     $discountPerUnit = (float) $saleItem->quantity > 0
@@ -484,11 +484,7 @@ class DocumentService
 
         $code = $document->documentType?->code;
 
-        if (
-            $code === DocumentType::INVOICE
-            && $document->invoice_source === 'repair'
-            && $document->repair_ticket_id
-        ) {
+        if ($code === DocumentType::INVOICE && $document->repair_ticket_id) {
             $this->resyncFromRepairTicket($document);
             return;
         }
@@ -499,7 +495,7 @@ class DocumentService
         }
 
         // For all other types recalculate totals from stored items
-        if (! in_array($code, [DocumentType::SALE_RETURN, DocumentType::SUPPLIER_ORDER], true)) {
+        if (! \in_array($code, [DocumentType::SALE_RETURN, DocumentType::SUPPLIER_ORDER], true)) {
             $this->recalculateTotals($document);
         }
     }
@@ -535,10 +531,15 @@ class DocumentService
             ];
         }
 
-        // Set discount before syncItems so recalculateTotals inside syncItems uses it
+        // Set discount before recalculateTotals so it is included in the net total
         $document->forceFill(['discount_amount' => max(0.0, (float) $ticket->discount_amount)])->save();
 
         $this->syncItems($document, $items);
+
+        // syncItems does not call recalculateTotals — do it explicitly.
+        // unit_prices and discount_amount are all TTC values;
+        // recalculateTotals reverse-extracts HT and TVA from the TTC net.
+        $this->recalculateTotals($document);
 
         $document->refresh();
     }

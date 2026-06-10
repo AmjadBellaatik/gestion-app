@@ -10,6 +10,38 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
+/**
+ * @property int $id
+ * @property int $company_id
+ * @property int $document_type_id
+ * @property int|null $document_template_id
+ * @property int|null $client_id
+ * @property int|null $supplier_id
+ * @property int|null $reseller_id
+ * @property int|null $sale_id
+ * @property int|null $repair_ticket_id
+ * @property string|null $invoice_source
+ * @property string $uuid
+ * @property string $verification_url
+ * @property string $document_number
+ * @property int|null $document_year
+ * @property int|null $sequence_number
+ * @property \Carbon\Carbon $document_date
+ * @property string $language
+ * @property string $status
+ * @property float $subtotal
+ * @property float $tax_rate
+ * @property float $tax
+ * @property float $tax_amount
+ * @property float $discount_amount
+ * @property float $total
+ * @property float $total_amount
+ * @property string|null $notes
+ * @property string|null $pdf_path
+ * @property \Carbon\Carbon|null $generated_at
+ * @property int|null $generated_by
+ * @property array|null $metadata
+ */
 class Document extends Model
 {
     use SoftDeletes;

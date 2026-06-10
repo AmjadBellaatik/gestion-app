@@ -4,6 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int $sale_id
+ * @property int|null $product_id
+ * @property int|null $motorcycle_unit_id
+ * @property int|null $motorcycle_id
+ * @property float $quantity
+ * @property float $returned_quantity
+ * @property float $unit_price
+ * @property float $discount
+ * @property float $tax
+ * @property float $total
+ * @property int|null $warranty_duration_value
+ * @property string|null $warranty_duration_unit
+ * @property int|null $warranty_kilometers
+ */
 class SaleItem extends Model
 {
     protected $fillable = [

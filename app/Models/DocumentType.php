@@ -6,6 +6,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property int|null $company_id
+ * @property string $name
+ * @property string $code
+ * @property string|null $prefix
+ * @property string|null $category
+ * @property string|null $template
+ * @property string|null $blade_view
+ * @property array|null $automatic_variables
+ * @property bool $header_enabled
+ * @property bool $footer_enabled
+ * @property bool $affects_stock
+ * @property bool $affects_accounting
+ * @property string|null $default_language
+ * @property string|null $language
+ * @property bool $is_active
+ */
 class DocumentType extends Model
 {
     public const INVOICE = 'INVOICE';

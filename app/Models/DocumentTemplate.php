@@ -7,6 +7,30 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property int|null $company_id
+ * @property int|null $brand_id
+ * @property int|null $document_type_id
+ * @property string $name
+ * @property string|null $category
+ * @property string|null $blade_view
+ * @property int $version
+ * @property array|null $variables
+ * @property array|null $header_config
+ * @property array|null $footer_config
+ * @property string|null $language
+ * @property bool $is_default
+ * @property string|null $orientation
+ * @property string|null $paper_size
+ * @property bool $rtl
+ * @property bool $footer_enabled
+ * @property bool $header_enabled
+ * @property string|null $watermark
+ * @property bool $signature_enabled
+ * @property bool $stamp_enabled
+ * @property string|null $template_type
+ */
 class DocumentTemplate extends Model
 {
     protected $fillable = [

@@ -15,6 +15,29 @@ use App\Notifications\SaleCreatedNotification;
 use App\Services\Payments\PaymentService;
 use App\Services\Sales\SaleService;
 
+/**
+ * @property int $id
+ * @property int|null $company_id
+ * @property int|null $client_id
+ * @property int|null $reseller_id
+ * @property int|null $repair_ticket_id
+ * @property int|null $user_id
+ * @property string $sale_number
+ * @property \Carbon\Carbon $sale_date
+ * @property string|null $sale_type
+ * @property float $subtotal
+ * @property float $discount
+ * @property string|null $discount_note
+ * @property float $tax
+ * @property float $total
+ * @property float $paid_amount
+ * @property float $remaining_amount
+ * @property string $payment_status
+ * @property string $status
+ * @property \Carbon\Carbon|null $returned_at
+ * @property string|null $notes
+ * @property string|null $purchase_order_number
+ */
 class Sale extends Model
 {
     use SoftDeletes;

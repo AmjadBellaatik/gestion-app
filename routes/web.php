@@ -3,14 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmergencyAccessController;
 
-use App\Http\Controllers\SaleController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\RepairController;
 use App\Http\Controllers\RepairPrintController;
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportPdfController;
-use App\Http\Controllers\SettingController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CompanySwitchController;
 use App\Http\Controllers\DocumentPdfController;
 use App\Http\Controllers\DocumentVerificationController;
