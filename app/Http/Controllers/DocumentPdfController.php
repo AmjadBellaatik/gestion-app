@@ -52,7 +52,7 @@ class DocumentPdfController extends Controller
     {
         abort_unless(auth()->user()?->can('manage_documents'), 403);
 
-        app(DocumentService::class)->storePdf($document);
+        DocumentService::generatePdfFor($document);
 
         return back()->with('status', __('messages.pdf_regenerated'));
     }
