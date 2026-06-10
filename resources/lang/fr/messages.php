@@ -538,6 +538,8 @@ return [
     'item_type' => 'Type Article',
     'item' => 'Article',
     'unit_price' => 'Prix Unitaire (DH)',
+    'unit_price_col' => 'Prix Unit.',
+    'discount_col' => 'Remise',
     'financial_information' => 'Informations Financières',
     'document_information' => 'Informations Document',
     'generated' => 'Genere',

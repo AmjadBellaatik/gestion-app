@@ -721,10 +721,11 @@ class RepairTicketForm
                 }),
 
             // Row 2 — Qty | Unit Price | Discount | Subtotal
-            Grid::make(4)->schema([
+            Grid::make(12)->schema([
 
                 TextInput::make('quantity')
                     ->label(__('messages.quantity'))
+                    ->columnSpan(2)
                     ->numeric()
                     ->default(1)
                     ->minValue(0.01)
@@ -745,11 +746,12 @@ class RepairTicketForm
                     }),
 
                 TextInput::make('unit_price')
-                    ->label(__('messages.unit_price'))
+                    ->label(__('messages.unit_price_col'))
                     ->numeric()
                     ->default(0)
                     ->prefix('DH')
                     ->live()
+                    ->columnSpan(3)
                     ->afterStateUpdated(function ($state, Get $get, callable $set) {
                         $qty      = max(0, (float) ($get('quantity') ?? 1));
                         $price    = max(0, (float) $state);
@@ -759,11 +761,12 @@ class RepairTicketForm
                     }),
 
                 TextInput::make('discount_amount')
-                    ->label(__('messages.discount_amount'))
+                    ->label(__('messages.discount_col'))
                     ->numeric()
                     ->default(0)
                     ->prefix('DH')
                     ->live()
+                    ->columnSpan(3)
                     ->afterStateUpdated(function ($state, Get $get, callable $set) {
                         $qty      = max(0, (float) ($get('quantity') ?? 1));
                         $price    = (float) ($get('unit_price') ?? 0);
@@ -777,7 +780,8 @@ class RepairTicketForm
                     ->numeric()
                     ->prefix('DH')
                     ->disabled()
-                    ->dehydrated(),
+                    ->dehydrated()
+                    ->columnSpan(4),
 
             ]),
         ];

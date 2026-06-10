@@ -536,6 +536,8 @@ return [
     'item_type' => 'نوع العنصر',
     'item' => 'عنصر',
     'unit_price' => 'سعر الوحدة (DH)',
+    'unit_price_col' => 'سعر الوحدة',
+    'discount_col' => 'خصم',
     'financial_information' => 'المعلومات المالية',
     'document_information' => 'معلومات المستند',
     'generated' => 'تم الإنشاء',

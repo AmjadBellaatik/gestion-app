@@ -538,6 +538,8 @@ return [
     'item_type' => 'Item Type',
     'item' => 'Item',
     'unit_price' => 'Unit Price (DH)',
+    'unit_price_col' => 'Unit Price',
+    'discount_col' => 'Discount',
     'financial_information' => 'Financial Information',
     'document_information' => 'Document Information',
     'generated' => 'Generated',
