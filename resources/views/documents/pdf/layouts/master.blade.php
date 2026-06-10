@@ -153,10 +153,12 @@
            thead:display:table-header-group — column headers repeat on every page.
            tfoot:display:table-footer-group — table footers repeat on every page.
            tr:page-break-inside:avoid       — no row is ever split mid-row.
+           break-inside:avoid is the CSS4 alias; both are set for DOMPDF coverage.
         */
         thead { display: table-header-group; }
         tfoot { display: table-footer-group; }
-        tr    { page-break-inside: avoid; page-break-after: auto; }
+        tr    { page-break-inside: avoid; break-inside: avoid; page-break-after: auto; }
+        td, th { overflow: hidden; }
 
         /* ── Block protection ─────────────────────────────────────────────────── */
         /*

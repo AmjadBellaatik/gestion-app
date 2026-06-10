@@ -765,6 +765,9 @@ return [
     'generate_invoice'           => 'إنشاء الفاتورة',
     'invoice_type_not_found'     => 'نوع مستند INVOICE غير موجود',
     'invoice_generated'          => 'تم إنشاء الفاتورة بنجاح',
+    'generate_delivery_note'     => 'إنشاء وصل التسليم',
+    'delivery_note_generated'    => 'تم إنشاء وصل التسليم بنجاح',
+    'document_type_not_found'    => 'نوع المستند غير موجود',
     'recalculate_costs'          => 'إعادة حساب التكاليف',
     'costs_recalculated'         => 'تمت إعادة حساب التكاليف',
     'repair_order'               => 'أمر الإصلاح',
@@ -835,6 +838,8 @@ return [
     'discount_reduces_total'     => 'سيتم خصم هذا المبلغ من الإجمالي الشامل للضريبة.',
     'discount_note_placeholder'  => 'سبب الخصم (وفاء، تفاوض…)',
     'gross_total'                => 'الإجمالي الخام',
+    'gross_total_label'          => 'إجمالي',
+    'net_label'                  => 'صافي',
     'net_total_after_discount'   => 'الإجمالي الصافي (بعد الخصم)',
     'discount_applied'           => 'تم تطبيق الخصم',
 

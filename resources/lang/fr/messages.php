@@ -773,6 +773,9 @@ return [
     'generate_invoice'             => 'Générer la facture',
     'invoice_type_not_found'       => 'Type de document INVOICE introuvable',
     'invoice_generated'            => 'Facture générée avec succès',
+    'generate_delivery_note'       => 'Générer un bon de livraison',
+    'delivery_note_generated'      => 'Bon de livraison généré avec succès',
+    'document_type_not_found'      => 'Type de document introuvable',
     'invoice_source'               => 'Source de la facture',
     'invoice_source_sale'          => 'Facture de vente',
     'invoice_source_repair'        => 'Facture de réparation',
@@ -854,6 +857,8 @@ return [
     'discount_reduces_total'        => 'Ce montant sera déduit du total TTC.',
     'discount_note_placeholder'     => 'Raison de la remise (fidélité, négociation…)',
     'gross_total'                   => 'Total brut',
+    'gross_total_label'             => 'brut',
+    'net_label'                     => 'net',
     'net_total_after_discount'      => 'Total net (après remise)',
     'discount_applied'              => 'Remise appliquée',
 

@@ -41,15 +41,21 @@ class DocumentVerificationController extends Controller
             ]);
         }
 
-        return view($this->resolveView($document->documentType?->code), [
+        return view($this->resolveView($document), [
             'authentic' => true,
             'document'  => $document,
             'v'         => DocumentVerificationPresenter::from($document),
         ]);
     }
 
-    private function resolveView(?string $code): string
+    private function resolveView(Document $document): string
     {
+        $code = $document->documentType?->code;
+
+        if ($code === 'INVOICE' && $document->invoice_source === 'repair') {
+            return 'documents.verify.repair-invoice';
+        }
+
         return match ($code) {
             'CONFORMITY'      => 'documents.verify.conformity',
             'INVOICE'         => 'documents.verify.invoice',

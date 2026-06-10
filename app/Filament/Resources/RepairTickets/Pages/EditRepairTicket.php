@@ -15,7 +15,6 @@ use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
@@ -150,7 +149,7 @@ class EditRepairTicket extends EditRecord
                         ->body(__('messages.open_report_link'))
                         ->success()
                         ->actions([
-                            NotificationAction::make('open')
+                            Action::make('open')
                                 ->label(__('messages.open'))
                                 ->url($url)
                                 ->openUrlInNewTab(),

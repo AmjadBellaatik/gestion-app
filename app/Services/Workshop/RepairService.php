@@ -2,8 +2,10 @@
 
 namespace App\Services\Workshop;
 
+use App\Models\Payment;
 use App\Models\RepairTicket;
 use App\Services\Accounting\AccountingService;
+use App\Services\Payments\PaymentService;
 
 class RepairService
 {
@@ -58,5 +60,22 @@ class RepairService
             'completed_at' => now(),
             'finished_at'  => now(),
         ]);
+
+        // Auto-create payment + transaction for paid repairs when none exists yet.
+        // This mirrors the sale automation: Payment::creating sets status=paid (cash),
+        // Payment::created → applyPayment() → creates Transaction + TreasuryTransaction.
+        $ticket->refresh();
+
+        if (
+            ! in_array($ticket->repair_type, ['warranty', 'internal'], true)
+            && (float) ($ticket->total_cost ?? 0) > 0
+            && ! Payment::where('repair_ticket_id', $ticket->id)->exists()
+        ) {
+            try {
+                PaymentService::createFromRepair($ticket, 'cash');
+            } catch (\Throwable) {
+                // Payment failures must not block repair completion
+            }
+        }
     }
 }

@@ -772,6 +772,9 @@ return [
     'generate_invoice'             => 'Generate Invoice',
     'invoice_type_not_found'       => 'INVOICE document type not found',
     'invoice_generated'            => 'Invoice generated successfully',
+    'generate_delivery_note'       => 'Generate Delivery Note',
+    'delivery_note_generated'      => 'Delivery note generated successfully',
+    'document_type_not_found'      => 'Document type not found',
     'invoice_source'               => 'Invoice source',
     'invoice_source_sale'          => 'Sale invoice',
     'invoice_source_repair'        => 'Repair invoice',
@@ -853,6 +856,8 @@ return [
     'discount_reduces_total'        => 'This amount will be deducted from the gross total (TTC).',
     'discount_note_placeholder'     => 'Reason for discount (loyalty, negotiation…)',
     'gross_total'                   => 'Gross Total',
+    'gross_total_label'             => 'gross',
+    'net_label'                     => 'net',
     'net_total_after_discount'      => 'Net Total (after discount)',
     'discount_applied'              => 'Discount applied',
 

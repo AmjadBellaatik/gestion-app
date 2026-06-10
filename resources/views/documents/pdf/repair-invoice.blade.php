@@ -134,15 +134,25 @@
     <div class="pdf-protect">
         <table class="totals">
             @if($discountHt > 0)
+            {{-- subtotal is already net of the global discount; show gross first --}}
             <tr>
-                <td>Remise</td>
-                <td class="num">- {{ number_format($discountHt, 2, ',', ' ') }} MAD</td>
+                <td>{{ __('messages.subtotal_ht') }} {{ __('messages.gross_total_label') ?: 'brut' }}</td>
+                <td class="num">{{ number_format(round($subtotal + $discountHt, 2), 2, ',', ' ') }} MAD</td>
             </tr>
-            @endif
+            <tr>
+                <td style="color:#b45309; font-weight:600;">{{ __('messages.discount_amount') }}</td>
+                <td class="num" style="color:#b45309; font-weight:600;">- {{ number_format($discountHt, 2, ',', ' ') }} MAD</td>
+            </tr>
+            <tr>
+                <td>{{ __('messages.subtotal_ht') }} {{ __('messages.net_label') ?: 'net' }}</td>
+                <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @else
             <tr>
                 <td>{{ __('messages.subtotal_ht') }}</td>
                 <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
             </tr>
+            @endif
             <tr>
                 <td>{{ __('messages.tva_20') }}</td>
                 <td class="num">{{ number_format($taxAmount, 2, ',', ' ') }} MAD</td>

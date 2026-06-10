@@ -52,6 +52,7 @@ class DocumentService
                 'reseller_id' => $resellerId,
                 'sale_id' => $data['sale_id'] ?? null,
                 'repair_ticket_id' => $data['repair_ticket_id'] ?? null,
+                'invoice_source'   => $data['invoice_source'] ?? null,
                 'document_number' => $data['document_number'] ?? null,
                 'sequence_number' => $data['sequence_number'] ?? null,
                 'document_year'   => $data['document_year'] ?? null,

@@ -13,7 +13,10 @@
     };
     $buyerName = $isResellerBuyer ? $buyer?->name : $clientName;
 
-    $discount     = $document->sale ? max(0.0, (float) $document->sale->discount) : 0.0;
+    $repairTicket = $document->repairTicket;
+    $discount     = $document->sale
+        ? max(0.0, (float) $document->sale->discount)
+        : ($repairTicket?->discount_validated ? max(0.0, (float) $repairTicket->discount_amount) : 0.0);
     $discountNote = $document->sale?->discount_note;
 
     $totalTtc = (float) $document->total_amount;
@@ -56,7 +59,9 @@
     <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.document_number') }} :</span> {{ $document->document_number }}</div>
     <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.document_date') }} :</span> {{ $document->document_date?->format('d/m/Y') }}</div>
     @if($document->sale)
-    <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.sale') }} :</span> {{ $document->sale?->sale_number }}</div>
+    <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.sale') }} :</span> {{ $document->sale->sale_number }}</div>
+    @elseif($repairTicket)
+    <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.repair_ticket') }} :</span> {{ $repairTicket->ticket_number }}</div>
     @endif
 
     <div style="border: 1px solid #555; padding: 8px 10px; margin-top: 12px; margin-bottom: 14px;">

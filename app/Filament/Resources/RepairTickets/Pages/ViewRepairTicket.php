@@ -19,7 +19,6 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -268,7 +267,7 @@ class ViewRepairTicket extends ViewRecord
                         ->body(__('messages.open_report_link'))
                         ->success()
                         ->actions([
-                            NotificationAction::make('open')
+                            Action::make('open')
                                 ->label(__('messages.open'))
                                 ->url($url)
                                 ->openUrlInNewTab(),
@@ -337,6 +336,62 @@ class ViewRepairTicket extends ViewRecord
                     }
 
                     Notification::make()->title(__('messages.invoice_generated'))->success()->send();
+                }),
+
+            /*
+            |------------------------------------------------------------------
+            | Generate Bon de Livraison
+            |------------------------------------------------------------------
+            */
+
+            Action::make('generate_bl')
+                ->label(__('messages.generate_delivery_note'))
+                ->icon('heroicon-o-truck')
+                ->color('warning')
+                ->visible(fn (RepairTicket $record) => in_array($record->status, ['completed', 'delivered', 'closed'])
+                    && ! in_array($record->repair_type, ['warranty', 'internal']))
+                ->action(function (RepairTicket $record): void {
+                    $record->loadMissing(['items.product']);
+
+                    $documentTypeId = DocumentType::where('code', DocumentType::DELIVERY_NOTE)->value('id');
+
+                    if (! $documentTypeId) {
+                        Notification::make()->title(__('messages.document_type_not_found'))->warning()->send();
+                        return;
+                    }
+
+                    $items = [];
+                    foreach ($record->items as $item) {
+                        $items[] = [
+                            'description'     => $item->product?->name ?? __('messages.part'),
+                            'item_type'       => 'product',
+                            'quantity'        => (float) $item->quantity,
+                            'unit_price'      => (float) $item->unit_price,
+                            'discount_amount' => (float) $item->discount_amount,
+                        ];
+                    }
+                    if ((float) $record->labor_cost > 0) {
+                        $items[] = [
+                            'description'     => __('messages.labor_cost'),
+                            'item_type'       => 'service',
+                            'quantity'        => 1,
+                            'unit_price'      => (float) $record->labor_cost,
+                            'discount_amount' => 0,
+                        ];
+                    }
+
+                    DocumentService::generate([
+                        'document_type_id' => $documentTypeId,
+                        'client_id'        => $record->client_id,
+                        'repair_ticket_id' => $record->getKey(),
+                        'language'         => app()->getLocale(),
+                        'status'           => 'generated',
+                        'discount_amount'  => $record->discount_validated ? (float) $record->discount_amount : 0,
+                        'items'            => $items,
+                        'notes'            => 'Bon de livraison réparation ' . $record->ticket_number,
+                    ]);
+
+                    Notification::make()->title(__('messages.delivery_note_generated'))->success()->send();
                 }),
 
             /*

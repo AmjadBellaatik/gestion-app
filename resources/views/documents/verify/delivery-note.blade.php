@@ -24,11 +24,16 @@
 
 </div>
 
-{{-- ── Sale reference ────────────────────────────────────────────────── --}}
+{{-- ── Reference (sale or repair ticket) ────────────────────────────── --}}
 @if($document->sale)
     <div class="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
         <span class="font-semibold">{{ __('messages.sale') }}:</span>
         <span>{{ $document->sale->sale_number }}</span>
+    </div>
+@elseif($document->repairTicket)
+    <div class="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <span class="font-semibold">{{ __('messages.repair_ticket') }}:</span>
+        <span>{{ $document->repairTicket->ticket_number }}</span>
     </div>
 @endif
 
