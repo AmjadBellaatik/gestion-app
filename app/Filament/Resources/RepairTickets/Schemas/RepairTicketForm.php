@@ -720,12 +720,11 @@ class RepairTicketForm
                     self::recalculateParentTotals($get, $set);
                 }),
 
-            // Row 2 — Qty | Unit Price | Discount | Subtotal
-            Grid::make(12)->schema([
+            // Row 2 — Qty | Unit Price
+            Grid::make(2)->schema([
 
                 TextInput::make('quantity')
                     ->label(__('messages.quantity'))
-                    ->columnSpan(2)
                     ->numeric()
                     ->default(1)
                     ->minValue(0.01)
@@ -751,7 +750,6 @@ class RepairTicketForm
                     ->default(0)
                     ->prefix('DH')
                     ->live()
-                    ->columnSpan(3)
                     ->afterStateUpdated(function ($state, Get $get, callable $set) {
                         $qty      = max(0, (float) ($get('quantity') ?? 1));
                         $price    = max(0, (float) $state);
@@ -760,13 +758,17 @@ class RepairTicketForm
                         self::recalculateParentTotals($get, $set);
                     }),
 
+            ]),
+
+            // Row 3 — Discount | Subtotal
+            Grid::make(2)->schema([
+
                 TextInput::make('discount_amount')
                     ->label(__('messages.discount_col'))
                     ->numeric()
                     ->default(0)
                     ->prefix('DH')
                     ->live()
-                    ->columnSpan(3)
                     ->afterStateUpdated(function ($state, Get $get, callable $set) {
                         $qty      = max(0, (float) ($get('quantity') ?? 1));
                         $price    = (float) ($get('unit_price') ?? 0);
@@ -780,8 +782,7 @@ class RepairTicketForm
                     ->numeric()
                     ->prefix('DH')
                     ->disabled()
-                    ->dehydrated()
-                    ->columnSpan(4),
+                    ->dehydrated(),
 
             ]),
         ];

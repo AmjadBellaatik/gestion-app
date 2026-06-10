@@ -21,16 +21,26 @@
     $repairUnit   = $motorcycleUnit ?? $document->primaryMotorcycleUnit();
     $repairModel  = $repairUnit?->motorcycleModel;
 
-    $totalTtc = (float) $document->total_amount;
-    if ($totalTtc <= 0 && $document->items->isNotEmpty()) {
-        $totalTtc = (float) $document->items->sum(fn ($item) => (float) $item->total);
+    // Totals come from the document, which DocumentService sets directly
+    // from RepairTicket->total_cost (HT net of all discounts) + 20% TVA.
+    // Fall back to the repair ticket itself for documents generated before this fix.
+    $subtotal  = (float) $document->subtotal;
+    $taxAmount = (float) $document->tax_amount;
+    $totalTtc  = (float) $document->total_amount;
+
+    if ($totalTtc <= 0 && $repairTicket) {
+        $subtotal  = max(0.0, (float) $repairTicket->total_cost);
+        $taxAmount = round($subtotal * 0.20, 2);
+        $totalTtc  = round($subtotal + $taxAmount, 2);
     }
-    $taxAmount = $totalTtc > 0
-        ? round($totalTtc * (20 / 120), 2)
-        : (float) $document->tax_amount;
-    $subtotal = $totalTtc > 0
-        ? round($totalTtc - $taxAmount, 2)
-        : (float) $document->subtotal;
+
+    // Global discount shown in the totals section (only if validated)
+    $discountHt = 0.0;
+    if ($repairTicket && $repairTicket->discount_validated) {
+        $discountHt = max(0.0, (float) $repairTicket->discount_amount);
+    } elseif ((float) $document->discount_amount > 0) {
+        $discountHt = (float) $document->discount_amount;
+    }
 
     $watermarkText = strtoupper($repairModel?->brand?->name ?: $repairModel?->marque ?: $companyName);
 @endphp
@@ -85,17 +95,24 @@
                     {{ __('messages.chassis_number') }}: {{ $repairUnit->chassis_number }}<br>
                     @if($repairModel?->type){{ __('messages.type') }}: {{ $repairModel->type }}@endif
                 </div>
+                @elseif($repairTicket?->is_foreign_vehicle)
+                <div class="box">
+                    <div class="box-title">{{ __('messages.vehicle_information') }}</div>
+                    <strong>{{ $repairTicket->foreign_brand }} {{ $repairTicket->foreign_model }}</strong><br>
+                    @if($repairTicket->foreign_chassis){{ __('messages.chassis_number') }}: {{ $repairTicket->foreign_chassis }}<br>@endif
+                </div>
                 @endif
             </td>
         </tr>
     </table>
 
+    @if($document->items->isNotEmpty())
     <table class="items-table">
         <thead>
             <tr>
                 <th>{{ __('messages.description') }}</th>
                 <th class="num">{{ __('messages.quantity') }}</th>
-                <th class="num">{{ __('messages.unit_price_ttc') }}</th>
+                <th class="num">{{ __('messages.price_ht') }}</th>
                 <th class="num">{{ __('messages.tax_rate') }}</th>
                 <th class="num">{{ __('messages.total_amount') }}</th>
             </tr>
@@ -112,9 +129,16 @@
             @endforeach
         </tbody>
     </table>
+    @endif
 
     <div class="pdf-protect">
         <table class="totals">
+            @if($discountHt > 0)
+            <tr>
+                <td>Remise</td>
+                <td class="num">- {{ number_format($discountHt, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @endif
             <tr>
                 <td>{{ __('messages.subtotal_ht') }}</td>
                 <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>

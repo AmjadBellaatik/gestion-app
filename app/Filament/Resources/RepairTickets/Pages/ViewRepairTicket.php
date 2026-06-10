@@ -289,6 +289,7 @@ class ViewRepairTicket extends ViewRecord
                 ->visible(fn (RepairTicket $record) => in_array($record->status, ['completed', 'delivered', 'closed'])
                     && ! $record->invoice_document_id)
                 ->action(function (RepairTicket $record): void {
+                    $record->loadMissing(['items.product']);
                     $record->recalculateCosts();
 
                     $documentTypeId = DocumentType::where('code', DocumentType::INVOICE)->value('id');
@@ -298,6 +299,27 @@ class ViewRepairTicket extends ViewRecord
                         return;
                     }
 
+                    // Build one document line-item per repair item (HT prices)
+                    $items = [];
+                    foreach ($record->items as $item) {
+                        $items[] = [
+                            'description'     => $item->product?->name ?? __('messages.part'),
+                            'item_type'       => 'product',
+                            'quantity'        => (float) $item->quantity,
+                            'unit_price'      => (float) $item->unit_price,
+                            'discount_amount' => (float) $item->discount_amount,
+                        ];
+                    }
+                    if ((float) $record->labor_cost > 0) {
+                        $items[] = [
+                            'description'     => __('messages.labor_cost'),
+                            'item_type'       => 'service',
+                            'quantity'        => 1,
+                            'unit_price'      => (float) $record->labor_cost,
+                            'discount_amount' => 0,
+                        ];
+                    }
+
                     $document = DocumentService::generate([
                         'document_type_id' => $documentTypeId,
                         'invoice_source'   => 'repair',
@@ -305,9 +327,8 @@ class ViewRepairTicket extends ViewRecord
                         'repair_ticket_id' => $record->getKey(),
                         'language'         => app()->getLocale(),
                         'status'           => 'generated',
-                        'subtotal'         => (float) $record->total_cost,
-                        'tax'              => 0,
-                        'total'            => (float) $record->total_cost,
+                        'discount_amount'  => $record->discount_validated ? (float) $record->discount_amount : 0,
+                        'items'            => $items,
                         'notes'            => 'Facture réparation ' . $record->ticket_number,
                     ]);
 

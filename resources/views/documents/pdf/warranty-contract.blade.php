@@ -17,6 +17,24 @@
     .terms p { page-break-inside: avoid; }
 
     .date-place { margin-top: 12px; text-align: right; font-weight: 700; }
+
+    /* Signature block pinned just above the footer on every page.
+       Footer = 22mm, add 3mm gap → bottom: 25mm.
+       padding matches @page left/right margin (12mm). */
+    .warranty-sign-block {
+        position: fixed;
+        bottom: 25mm;
+        left:   0;
+        right:  0;
+        padding: 0 12mm;
+        background: #fff;
+    }
+    .warranty-sign-block .signatures {
+        margin-top: 6px;
+    }
+    .warranty-sign-block .signature-line {
+        margin: 30px 28px 0;
+    }
 </style>
 @endpush
 
@@ -154,7 +172,7 @@
         @endif
     </div>
 
-    <div class="pdf-protect">
+    <div class="warranty-sign-block">
         <div class="date-place">{{ $city }} le : {{ $document->document_date?->format('d/m/Y') }}</div>
         <table class="signatures">
             <tr>

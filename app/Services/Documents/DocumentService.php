@@ -10,6 +10,7 @@ use App\Models\DocumentType;
 use App\Models\GeneratedPdf;
 use App\Models\Product;
 use App\Models\MotorcycleUnit;
+use App\Models\RepairTicket;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
@@ -74,6 +75,11 @@ class DocumentService
                     'total_amount' => $data['total_amount'] ?? 0,
                     'total'        => $data['total_amount'] ?? 0,
                 ])->save();
+            } elseif (
+                ($data['invoice_source'] ?? null) === 'repair'
+                && ! empty($data['repair_ticket_id'])
+            ) {
+                $this->setRepairInvoiceTotals($document, (int) $data['repair_ticket_id']);
             } else {
                 $this->recalculateTotals($document);
             }
@@ -209,6 +215,32 @@ class DocumentService
         $this->recalculateTotals($document);
     }
 
+    private function setRepairInvoiceTotals(Document $document, int $repairTicketId): void
+    {
+        $ticket = RepairTicket::withoutGlobalScopes()->find($repairTicketId);
+
+        if (! $ticket) {
+            $this->recalculateTotals($document);
+            return;
+        }
+
+        // RepairTicket->total_cost is already the HT total net of all discounts
+        // (= labor_cost + parts_cost - discount_amount).
+        // Tax is applied on top at 20%.
+        $subtotalHt = max(0.0, round((float) $ticket->total_cost, 2));
+        $tax        = round($subtotalHt * 0.20, 2);
+        $total      = round($subtotalHt + $tax, 2);
+
+        $document->forceFill([
+            'subtotal'     => $subtotalHt,
+            'tax_rate'     => 20,
+            'tax_amount'   => $tax,
+            'tax'          => $tax,
+            'total_amount' => $total,
+            'total'        => $total,
+        ])->save();
+    }
+
     public static function generate(array $data): Document
     {
         return app(self::class)->create($data);
@@ -302,6 +334,7 @@ class DocumentService
                 'supplier',
                 'reseller',
                 'sale.reseller',
+                'repairTicket',
                 'items.product',
                 'items.motorcycleUnit.motorcycleModel.brand',
                 'items.motorcycleUnit.motorcycleModel.homologation',
@@ -317,6 +350,7 @@ class DocumentService
             'reseller',
             'sale.reseller',
             'sale.items',
+            'repairTicket',
             'items.product',
             'items.motorcycleUnit.motorcycleModel.brand',
             'items.motorcycleUnit.motorcycleModel.homologation',
