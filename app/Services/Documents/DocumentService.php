@@ -473,7 +473,79 @@ class DocumentService
 
     public static function generatePdfFor(Document $document): GeneratedPdf
     {
-        return app(self::class)->storePdf($document);
+        $service = app(self::class);
+        $service->resyncFromSource($document);
+        return $service->storePdf($document);
+    }
+
+    private function resyncFromSource(Document $document): void
+    {
+        $document->loadMissing(['documentType', 'repairTicket', 'sale']);
+
+        $code = $document->documentType?->code;
+
+        if (
+            $code === DocumentType::INVOICE
+            && $document->invoice_source === 'repair'
+            && $document->repair_ticket_id
+        ) {
+            $this->resyncFromRepairTicket($document);
+            return;
+        }
+
+        if ($code === DocumentType::DELIVERY_NOTE && $document->repair_ticket_id) {
+            $this->resyncFromRepairTicket($document);
+            return;
+        }
+
+        // For all other types recalculate totals from stored items
+        if (! in_array($code, [DocumentType::SALE_RETURN, DocumentType::SUPPLIER_ORDER], true)) {
+            $this->recalculateTotals($document);
+        }
+    }
+
+    private function resyncFromRepairTicket(Document $document): void
+    {
+        $ticket = RepairTicket::with(['items.product'])->find($document->repair_ticket_id);
+
+        if (! $ticket) {
+            return;
+        }
+
+        $locale = $document->language ?? 'fr';
+
+        $items = [];
+        foreach ($ticket->items as $item) {
+            $items[] = [
+                'description'     => $item->product?->name ?? trans('messages.part', [], $locale),
+                'item_type'       => 'product',
+                'quantity'        => (float) $item->quantity,
+                'unit_price'      => (float) $item->unit_price,
+                'discount_amount' => (float) ($item->discount_amount ?? 0),
+            ];
+        }
+
+        if ((float) $ticket->labor_cost > 0) {
+            $items[] = [
+                'description'     => trans('messages.labor_cost', [], $locale),
+                'item_type'       => 'service',
+                'quantity'        => 1,
+                'unit_price'      => (float) $ticket->labor_cost,
+                'discount_amount' => 0,
+            ];
+        }
+
+        $this->syncItems($document, $items);
+
+        $discountAmount = $ticket->discount_validated
+            ? max(0.0, (float) $ticket->discount_amount)
+            : 0.0;
+
+        $document->forceFill(['discount_amount' => $discountAmount])->save();
+
+        $this->setRepairInvoiceTotals($document, (int) $ticket->id);
+
+        $document->refresh();
     }
 
     public static function generatePdf(Document $document, string $template = ''): \Barryvdh\DomPDF\PDF

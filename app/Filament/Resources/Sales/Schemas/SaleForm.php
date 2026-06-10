@@ -10,6 +10,7 @@ use App\Models\MotorcycleUnit;
 use App\Models\Product;
 use App\Models\Reseller;
 use App\Models\Sale;
+use App\Models\SaleItem;
 
 use App\Filament\Resources\Sales\SaleResource;
 
@@ -192,7 +193,8 @@ class SaleForm
                                                     )
                                                     ->orderBy('name')
                                                     ->get()
-                                                    ->filter(fn (Product $p) => $p->current_stock > 0)
+                                                    ->filter(fn (Product $p) => $p->current_stock > 0
+                                                        || (int) $p->id === (int) $get('product_id'))
                                                     ->pluck('name', 'id')
 
                                             )
@@ -234,9 +236,12 @@ class SaleForm
 
                                         Select::make('motorcycle_unit_id')
                                             ->label(__('messages.motorcycle_unit'))
-                                            ->options(fn () => MotorcycleUnit::query()
+                                            ->options(fn ($get) => MotorcycleUnit::query()
                                                 ->with('motorcycleModel')
-                                                ->whereIn('status', ['available', 'in_stock'])
+                                                ->where(fn ($q) => $q
+                                                    ->whereIn('status', ['available', 'in_stock'])
+                                                    ->orWhere('id', (int) $get('motorcycle_unit_id'))
+                                                )
                                                 ->orderByDesc('id')
                                                 ->get()
                                                 ->mapWithKeys(fn (MotorcycleUnit $unit) => [
@@ -293,7 +298,8 @@ class SaleForm
                                                 if (! $product) {
                                                     return null;
                                                 }
-                                                $stock = (float) $product->current_stock;
+                                                $stock = (float) $product->current_stock
+                                                    + self::originalSaleItemQty($get('id'), $productId);
                                                 return __('messages.available_stock') . ': ' . number_format($stock, 2);
                                             })
                                             ->rules([
@@ -309,7 +315,8 @@ class SaleForm
                                                     if (! $product) {
                                                         return;
                                                     }
-                                                    $stock = (float) $product->current_stock;
+                                                    $stock = (float) $product->current_stock
+                                                        + self::originalSaleItemQty($get('id'), $productId);
                                                     if ((float) $value > $stock) {
                                                         $fail(__('messages.quantity_exceeds_stock', ['available' => number_format($stock, 2)]));
                                                     }
@@ -764,5 +771,25 @@ class SaleForm
         }
 
         return (float) $model->price_ttc;
+    }
+
+    /**
+     * When editing an existing sale, the product's stock was already decremented
+     * when the original sale was saved. Return the quantity committed on that
+     * sale item so the validator can add it back to current_stock and avoid
+     * false "exceeds stock" errors on unmodified or reduced quantities.
+     */
+    private static function originalSaleItemQty(mixed $saleItemId, mixed $productId): float
+    {
+        if (! $saleItemId || ! $productId) {
+            return 0.0;
+        }
+
+        $item = SaleItem::query()
+            ->whereKey((int) $saleItemId)
+            ->where('product_id', (int) $productId)
+            ->first();
+
+        return $item ? (float) $item->quantity : 0.0;
     }
 }

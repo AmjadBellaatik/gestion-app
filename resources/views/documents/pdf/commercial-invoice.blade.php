@@ -23,7 +23,8 @@
     $purchaseOrderNumber = data_get($document->metadata, 'purchase_order_number')
         ?: $document->sale?->purchase_order_number;
 
-    $discount     = $document->sale ? max(0.0, (float) $document->sale->discount) : 0.0;
+    $saleDiscount = $document->sale ? max(0.0, (float) $document->sale->discount) : 0.0;
+    $discount     = max($saleDiscount, (float) $document->discount_amount);
     $discountNote = $document->sale?->discount_note;
 
     $totalTtc = (float) $document->total_amount;
@@ -54,9 +55,8 @@
         <tr>
             <td style="width: 75%; vertical-align: middle;">
                 @if($company->logo)
-                <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
+                <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}">
                 @endif
-                <div class="company-name">{{ $companyName }}</div>
             </td>
             <td style="width: 25%; text-align: right; vertical-align: middle;">
                 <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">

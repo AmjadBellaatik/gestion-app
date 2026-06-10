@@ -31,6 +31,7 @@ class ViewDocument extends ViewRecord
                         'client',
                         'supplier',
                         'sale',
+                        'repairTicket.items.product',
                         'items.product',
                         'items.motorcycleUnit.motorcycleModel.brand',
                         'items.motorcycleUnit.motorcycleModel.homologation',

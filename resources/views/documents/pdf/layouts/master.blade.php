@@ -125,9 +125,9 @@
     <style>
         /* ── @page: sets body content boundary ───────────────────────────────── */
         @page {
-            margin: 10mm 12mm 22mm 12mm;
+            margin: 10mm 12mm 28mm 12mm;
             /*          top  lr  BOTTOM  lr
-               BOTTOM (22mm) == .pdf-footer height (22mm)
+               BOTTOM (28mm) == .pdf-footer height (28mm)
                Changing this requires changing .pdf-footer height below.       */
         }
 
@@ -137,7 +137,7 @@
             bottom: 0;          /* anchored to physical page bottom on every page */
             left:   0;
             right:  0;
-            height: 22mm;       /* == @page margin-bottom above — DO NOT CHANGE INDEPENDENTLY */
+            height: 28mm;       /* == @page margin-bottom above — DO NOT CHANGE INDEPENDENTLY */
             background: #ffffff; /* white barrier: content rendered before footer cannot show through */
             border-top: 1px solid #9ca3af;
             padding: 4mm 12mm 0 12mm;
