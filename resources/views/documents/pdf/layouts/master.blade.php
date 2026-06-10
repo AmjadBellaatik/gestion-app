@@ -123,28 +123,22 @@
          DO NOT CHANGE .pdf-footer HEIGHT WITHOUT CHANGING @page margin-bottom.
     ════════════════════════════════════════════════════════════════════ --}}
     <style>
-        /* ── @page: sets body content boundary ───────────────────────────────── */
+        /* ── @page: standard margins — no reserved footer zone needed ──────────── */
         @page {
-            margin: 10mm 12mm 28mm 12mm;
-            /*          top  lr  BOTTOM  lr
-               BOTTOM (28mm) == .pdf-footer height (28mm)
-               Changing this requires changing .pdf-footer height below.       */
+            margin: 10mm 12mm 10mm 12mm;
         }
 
-        /* ── Footer safe zone ────────────────────────────────────────────────── */
+        /* ── Footer: normal document flow, appears right after last content ────── */
         .pdf-footer {
-            position: fixed;
-            bottom: 0;          /* anchored to physical page bottom on every page */
-            left:   0;
-            right:  0;
-            height: 28mm;       /* == @page margin-bottom above — DO NOT CHANGE INDEPENDENTLY */
-            background: #ffffff; /* white barrier: content rendered before footer cannot show through */
+            display: block;
+            width: 100%;
+            margin-top: 8mm;
             border-top: 1px solid #9ca3af;
-            padding: 4mm 12mm 0 12mm;
+            padding-top: 4mm;
             font-size: 8.5px;
             line-height: 1.4;
             color: #4b5563;
-            box-sizing: border-box;
+            page-break-inside: avoid;
         }
         .pdf-footer table { width: 100%; border-collapse: collapse; }
 

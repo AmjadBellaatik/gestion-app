@@ -16,6 +16,7 @@ use App\Filament\Resources\Sales\SaleResource;
 
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -149,6 +150,8 @@ class SaleForm
                         )
 
                             ->schema([
+
+                                Hidden::make('_sale_item_id'),
 
                                 Grid::make(4)
 
@@ -299,7 +302,7 @@ class SaleForm
                                                     return null;
                                                 }
                                                 $stock = (float) $product->current_stock
-                                                    + self::originalSaleItemQty($get('id'), $productId);
+                                                    + self::originalSaleItemQty($get('_sale_item_id'), $productId);
                                                 return __('messages.available_stock') . ': ' . number_format($stock, 2);
                                             })
                                             ->rules([
@@ -316,7 +319,7 @@ class SaleForm
                                                         return;
                                                     }
                                                     $stock = (float) $product->current_stock
-                                                        + self::originalSaleItemQty($get('id'), $productId);
+                                                        + self::originalSaleItemQty($get('_sale_item_id'), $productId);
                                                     if ((float) $value > $stock) {
                                                         $fail(__('messages.quantity_exceeds_stock', ['available' => number_format($stock, 2)]));
                                                     }
@@ -781,15 +784,13 @@ class SaleForm
      */
     private static function originalSaleItemQty(mixed $saleItemId, mixed $productId): float
     {
-        if (! $saleItemId || ! $productId) {
+        if (! $saleItemId || ! $productId || ! is_numeric($saleItemId)) {
             return 0.0;
         }
 
-        $item = SaleItem::query()
+        return (float) SaleItem::query()
             ->whereKey((int) $saleItemId)
             ->where('product_id', (int) $productId)
-            ->first();
-
-        return $item ? (float) $item->quantity : 0.0;
+            ->value('quantity') ?? 0.0;
     }
 }

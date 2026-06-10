@@ -1,24 +1,4 @@
-{{--
-    Legal-info footer — text-only variant.
-
-    Rendered by layouts/master.blade.php inside @section('footer-partial').
-    Uses .pdf-footer class defined in the master's IMMUTABLE SAFE-ZONE block.
-
-    Safe-zone contract (enforced by master.blade.php, Block 3):
-        .pdf-footer { position:fixed; bottom:0; height:22mm; background:#fff; }
-        @page { margin-bottom: 22mm; }
-    Both values are 22mm.  Content area ends at the same physical point
-    where the footer begins.  No overlap is possible.
-
-    CONTENT MEASUREMENT (9px font, 1.4 line-height, 2 rows):
-        Each row: 9px × 1.4 = 12.6px ≈ 3.3mm
-        Two rows: 6.6mm
-        Padding-top: 4mm
-        Border-top: ~0.3mm
-        Total content: ~10.9mm
-        Footer height: 22mm
-        Safety buffer: 22 - 10.9 = 11.1mm  ← generous margin for wrapped lines
---}}
+{{-- Legal-info footer — appears in normal document flow after the last content item. --}}
 <div class="pdf-footer">
     <table>
         <tr>
