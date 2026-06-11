@@ -136,8 +136,9 @@ class DocumentForm
                             ->live()
                             ->visible(fn ($get) => self::isInvoiceDocument($get)
                                 || self::isDeliveryNoteDocument($get))
-                            ->required(fn ($get) => self::isInvoiceDocument($get)
+                            ->required(fn ($get) => (self::isInvoiceDocument($get)
                                 && in_array($get('invoice_source'), ['repair', 'combined'], true))
+                                || (self::isDeliveryNoteDocument($get) && blank($get('sale_id'))))
                             ->afterStateUpdated(function ($state, callable $set, callable $get): void {
                                 if (! $state) {
                                     return;
@@ -813,9 +814,13 @@ class DocumentForm
     {
         // INVOICE intentionally excluded — sale is optional; supports A) sale-only
         // B) repair-only and C) combined modes.
+        // DELIVERY_NOTE: sale required only when no repair ticket is selected (either one suffices).
+        if (self::isDeliveryNoteDocument($get)) {
+            return blank($get('repair_ticket_id'));
+        }
+
         return self::isWarrantyContract($get)
             || self::isConformityDocument($get)
-            || self::isDeliveryNoteDocument($get)
             || self::isSaleReturnDocument($get);
     }
 
