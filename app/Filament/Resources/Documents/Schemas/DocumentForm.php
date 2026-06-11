@@ -197,6 +197,12 @@ class DocumentForm
                                     $set('client_id', $ticket->client_id);
                                     $set('items', $repairItems);
                                 }
+
+                                // Propagate the ticket-level discount so recalculateTotals
+                                // can subtract it from the items sum (prices are already TTC).
+                                if ((float) $ticket->discount_amount > 0) {
+                                    $set('discount_amount', (float) $ticket->discount_amount);
+                                }
                             }),
 
                         Select::make('client_id')

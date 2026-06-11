@@ -14,9 +14,11 @@
     $buyerName = $isResellerBuyer ? $buyer?->name : $clientName;
 
     $repairTicket = $document->repairTicket;
-    $discount     = $document->sale
-        ? max(0.0, (float) $document->sale->discount)
-        : ($repairTicket?->discount_validated ? max(0.0, (float) $repairTicket->discount_amount) : 0.0);
+    // Use the document-level discount (already factored into total_amount by recalculateTotals).
+    // For sale-linked BLs fall back to the sale discount when the document discount was not set.
+    $discount = (float) $document->discount_amount > 0
+        ? max(0.0, (float) $document->discount_amount)
+        : ($document->sale ? max(0.0, (float) $document->sale->discount) : 0.0);
     $discountNote = $document->sale?->discount_note;
 
     $totalTtc = (float) $document->total_amount;
