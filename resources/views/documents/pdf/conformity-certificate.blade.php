@@ -50,15 +50,16 @@
     $city = strtoupper(\Illuminate\Support\Str::ascii($company->city ?: 'SALE'));
 @endphp
 
-    <div class="pdf-watermark">{{ strtoupper($brand ?? '') }}</div>
+    <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
 
     <div class="doc-header" style="margin-bottom: 28px; font-style: normal;">
         <table style="width:100%; border-collapse:collapse;">
             <tr>
-                <td style="width: 75%; vertical-align: middle;">
+                <td style="width: 75%; text-align: center; vertical-align: middle;">
                     @if($company->logo)
-                    <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}">
+                    <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
                     @endif
+                    <div class="company-name">{{ $companyName }}</div>
                 </td>
                 <td style="width: 25%; text-align: right; vertical-align: middle;">
                     <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">
