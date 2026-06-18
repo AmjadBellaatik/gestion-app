@@ -52,22 +52,7 @@
 
     <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
 
-    <div class="doc-header" style="margin-bottom: 28px; font-style: normal;">
-        <table style="width:100%; border-collapse:collapse;">
-            <tr>
-                <td style="width: 75%; text-align: center; vertical-align: middle;">
-                    @if($company->logo)
-                    <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
-                    @endif
-                    <div class="company-name">{{ $companyName }}</div>
-                </td>
-                <td style="width: 25%; text-align: right; vertical-align: middle;">
-                    <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">
-                    <div class="header-qr-label">{{ __('messages.verify_document') }}</div>
-                </td>
-            </tr>
-        </table>
-    </div>
+    @include('documents.pdf.partials.doc-header')
 
     <div style="margin: 22px 0 30px; text-align: center; font-size: 24px; font-style: normal; font-weight: 700; text-decoration: underline;">
         {{ __('messages.conformity_certificate_title') }}
@@ -97,7 +82,7 @@
     @endif
     <div class="line"><span class="bullet">&#10146;</span>{{ __('messages.address') }} : <span class="c-value">{{ $isResellerSale ? '' : $client?->address }}</span></div>
 
-    <div class="pdf-protect">
+    <div class="pdf-protect signature-section">
         <div class="date-place">{{ __('messages.conformity_done_at', ['city' => $city, 'date' => $document->document_date?->format('d/m/Y')]) }}</div>
         <div class="conformity-signature">
             <div>{{ __('messages.conformity_signature_constructor') }}</div>

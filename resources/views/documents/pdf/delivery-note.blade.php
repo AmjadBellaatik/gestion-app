@@ -37,20 +37,7 @@
 
     <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
 
-    <table class="doc-header">
-        <tr>
-            <td style="width: 75%; text-align: center; vertical-align: middle;">
-                @if($company->logo)
-                <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
-                @endif
-                <div class="company-name">{{ $companyName }}</div>
-            </td>
-            <td style="width: 25%; text-align: right; vertical-align: middle;">
-                <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">
-                <div class="header-qr-label">{{ __('messages.verify_document') }}</div>
-            </td>
-        </tr>
-    </table>
+    @include('documents.pdf.partials.doc-header')
 
     <div class="doc-title">{{ __('messages.delivery_note') }}</div>
 
@@ -105,7 +92,7 @@
     </table>
 
     <div class="pdf-protect">
-        <table class="totals">
+        <table class="totals totals-section">
             <tr>
                 <td>{{ __('messages.subtotal_ht') }}</td>
                 <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
@@ -138,7 +125,7 @@
             @endif
         </table>
 
-        <table class="signatures">
+        <table class="signatures signature-section">
             <tr>
                 <td><div class="signature-line">{{ __('messages.delivered_by') }}</div></td>
                 <td><div class="signature-line">{{ __('messages.received_by') }}</div></td>

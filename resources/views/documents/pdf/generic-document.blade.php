@@ -1,13 +1,4 @@
-{{--
-    Generic fallback document — rendered as a commercial invoice.
-    Used when a document type has no specific template configured.
-
-    NOTE: This file formerly used @include('documents.pdf.commercial-invoice').
-    Since commercial-invoice now uses @extends(), including it caused Blade
-    layout-inheritance conflicts. This file now extends the master directly
-    and duplicates the minimal commercial-invoice content.  When a dedicated
-    template exists for a document type, this file is never reached.
---}}
+{{-- Generic fallback document. Used when no specific template exists for a document type. --}}
 @extends('documents.pdf.layouts.master')
 
 @section('content')
@@ -28,20 +19,7 @@
     $subtotal  = $totalTtc > 0 ? round($totalTtc - $taxAmount, 2) : (float) $document->subtotal;
 @endphp
 
-    <table class="doc-header">
-        <tr>
-            <td style="width: 75%; text-align: center; vertical-align: middle;">
-                @if($company->logo)
-                <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
-                @endif
-                <div class="company-name">{{ $companyName }}</div>
-            </td>
-            <td style="width: 25%; text-align: right; vertical-align: middle;">
-                <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">
-                <div class="header-qr-label">{{ __('messages.verify_document') }}</div>
-            </td>
-        </tr>
-    </table>
+    @include('documents.pdf.partials.doc-header')
 
     <div class="doc-title">{{ $document->documentType?->name }}</div>
     <div class="doc-ref">
@@ -79,7 +57,7 @@
     </table>
 
     <div class="pdf-protect">
-        <table class="totals">
+        <table class="totals totals-section">
             <tr>
                 <td>{{ __('messages.subtotal_ht') }}</td>
                 <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
@@ -93,7 +71,7 @@
                 <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
             </tr>
         </table>
-        <table class="signatures">
+        <table class="signatures signature-section">
             <tr>
                 <td style="width: 50%;"></td>
                 <td style="width: 50%;"><div class="signature-line">{{ __('messages.company_signature') }}</div></td>

@@ -21,45 +21,18 @@
     $repairUnit   = $motorcycleUnit ?? $document->primaryMotorcycleUnit();
     $repairModel  = $repairUnit?->motorcycleModel;
 
-    // Totals come from the document, which DocumentService sets directly
-    // from RepairTicket->total_cost (HT net of all discounts) + 20% TVA.
-    // Fall back to the repair ticket itself for documents generated before this fix.
-    $subtotal  = (float) $document->subtotal;
-    $taxAmount = (float) $document->tax_amount;
-    $totalTtc  = (float) $document->total_amount;
-
-    if ($totalTtc <= 0 && $repairTicket) {
-        $subtotal  = max(0.0, (float) $repairTicket->total_cost);
-        $taxAmount = round($subtotal * 0.20, 2);
-        $totalTtc  = round($subtotal + $taxAmount, 2);
-    }
-
-    // Global discount shown in the totals section (only if validated)
-    $discountHt = 0.0;
-    if ($repairTicket && $repairTicket->discount_validated) {
-        $discountHt = max(0.0, (float) $repairTicket->discount_amount);
-    } elseif ((float) $document->discount_amount > 0) {
-        $discountHt = (float) $document->discount_amount;
-    }
-
+    // DocumentService synchronizes all totals from the repair ticket into the document.
+    // Use stored values directly — no view-layer recalculation.
+    $subtotal     = (float) $document->subtotal;
+    $taxAmount    = (float) $document->tax_amount;
+    $totalTtc     = (float) $document->total_amount;
+    $discount     = (float) $document->discount_amount;
+    $discountNote = $repairTicket?->discount_note ?? null;
 @endphp
 
     <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
 
-    <table class="doc-header">
-        <tr>
-            <td style="width: 75%; text-align: center; vertical-align: middle;">
-                @if($company->logo)
-                <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
-                @endif
-                <div class="company-name">{{ $companyName }}</div>
-            </td>
-            <td style="width: 25%; text-align: right; vertical-align: middle;">
-                <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">
-                <div class="header-qr-label">{{ __('messages.verify_document') }}</div>
-            </td>
-        </tr>
-    </table>
+    @include('documents.pdf.partials.doc-header')
 
     <div class="doc-title">{{ __('messages.repair_invoice') }}</div>
     <div class="doc-ref">
@@ -111,7 +84,7 @@
             <tr>
                 <th>{{ __('messages.description') }}</th>
                 <th class="num">{{ __('messages.quantity') }}</th>
-                <th class="num">{{ __('messages.price_ht') }}</th>
+                <th class="num">{{ __('messages.unit_price_ttc') }}</th>
                 <th class="num">{{ __('messages.tax_rate') }}</th>
                 <th class="num">{{ __('messages.total_amount') }}</th>
             </tr>
@@ -131,50 +104,50 @@
     @endif
 
     <div class="pdf-protect">
-        <table class="totals">
-            @if($discountHt > 0)
-            {{-- subtotal is already net of the global discount; show gross first --}}
-            <tr>
-                <td>{{ __('messages.subtotal_ht') }} {{ __('messages.gross_total_label') ?: 'brut' }}</td>
-                <td class="num">{{ number_format(round($subtotal + $discountHt, 2), 2, ',', ' ') }} MAD</td>
-            </tr>
-            <tr>
-                <td style="color:#b45309; font-weight:600;">{{ __('messages.discount_amount') }}</td>
-                <td class="num" style="color:#b45309; font-weight:600;">- {{ number_format($discountHt, 2, ',', ' ') }} MAD</td>
-            </tr>
-            <tr>
-                <td>{{ __('messages.subtotal_ht') }} {{ __('messages.net_label') ?: 'net' }}</td>
-                <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
-            </tr>
-            @else
+        <table class="totals totals-section">
             <tr>
                 <td>{{ __('messages.subtotal_ht') }}</td>
                 <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
             </tr>
-            @endif
             <tr>
                 <td>{{ __('messages.tva_20') }}</td>
                 <td class="num">{{ number_format($taxAmount, 2, ',', ' ') }} MAD</td>
             </tr>
+            @if($discount > 0)
+            <tr>
+                <td style="color:#b45309; font-weight:600;">
+                    {{ __('messages.discount_amount') }}
+                    @if($discountNote)
+                        <br><span style="font-weight:400; font-size:10px;">{{ $discountNote }}</span>
+                    @endif
+                </td>
+                <td class="num" style="color:#b45309; font-weight:600;">- {{ number_format($discount, 2, ',', ' ') }} MAD</td>
+            </tr>
+            <tr class="grand">
+                <td>{{ __('messages.net_total_after_discount') }}</td>
+                <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @else
             <tr class="grand">
                 <td>{{ __('messages.total_ttc') }}</td>
                 <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
             </tr>
+            @endif
         </table>
 
-        <div class="total-words">
+        <div class="total-words comments-section">
             Arrêté la présente Facture de Réparation à la somme TTC de :
             <strong>{{ \App\Services\Amounts\AmountInWordsService::convert($totalTtc, 'fr') }}</strong>
         </div>
 
         @if($document->notes)
-        <div style="margin-top: 12px; padding: 8px 10px; border: 1px solid #d1d5db; font-size: 11px;">
+        <div class="comments-section" style="margin-top: 12px; padding: 8px 10px; border: 1px solid #d1d5db; font-size: 11px;">
             <div style="font-weight:700; text-transform:uppercase; margin-bottom:4px; font-size:10px;">{{ __('messages.notes') }}</div>
             {{ $document->notes }}
         </div>
         @endif
 
-        <table class="signatures">
+        <table class="signatures signature-section">
             <tr>
                 <td><div class="signature-line">{{ __('messages.client_signature') }}</div></td>
                 <td><div class="signature-line">{{ __('messages.company_signature') }}</div></td>

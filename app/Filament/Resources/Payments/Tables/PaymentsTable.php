@@ -46,6 +46,11 @@ class PaymentsTable
                     ->searchable()
                     ->placeholder('-'),
 
+                TextColumn::make('repairTicket.ticket_number')
+                    ->label(__('messages.repair_ticket'))
+                    ->searchable()
+                    ->placeholder('-'),
+
                 TextColumn::make('amount')
                     ->label(__('messages.amount'))
                     ->money('MAD')

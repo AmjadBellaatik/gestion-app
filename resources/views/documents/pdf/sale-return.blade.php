@@ -36,20 +36,7 @@
 
     <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
 
-    <table class="doc-header">
-        <tr>
-            <td style="width: 75%; text-align: center; vertical-align: middle;">
-                @if($company->logo)
-                <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
-                @endif
-                <div class="company-name">{{ $companyName }}</div>
-            </td>
-            <td style="width: 25%; text-align: right; vertical-align: middle;">
-                <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">
-                <div class="header-qr-label">{{ __('messages.verify_document') }}</div>
-            </td>
-        </tr>
-    </table>
+    @include('documents.pdf.partials.doc-header')
 
     <div class="doc-title">{{ __('messages.sale_return') }}</div>
     <div style="margin-bottom: 4px; font-size: 11px;"><span style="font-weight:700;">{{ __('messages.document_number') }} :</span> {{ $document->document_number }}</div>
@@ -113,47 +100,48 @@
         </tbody>
     </table>
 
-    <table class="totals">
-        <tr>
-            <td>{{ __('messages.subtotal_ht') }}</td>
-            <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
-        </tr>
-        <tr>
-            <td>{{ __('messages.tva_20') }}</td>
-            <td class="num">{{ number_format($taxAmount, 2, ',', ' ') }} MAD</td>
-        </tr>
-        @if($discount > 0)
-        <tr>
-            <td>{{ __('messages.gross_total') }}</td>
-            <td class="num">{{ number_format($grossTtc, 2, ',', ' ') }} MAD</td>
-        </tr>
-        <tr>
-            <td style="color:#b45309; font-weight:600;">
-                {{ __('messages.discount_amount') }}
-                @if($discountNote) <br><span style="font-weight:400; font-size:10px;">{{ $discountNote }}</span>@endif
-            </td>
-            <td class="num" style="color:#b45309; font-weight:600;">- {{ number_format($discount, 2, ',', ' ') }} MAD</td>
-        </tr>
-        <tr class="grand">
-            <td>{{ __('messages.net_total_after_discount') }}</td>
-            <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
-        </tr>
-        @else
-        <tr class="grand">
-            <td>{{ __('messages.total_ttc') }}</td>
-            <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
-        </tr>
-        @endif
-    </table>
+    <div class="totals-section">
+        <table class="totals">
+            <tr>
+                <td>{{ __('messages.subtotal_ht') }}</td>
+                <td class="num">{{ number_format($subtotal, 2, ',', ' ') }} MAD</td>
+            </tr>
+            <tr>
+                <td>{{ __('messages.tva_20') }}</td>
+                <td class="num">{{ number_format($taxAmount, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @if($discount > 0)
+            <tr>
+                <td>{{ __('messages.gross_total') }}</td>
+                <td class="num">{{ number_format($grossTtc, 2, ',', ' ') }} MAD</td>
+            </tr>
+            <tr>
+                <td style="color:#b45309; font-weight:600;">
+                    {{ __('messages.discount_amount') }}
+                    @if($discountNote) <br><span style="font-weight:400; font-size:10px;">{{ $discountNote }}</span>@endif
+                </td>
+                <td class="num" style="color:#b45309; font-weight:600;">- {{ number_format($discount, 2, ',', ' ') }} MAD</td>
+            </tr>
+            <tr class="grand">
+                <td>{{ __('messages.net_total_after_discount') }}</td>
+                <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @else
+            <tr class="grand">
+                <td>{{ __('messages.total_ttc') }}</td>
+                <td class="num">{{ number_format($totalTtc, 2, ',', ' ') }} MAD</td>
+            </tr>
+            @endif
+        </table>
+    </div>
 
-    {{-- Reason box: can contain long text — left outside pdf-protect to allow natural breaks --}}
-    <div class="reason-box">
+    {{-- Reason box: can contain long text — natural page flow allowed --}}
+    <div class="reason-box comments-section">
         <div class="reason-title">{{ __('messages.return_reason') }}</div>
         {{ $document->notes ?: __('messages.return_document') }}
     </div>
 
-    {{-- Signature block: protected — never split with footer --}}
-    <div class="pdf-protect">
+    <div class="signature-section">
         <table class="signatures">
             <tr>
                 <td><div class="signature-line">{{ __('messages.client_signature') }}</div></td>

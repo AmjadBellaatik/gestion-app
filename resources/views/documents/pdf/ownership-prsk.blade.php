@@ -1,4 +1,8 @@
-@extends('documents.pdf.layouts.master-qr')
+@extends('documents.pdf.layouts.master')
+
+@section('footer-partial')
+    @include('documents.pdf.partials._footer-qr')
+@endsection
 
 @push('styles')
 <style>

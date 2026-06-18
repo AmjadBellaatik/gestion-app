@@ -18,16 +18,10 @@
 
     .date-place { margin-top: 12px; text-align: right; font-weight: 700; }
 
-    /* Signature block pinned just above the footer on every page.
-       Footer = 22mm, add 3mm gap → bottom: 25mm.
-       padding matches @page left/right margin (12mm). */
+    /* Signature block: stays on the same page as the date line.
+       If there is not enough room, DOMPDF pushes the whole block to the next page. */
     .warranty-sign-block {
-        position: fixed;
-        bottom: 25mm;
-        left:   0;
-        right:  0;
-        padding: 0 12mm;
-        background: #fff;
+        page-break-inside: avoid;
     }
     .warranty-sign-block .signatures {
         margin-top: 6px;
@@ -72,20 +66,7 @@
 
     <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
 
-    <table class="doc-header">
-        <tr>
-            <td style="width: 75%; text-align: center; vertical-align: middle;">
-                @if($company->logo)
-                <img class="company-logo" src="{{ public_path('storage/' . $company->logo) }}" alt="{{ $companyName }}"><br>
-                @endif
-                <div class="company-name">{{ $companyName }}</div>
-            </td>
-            <td style="width: 25%; text-align: right; vertical-align: middle;">
-                <img class="header-qr" src="data:image/svg+xml;base64,{{ $qrSvg }}" alt="QR">
-                <div class="header-qr-label">{{ __('messages.verify_document') }}</div>
-            </td>
-        </tr>
-    </table>
+    @include('documents.pdf.partials.doc-header')
 
     <div class="doc-title">Contrat de garantie</div>
 
@@ -172,7 +153,7 @@
         @endif
     </div>
 
-    <div class="warranty-sign-block">
+    <div class="warranty-sign-block signature-section">
         <div class="date-place">{{ $city }} le : {{ $document->document_date?->format('d/m/Y') }}</div>
         <table class="signatures">
             <tr>
