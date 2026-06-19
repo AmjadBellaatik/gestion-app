@@ -64,6 +64,8 @@ class Sale extends Model
         'returned_at',
         'notes',
         'purchase_order_number',
+        'chassis_number',
+        'color',
 
     ];
 

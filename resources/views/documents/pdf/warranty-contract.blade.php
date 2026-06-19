@@ -62,6 +62,10 @@
     $city  = \Illuminate\Support\Str::title(\Illuminate\Support\Str::lower($company->city ?: 'Sale'));
     $brand = $model?->brand?->name ?: $model?->marque;
     $isElectricOrScooter = !$unit && $product && in_array($product->type, ['trotinette', 'velo_electrique']);
+
+    // Chassis number + color — only present for electric scooters / bicycles.
+    $chassisNumber = $document->sale?->chassis_number;
+    $vehicleColor  = $document->sale?->color;
 @endphp
 
     <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
@@ -102,6 +106,13 @@
             </tr>
         @endif
     </table>
+
+    @if($chassisNumber || $vehicleColor)
+    <div style="margin-top: 10px; font-size: 13px;">
+        @if($chassisNumber)<div><strong>{{ __('messages.chassis_number') }} :</strong> {{ $chassisNumber }}</div>@endif
+        @if($vehicleColor)<div><strong>{{ __('messages.color') }} :</strong> {{ $vehicleColor }}</div>@endif
+    </div>
+    @endif
 
     <div class="party">
         <div class="party-title">D'une part</div>

@@ -250,6 +250,10 @@ class SaleService
 
                 'notes' => $data['notes'] ?? null,
 
+                // Chassis number + color — only set for electric scooters / bicycles.
+                'chassis_number' => $data['chassis_number'] ?? null,
+                'color'          => $data['color'] ?? null,
+
             ]);
 
             /*

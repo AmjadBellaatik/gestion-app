@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Services\Stock\StockService;
+use App\Services\Workshop\RepairStockService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -35,68 +35,101 @@ class RepairItem extends Model
             );
         });
 
-        // Deduct stock when a part/consumable is added to a repair ticket
+        /*
+        |----------------------------------------------------------------------
+        | ADD — consume stock (OUT) + recalc ticket totals.
+        | All stock changes flow through RepairStockService so they always
+        | produce a StockMovement with a resolved warehouse (the previous code
+        | passed a null warehouse, so every movement threw and was swallowed).
+        |----------------------------------------------------------------------
+        */
         static::created(function (RepairItem $item) {
-            if (! $item->product_id) {
-                return;
-            }
-            if (! in_array($item->item_type, ['part', 'accessory', 'consumable'], true)) {
+            if (RepairTicket::$reversingStock) {
                 return;
             }
 
             $ticket = $item->repairTicket;
+            if (! $ticket) {
+                return;
+            }
 
             try {
-                StockService::movement([
-                    'company_id'         => $ticket?->company_id ?? session('company_id'),
-                    'warehouse_id'       => $ticket?->warehouse_id ?? null,
-                    'product_id'         => $item->product_id,
-                    'motorcycle_unit_id' => $ticket?->motorcycle_unit_id ?? null,
-                    'type'               => 'exit',
-                    'movement_type'      => 'repair',
-                    'quantity'           => (float) $item->quantity,
-                    'unit_cost'          => (float) $item->unit_price,
-                    'reference'          => $ticket?->ticket_number ?? ('RT-' . $item->repair_ticket_id),
-                    'reference_type'     => RepairTicket::class,
-                    'reference_id'       => $item->repair_ticket_id,
-                    'notes'              => 'Repair ticket ' . ($ticket?->ticket_number ?? $item->repair_ticket_id),
-                    'user_id'            => auth()->user()?->getAuthIdentifier(),
-                ]);
+                RepairStockService::consume($ticket, $item);
             } catch (\Throwable) {
-                // Stock failures must not block item creation
+                // Stock failures must never block item creation
             }
+
+            self::syncTicket($ticket);
         });
 
-        // Restore stock when a part/consumable is removed from a repair ticket
-        static::deleted(function (RepairItem $item) {
-            if (! $item->product_id) {
-                return;
-            }
-            if (! in_array($item->item_type, ['part', 'accessory', 'consumable'], true)) {
+        /*
+        |----------------------------------------------------------------------
+        | EDIT — only the quantity delta leaves/returns stock (never double).
+        | Old 2 → New 5 ⇒ 3 OUT.  Old 5 → New 2 ⇒ 3 IN.
+        |----------------------------------------------------------------------
+        */
+        static::updated(function (RepairItem $item) {
+            if (RepairTicket::$reversingStock) {
                 return;
             }
 
             $ticket = $item->repairTicket;
+            if (! $ticket) {
+                return;
+            }
+
+            if ($item->wasChanged('quantity')) {
+                $oldQty = (float) $item->getOriginal('quantity');
+                $newQty = (float) $item->quantity;
+
+                try {
+                    RepairStockService::applyDelta($ticket, $item, $oldQty, $newQty);
+                } catch (\Throwable) {
+                    //
+                }
+            }
+
+            self::syncTicket($ticket);
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | REMOVE — restore stock (IN) + recalc ticket totals.
+        |----------------------------------------------------------------------
+        */
+        static::deleted(function (RepairItem $item) {
+            if (RepairTicket::$reversingStock) {
+                // Ticket-level delete/cancel handles restoration in bulk.
+                return;
+            }
+
+            $ticket = $item->repairTicket;
+            if (! $ticket) {
+                return;
+            }
 
             try {
-                StockService::movement([
-                    'company_id'         => $ticket?->company_id ?? session('company_id'),
-                    'warehouse_id'       => $ticket?->warehouse_id ?? null,
-                    'product_id'         => $item->product_id,
-                    'motorcycle_unit_id' => $ticket?->motorcycle_unit_id ?? null,
-                    'type'               => 'entry',
-                    'movement_type'      => 'repair_return',
-                    'quantity'           => (float) $item->quantity,
-                    'reference'          => $ticket?->ticket_number ?? ('RT-' . $item->repair_ticket_id),
-                    'reference_type'     => RepairTicket::class,
-                    'reference_id'       => $item->repair_ticket_id,
-                    'notes'              => 'Stock restored: item removed from repair ' . ($ticket?->ticket_number ?? ''),
-                    'user_id'            => auth()->user()?->getAuthIdentifier(),
-                ]);
+                RepairStockService::restoreItem($ticket, $item);
             } catch (\Throwable) {
                 //
             }
+
+            self::syncTicket($ticket);
         });
+    }
+
+    /**
+     * Keep the ticket's parts_cost / total_cost in step with its items, and
+     * resync accounting when the ticket has already been finalised.
+     */
+    protected static function syncTicket(RepairTicket $ticket): void
+    {
+        try {
+            $ticket->recalculateCosts();
+            \App\Services\Workshop\RepairService::syncAccountingIfFinalized($ticket);
+        } catch (\Throwable) {
+            //
+        }
     }
 
     public function repairTicket(): BelongsTo

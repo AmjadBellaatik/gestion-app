@@ -10,11 +10,21 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Scopes\CompanyScope;
 use App\Notifications\RepairStatusNotification;
 use App\Services\Payments\PaymentService;
+use App\Services\Workshop\RepairService;
+use App\Services\Workshop\RepairStockService;
 use Illuminate\Support\Facades\DB;
 
 class RepairTicket extends Model
 {
     use SoftDeletes;
+
+    /**
+     * Guard flag: while a ticket-level stock reversal is running (delete /
+     * cancel / restore), the per-item RepairItem observers must NOT fire their
+     * own stock movements — otherwise a cascade would double-restore. Ticket
+     * operations restore in bulk using the net-consumed quantity.
+     */
+    public static bool $reversingStock = false;
 
     public const REPAIR_TYPES = [
         'warranty',
@@ -209,44 +219,70 @@ class RepairTicket extends Model
                 }
             });
         });
-    }
 
-    private static function restoreItemsStock(RepairTicket $model): void
-    {
-        // Only restore if items exist — avoids import of StockService creating a circular dep
-        $ticketId = $model->getKey();
+        /*
+        |----------------------------------------------------------------------
+        | DELETE — return all consumed stock + reverse financials.
+        | Stock is restored in bulk (net-based) and the per-item observers are
+        | suppressed via the guard so a force-delete cascade cannot double it.
+        | Financial reversal mirrors the sale flow: soft-deleting each repair
+        | Payment triggers PaymentService::reversePayment (ledger + treasury +
+        | balance), and the repair JournalEntry is removed.
+        |----------------------------------------------------------------------
+        */
+        static::deleted(function (RepairTicket $model) {
+            self::$reversingStock = true;
 
-        if ($model->relationLoaded('items')) {
-            $items = $model->items;
-        } else {
-            $items = RepairItem::where('repair_ticket_id', $ticketId)->get();
-        }
-
-        foreach ($items as $item) {
-            if (! $item->product_id) {
-                continue;
-            }
-            if (! in_array($item->item_type, ['part', 'accessory', 'consumable'], true)) {
-                continue;
-            }
             try {
-                \App\Services\Stock\StockService::movement([
-                    'company_id'         => $model->company_id,
-                    'warehouse_id'       => $model->warehouse_id ?? null,
-                    'product_id'         => $item->product_id,
-                    'motorcycle_unit_id' => $model->motorcycle_unit_id ?? null,
-                    'type'               => 'entry',
-                    'movement_type'      => 'repair_cancel',
-                    'quantity'           => (float) $item->quantity,
-                    'reference'          => $model->ticket_number,
-                    'reference_type'     => self::class,
-                    'reference_id'       => $ticketId,
-                    'notes'              => 'Stock restored: repair ' . $model->ticket_number . ' cancelled',
-                    'user_id'            => auth()->user()?->getAuthIdentifier(),
-                ]);
+                RepairStockService::restoreTicket(
+                    $model,
+                    'Stock restored: repair ' . ($model->ticket_number ?? $model->getKey()) . ' deleted'
+                );
+
+                RepairService::reverseTicketFinancials($model);
             } catch (\Throwable) {
                 //
+            } finally {
+                self::$reversingStock = false;
             }
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | RESTORE — re-deduct the previously consumed quantities (net-based).
+        |----------------------------------------------------------------------
+        */
+        static::restored(function (RepairTicket $model) {
+            self::$reversingStock = true;
+
+            try {
+                RepairStockService::reconsumeTicket($model);
+            } catch (\Throwable) {
+                //
+            } finally {
+                self::$reversingStock = false;
+            }
+        });
+    }
+
+    /**
+     * Restore all stock still consumed by the ticket (net-based, idempotent).
+     * Routed through RepairStockService so every movement resolves a valid
+     * warehouse — the old inline call passed a null warehouse_id and threw.
+     */
+    private static function restoreItemsStock(RepairTicket $model): void
+    {
+        self::$reversingStock = true;
+
+        try {
+            RepairStockService::restoreTicket(
+                $model,
+                'Stock restored: repair ' . ($model->ticket_number ?? $model->getKey()) . ' cancelled'
+            );
+        } catch (\Throwable) {
+            //
+        } finally {
+            self::$reversingStock = false;
         }
     }
 

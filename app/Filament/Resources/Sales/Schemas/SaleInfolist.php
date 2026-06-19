@@ -81,6 +81,14 @@ class SaleInfolist
                                 default   => $state,
                             }),
 
+                        TextEntry::make('chassis_number')
+                            ->label(__('messages.chassis_number'))
+                            ->hidden(fn (Sale $record) => blank($record->chassis_number)),
+
+                        TextEntry::make('color')
+                            ->label(__('messages.color'))
+                            ->hidden(fn (Sale $record) => blank($record->color)),
+
                         TextEntry::make('notes')
                             ->label(__('messages.notes'))
                             ->columnSpanFull()

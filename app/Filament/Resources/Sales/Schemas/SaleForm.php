@@ -410,6 +410,32 @@ class SaleForm
                     ])
                     ->columnSpanFull(),
 
+                /*
+                |--------------------------------------------------------------------------
+                | CHASSIS NUMBER + COLOR (electric scooters / bicycles only)
+                |--------------------------------------------------------------------------
+                | Shown reactively when at least one sold item is a trotinette,
+                | velo_electrique or velo_normal. Stored on the sale itself.
+                */
+
+                Section::make(__('messages.vehicle_information'))
+                    ->icon('heroicon-o-identification')
+                    ->visible(fn ($get): bool => self::hasScooterOrBicycleItem($get))
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextInput::make('chassis_number')
+                                ->label(__('messages.chassis_number'))
+                                ->maxLength(100)
+                                ->dehydrated(),
+
+                            TextInput::make('color')
+                                ->label(__('messages.color'))
+                                ->maxLength(100)
+                                ->dehydrated(),
+                        ]),
+                    ])
+                    ->columnSpanFull(),
+
                 Section::make('Live total')
                     ->icon('heroicon-o-calculator')
                     ->schema([
@@ -743,6 +769,20 @@ class SaleForm
     {
         return collect($get('saleItems') ?? [])
             ->some(fn (array $item): bool => ($item['item_type'] ?? null) === 'motorcycle');
+    }
+
+    /**
+     * True when at least one sold item is an electric scooter or a bicycle —
+     * the only cases where chassis_number / color apply.
+     */
+    private static function hasScooterOrBicycleItem(callable $get): bool
+    {
+        return collect($get('saleItems') ?? [])
+            ->some(fn (array $item): bool => in_array(
+                $item['item_type'] ?? null,
+                self::warrantyProductTypes(),
+                true
+            ));
     }
 
     private static function warrantyProductTypes(): array

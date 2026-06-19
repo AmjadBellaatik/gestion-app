@@ -2,10 +2,15 @@
 
 namespace App\Services\Workshop;
 
+use App\Models\BankTransferPayment;
+use App\Models\ChequePayment;
+use App\Models\JournalEntry;
+use App\Models\JournalEntryLine;
 use App\Models\Payment;
 use App\Models\RepairTicket;
 use App\Services\Accounting\AccountingService;
 use App\Services\Payments\PaymentService;
+use Illuminate\Support\Facades\DB;
 
 class RepairService
 {
@@ -30,7 +35,7 @@ class RepairService
     |--------------------------------------------------------------------------
     | Complete a repair — finalize costs and create the accounting entry.
     | Stock is NOT consumed here; parts are deducted via RepairItem::created
-    | observer when each item is added to the ticket.
+    | observer (RepairStockService) when each item is added to the ticket.
     |--------------------------------------------------------------------------
     */
 
@@ -41,19 +46,7 @@ class RepairService
         // Refresh after calculateTotals saved
         $ticket->refresh();
 
-        try {
-            AccountingService::createEntry([
-                'company_id'  => $ticket->company_id,
-                'reference'   => $ticket->ticket_number,
-                'description' => 'Repair Ticket ' . $ticket->ticket_number,
-                'lines'       => [
-                    ['account_code' => '411100', 'debit'  => (float) $ticket->total_cost, 'credit' => 0],
-                    ['account_code' => '706100', 'debit'  => 0, 'credit' => (float) $ticket->total_cost],
-                ],
-            ]);
-        } catch (\Throwable) {
-            // Accounting failures must never block repair completion
-        }
+        self::writeJournalEntry($ticket);
 
         $ticket->update([
             'status'       => 'completed',
@@ -77,5 +70,99 @@ class RepairService
                 // Payment failures must not block repair completion
             }
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accounting — double-entry journal for the repair revenue.
+    | Idempotent per ticket reference: any existing entry is removed and
+    | rewritten with the current total so it always reflects live item changes.
+    |--------------------------------------------------------------------------
+    */
+
+    public static function writeJournalEntry(RepairTicket $ticket): void
+    {
+        try {
+            self::deleteJournalEntries($ticket);
+
+            $total = (float) $ticket->total_cost;
+            if ($total <= 0) {
+                return;
+            }
+
+            AccountingService::createEntry([
+                'company_id'  => $ticket->company_id,
+                'reference'   => $ticket->ticket_number,
+                'description' => 'Repair Ticket ' . $ticket->ticket_number,
+                'lines'       => [
+                    ['account_code' => '411100', 'debit' => $total, 'credit' => 0],
+                    ['account_code' => '706100', 'debit' => 0, 'credit' => $total],
+                ],
+            ]);
+        } catch (\Throwable) {
+            // Accounting failures must never block the repair workflow
+        }
+    }
+
+    /**
+     * Re-sync the journal entry after item/total changes, but only once the
+     * ticket has reached a finalised state (i.e. accounting already exists).
+     * Before completion there is nothing to keep in sync.
+     */
+    public static function syncAccountingIfFinalized(RepairTicket $ticket): void
+    {
+        if (! in_array($ticket->status, ['completed', 'delivered', 'closed'], true)) {
+            return;
+        }
+
+        $ticket->refresh();
+        self::writeJournalEntry($ticket);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reverse ALL financial records tied to a repair (used on ticket delete).
+    | Soft-deleting each Payment fires PaymentService::reversePayment, which
+    | reverses the ledger Transaction, TreasuryTransaction and the repair
+    | balance — exactly how sale deletion is handled. The repair's own journal
+    | entry is then removed.
+    |--------------------------------------------------------------------------
+    */
+
+    public static function reverseTicketFinancials(RepairTicket $ticket): void
+    {
+        DB::transaction(function () use ($ticket) {
+            $payments = Payment::withTrashed()
+                ->withoutGlobalScopes()
+                ->where('repair_ticket_id', $ticket->id)
+                ->get();
+
+            foreach ($payments as $payment) {
+                ChequePayment::query()->where('payment_id', $payment->id)->delete();
+                BankTransferPayment::query()->where('payment_id', $payment->id)->delete();
+
+                if (! $payment->trashed()) {
+                    // Fires Payment::deleting → reversePayment (ledger + treasury + balance)
+                    $payment->delete();
+                }
+            }
+
+            self::deleteJournalEntries($ticket);
+        });
+    }
+
+    private static function deleteJournalEntries(RepairTicket $ticket): void
+    {
+        $entryIds = JournalEntry::withoutGlobalScopes()
+            ->where('company_id', $ticket->company_id)
+            ->where('reference', $ticket->ticket_number)
+            ->pluck('id');
+
+        if ($entryIds->isEmpty()) {
+            return;
+        }
+
+        JournalEntryLine::whereIn('journal_entry_id', $entryIds)->delete();
+        JournalEntry::withoutGlobalScopes()->whereIn('id', $entryIds)->delete();
     }
 }
