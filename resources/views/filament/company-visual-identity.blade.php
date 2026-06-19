@@ -147,8 +147,11 @@
             gap: 0.125rem;
         }
 
-        /* Hide company name, show only logo */
-        .company-switcher__name,
+        /* Compact topbar trigger: show only the logo (hide the name + chevron)
+           to save space. The name is scoped to the trigger (.fi-topbar-item)
+           so it STAYS visible inside the switcher dropdown list — otherwise the
+           companies appear as unlabeled logos and can't be told apart. */
+        .company-switcher .fi-topbar-item .company-switcher__name,
         .company-switcher .text-xs { display: none !important; }
         .company-switcher .fi-topbar-item { padding: 0.375rem 0.5rem; }
 
@@ -213,11 +216,17 @@
         .fi-sidebar { max-width: 17rem; }
     }
 
-    /* ── Hide all default topbar sidebar toggle buttons ─────────────────── */
-    .fi-topbar-collapse-sidebar-btn-ctn,
-    .fi-topbar-open-sidebar-btn,
-    .fi-topbar-close-sidebar-btn {
-        display: none !important;
+    /* ── Hide default topbar sidebar toggle buttons on DESKTOP only ──────────
+       On desktop (≥1024px) the floating #sidebar-toggle-tab replaces them.
+       On mobile/tablet (≤1023px) the floating tab is hidden, so Filament's
+       native hamburger (.fi-topbar-open-sidebar-btn) must stay visible to open
+       the sidebar — otherwise the navigation becomes unreachable on mobile. */
+    @media (min-width: 1024px) {
+        .fi-topbar-collapse-sidebar-btn-ctn,
+        .fi-topbar-open-sidebar-btn,
+        .fi-topbar-close-sidebar-btn {
+            display: none !important;
+        }
     }
 
     /* ── Floating sidebar toggle tab ────────────────────────────────────── */
