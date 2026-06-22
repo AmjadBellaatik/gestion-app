@@ -100,6 +100,43 @@ class WarrantyService
 
     /*
     |--------------------------------------------------------------------------
+    | Resolve the active warranty for a sale (optionally a specific unit).
+    | Single source of truth consumed by the repair creation flow to auto-import
+    | warranty status — users never set it manually. Returns null when the sale
+    | has no warranty record at all.
+    |--------------------------------------------------------------------------
+    */
+
+    public static function findForSaleUnit(?int $saleId, ?int $unitId = null): ?Warranty
+    {
+        if (! $saleId) {
+            return null;
+        }
+
+        return Warranty::query()
+            ->where('sale_id', $saleId)
+            ->when($unitId, fn ($q) => $q->where('motorcycle_unit_id', $unitId))
+            ->orderByDesc('end_date')
+            ->first();
+    }
+
+    /**
+     * Machine-readable warranty status for a sale/unit: 'active' | 'expired' | 'none'.
+     * 'active'/'expired' come straight from Warranty::getStatusAttribute (end_date based).
+     */
+    public static function statusForSaleUnit(?int $saleId, ?int $unitId = null): string
+    {
+        $warranty = self::findForSaleUnit($saleId, $unitId);
+
+        if (! $warranty) {
+            return 'none';
+        }
+
+        return $warranty->status === 'expired' ? 'expired' : 'active';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Helpers
     |--------------------------------------------------------------------------
     */

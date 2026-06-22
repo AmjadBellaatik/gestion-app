@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\RepairTickets\Pages;
 
 use App\Filament\Resources\RepairTickets\RepairTicketResource;
+use App\Filament\Resources\RepairTickets\Schemas\RepairTicketForm;
 use App\Models\DocumentType;
 use App\Models\RepairTicket;
 use App\Models\User;
@@ -44,6 +45,9 @@ class EditRepairTicket extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        // Enforce source-driven rules authoritatively (type, warranty, mileage, labour)
+        $data = RepairTicketForm::normalizeBySource($data);
+
         unset($data['_repair_source']);
         return $data;
     }
@@ -168,6 +172,7 @@ class EditRepairTicket extends EditRecord
                 ->icon('heroicon-o-document-currency-dollar')
                 ->color('success')
                 ->visible(fn (RepairTicket $record) => in_array($record->status, ['completed', 'delivered', 'closed'])
+                    && $record->repair_type !== 'internal'
                     && ! $record->invoice_document_id)
                 ->action(function (RepairTicket $record): void {
                     $record->loadMissing(['items.product']);

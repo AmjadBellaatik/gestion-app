@@ -7,15 +7,14 @@ use App\Models\MotorcycleUnit;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Technician;
-use App\Models\User;
+use App\Services\Warranty\WarrantyService;
 
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -51,8 +50,15 @@ class RepairTicketForm
                             $set('is_foreign_vehicle', $state === 'foreign');
 
                             if ($state === 'sale') {
+                                // Sale-linked: user may choose Paid or Warranty.
+                                // Default to Paid; warranty status is imported when
+                                // a sale is selected (see sale_id afterStateUpdated).
                                 $set('motorcycle_unit_id', null);
+                                $set('repair_type', 'paid');
+                                $set('is_warranty', false);
+                                $set('warranty_status', 'none');
                             } elseif ($state === 'stock') {
+                                // In-stock vehicle → always INTERNAL, labour 0, no mileage.
                                 $set('sale_id', null);
                                 $set('client_id', null);
                                 $set('foreign_brand', null);
@@ -61,7 +67,12 @@ class RepairTicketForm
                                 $set('foreign_year', null);
                                 $set('foreign_color', null);
                                 $set('mileage', null);
+                                $set('repair_type', 'internal');
+                                $set('labor_cost', 0);
+                                $set('is_warranty', false);
+                                $set('warranty_status', 'none');
                             } else {
+                                // Foreign / external vehicle → always PAID, no warranty.
                                 $set('sale_id', null);
                                 $set('motorcycle_unit_id', null);
                                 $set('foreign_brand', null);
@@ -71,6 +82,9 @@ class RepairTicketForm
                                 $set('foreign_color', null);
                                 $set('mileage', null);
                                 $set('client_id', null);
+                                $set('repair_type', 'paid');
+                                $set('is_warranty', false);
+                                $set('warranty_status', 'none');
                             }
                         }),
                 ]),
@@ -162,6 +176,9 @@ class RepairTicketForm
                                 $set('foreign_year', null);
                                 $set('foreign_color', null);
                                 $set('mileage', null);
+                                $set('warranty_status', 'none');
+                                $set('is_warranty', false);
+                                $set('repair_type', 'paid');
                                 return;
                             }
 
@@ -195,6 +212,21 @@ class RepairTicketForm
                                 $set('foreign_color', null);
                                 $set('mileage', null);
                             }
+
+                            // Import warranty status from the sale's warranty record
+                            // (single source of truth) — never set manually by the user.
+                            $warrantyStatus = WarrantyService::statusForSaleUnit(
+                                (int) $state,
+                                $unit?->id
+                            );
+                            $set('warranty_status', $warrantyStatus);
+
+                            // Default the type to Warranty when the sale is still
+                            // under valid warranty, otherwise Paid. User may switch
+                            // between the two (no Internal for sale-linked repairs).
+                            $type = $warrantyStatus === 'active' ? 'warranty' : 'paid';
+                            $set('repair_type', $type);
+                            $set('is_warranty', $type === 'warranty');
                         }),
 
                     // ── Mode: In-stock inventory vehicle ───────────────────
@@ -230,24 +262,30 @@ class RepairTicketForm
 
                     // ── Mode: Foreign / non-inventory vehicle ──────────────
                     // Also shown in 'sale' mode so auto-populated values are visible.
+                    // For FOREIGN: every field is required and editable.
+                    // For SALE: fields are auto-populated from the linked unit and
+                    // shown read-only. Mileage is required in both modes.
                     Grid::make(3)
                         ->schema([
                             TextInput::make('foreign_brand')
                                 ->label(__('messages.brand'))
                                 ->maxLength(100)
                                 ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->required(fn (Get $get): bool => $get('_repair_source') === 'foreign')
                                 ->dehydrated(true),
 
                             TextInput::make('foreign_model')
                                 ->label(__('messages.model'))
                                 ->maxLength(100)
                                 ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->required(fn (Get $get): bool => $get('_repair_source') === 'foreign')
                                 ->dehydrated(true),
 
                             TextInput::make('foreign_chassis')
                                 ->label(__('messages.chassis_number'))
                                 ->maxLength(50)
                                 ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->required(fn (Get $get): bool => $get('_repair_source') === 'foreign')
                                 ->dehydrated(true),
 
                             TextInput::make('foreign_year')
@@ -255,34 +293,30 @@ class RepairTicketForm
                                 ->numeric()
                                 ->minValue(1900)
                                 ->maxValue((int) date('Y') + 2)
+                                ->required(fn (Get $get): bool => $get('_repair_source') === 'foreign')
                                 ->dehydrated(true),
 
                             TextInput::make('foreign_color')
                                 ->label(__('messages.color'))
                                 ->maxLength(50)
                                 ->disabled(fn (Get $get): bool => $get('_repair_source') === 'sale')
+                                ->required(fn (Get $get): bool => $get('_repair_source') === 'foreign')
                                 ->dehydrated(true),
 
+                            // Mileage at reception — required for foreign & sale.
+                            // Hidden and NOT saved for in-stock vehicles (never used).
                             TextInput::make('mileage')
                                 ->label(__('messages.mileage_at_reception'))
                                 ->numeric()
-                                ->default(0)
+                                ->minValue(0)
                                 ->suffix('km')
+                                ->required(fn (Get $get): bool => in_array($get('_repair_source'), ['foreign', 'sale'], true))
                                 ->dehydrated(true),
                         ])
                         ->visible(fn (Get $get): bool => in_array($get('_repair_source'), ['foreign', 'sale'], true)),
 
                     // Controlled by _repair_source — stored on the model
                     Hidden::make('is_foreign_vehicle')->default(false),
-
-                    // Mileage for stock mode (foreign/sale modes show it inside the Grid above)
-                    TextInput::make('mileage')
-                        ->label(__('messages.mileage_at_reception'))
-                        ->numeric()
-                        ->default(0)
-                        ->suffix('km')
-                        ->dehydrated(true)
-                        ->visible(fn (Get $get): bool => $get('_repair_source') === 'stock'),
 
                 ]),
 
@@ -420,15 +454,27 @@ class RepairTicketForm
                             ->dehydrated(false)
                             ->placeholder(__('messages.auto_generated')),
 
+                        // Repair type is DRIVEN BY THE SOURCE:
+                        //   sale    → Paid or Warranty (user choice)
+                        //   stock   → Internal (locked)
+                        //   foreign → Paid (locked)
                         Select::make('repair_type')
                             ->label(__('messages.repair_type'))
-                            ->options([
-                                'warranty' => __('messages.warranty'),
-                                'paid'     => __('messages.paid'),
-                                'internal' => __('messages.internal'),
-                            ])
+                            ->options(fn (Get $get): array => match ($get('_repair_source')) {
+                                'sale' => [
+                                    'paid'     => __('messages.paid'),
+                                    'warranty' => __('messages.warranty'),
+                                ],
+                                'stock'   => ['internal' => __('messages.internal')],
+                                'foreign' => ['paid' => __('messages.paid')],
+                                default   => ['paid' => __('messages.paid')],
+                            })
                             ->default('paid')
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->disabled(fn (Get $get): bool => in_array($get('_repair_source'), ['stock', 'foreign'], true))
+                            ->dehydrated(true)
+                            ->afterStateUpdated(fn ($state, callable $set) => $set('is_warranty', $state === 'warranty')),
 
                         Select::make('priority')
                             ->label(__('messages.priority'))
@@ -458,14 +504,22 @@ class RepairTicketForm
                         ->rows(2)
                         ->columnSpanFull(),
 
-                    Grid::make(2)->schema([
-                        Toggle::make('is_warranty')
-                            ->label(__('messages.is_warranty'))
-                            ->live(),
-                        TextInput::make('warranty_status')
-                            ->label(__('messages.warranty_status'))
-                            ->visible(fn ($get) => (bool) $get('is_warranty')),
-                    ]),
+                    // Warranty is NEVER set manually. It is imported automatically
+                    // from the linked sale's warranty record. The "Sous Garantie"
+                    // toggle has been removed. These hidden fields carry the
+                    // imported values to the model; the Placeholder shows the
+                    // imported status for sale-linked repairs (read-only).
+                    Hidden::make('is_warranty')->default(false),
+                    Hidden::make('warranty_status')->default('none'),
+
+                    Placeholder::make('warranty_status_display')
+                        ->label(__('messages.warranty_status'))
+                        ->content(fn (Get $get): string => match ($get('warranty_status')) {
+                            'active'  => __('messages.warranty_active'),
+                            'expired' => __('messages.warranty_expired'),
+                            default   => __('messages.warranty_none'),
+                        })
+                        ->visible(fn (Get $get): bool => $get('_repair_source') === 'sale'),
                 ]),
 
             /*
@@ -504,8 +558,13 @@ class RepairTicketForm
             |------------------------------------------------------------------
             */
 
+            // Internal repairs never bill the customer — the entire financial
+            // section (labour, parts price, discount, totals) is hidden. Labour
+            // is forced to 0 server-side (RepairTicket::saving) and the cost is
+            // booked as an inventory expense (RepairService::writeInternalExpense).
             Section::make(__('messages.financials'))
                 ->icon('heroicon-o-banknotes')
+                ->visible(fn (Get $get): bool => $get('repair_type') !== 'internal')
                 ->schema([
                     Grid::make(2)->schema([
                         TextInput::make('labor_cost')
@@ -600,53 +659,9 @@ class RepairTicketForm
                         ->columnSpanFull(),
                 ]),
 
-            /*
-            |------------------------------------------------------------------
-            | Section 8 — Intervention Steps
-            |------------------------------------------------------------------
-            */
-
-            Section::make(__('messages.intervention_steps'))
-                ->icon('heroicon-o-list-bullet')
-                ->schema([
-                    Repeater::make('steps')
-                        ->relationship('steps')
-                        ->label('')
-                        ->schema([
-                            Grid::make(3)->schema([
-                                TextInput::make('title')
-                                    ->label(__('messages.step_title'))
-                                    ->required()
-                                    ->maxLength(255)
-                                    ->columnSpan(2),
-                                Select::make('status')
-                                    ->label(__('messages.status'))
-                                    ->options([
-                                        'pending'     => __('messages.pending'),
-                                        'in_progress' => __('messages.in_progress'),
-                                        'done'        => __('messages.done'),
-                                    ])
-                                    ->default('pending')
-                                    ->columnSpan(1),
-                            ]),
-                            Textarea::make('description')
-                                ->label(__('messages.description'))
-                                ->rows(2)
-                                ->columnSpanFull(),
-                            Grid::make(2)->schema([
-                                Select::make('performed_by')
-                                    ->label(__('messages.performed_by'))
-                                    ->options(fn () => User::query()->orderBy('name')->pluck('name', 'id')->toArray())
-                                    ->searchable(),
-                                DateTimePicker::make('performed_at')
-                                    ->label(__('messages.performed_at')),
-                            ]),
-                        ])
-                        ->addActionLabel(__('messages.add_step'))
-                        ->defaultItems(0)
-                        ->reorderable()
-                        ->collapsible(),
-                ]),
+            // NOTE: Intervention steps are intentionally NOT part of repair
+            // creation/editing. They are added one-by-one from the View page
+            // ("Ajouter une étape" modal) and shown as a chronological timeline.
 
         ]);
     }
@@ -832,5 +847,58 @@ class RepairTicketForm
     private static function isAdmin(): bool
     {
         return auth()->user()?->hasAnyRole(['Admin', 'Super Admin']) ?? false;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authoritative server-side normalisation of source-driven rules.
+    | The form already enforces these in the UI, but this guarantees correct
+    | data regardless of client tampering. Called by the Create & Edit pages
+    | (mutateFormDataBeforeCreate / mutateFormDataBeforeSave).
+    |--------------------------------------------------------------------------
+    |
+    | SALE    → type ∈ {paid, warranty}; warranty imported from the sale.
+    | STOCK   → type = internal, labour 0, no mileage stored.
+    | FOREIGN → type = paid, no warranty.
+    */
+    public static function normalizeBySource(array $data): array
+    {
+        $source = $data['_repair_source'] ?? (
+            ! empty($data['sale_id']) ? 'sale'
+                : (! empty($data['is_foreign_vehicle']) ? 'foreign' : 'stock')
+        );
+
+        if ($source === 'stock') {
+            $data['is_foreign_vehicle'] = false;
+            $data['sale_id']            = null;
+            $data['repair_type']        = 'internal';
+            $data['labor_cost']         = 0;
+            $data['is_warranty']        = false;
+            $data['warranty_status']    = 'none';
+            // In-stock vehicles are unused — mileage is never recorded.
+            $data['mileage']            = null;
+        } elseif ($source === 'foreign') {
+            $data['is_foreign_vehicle'] = true;
+            $data['sale_id']            = null;
+            $data['repair_type']        = 'paid';
+            $data['is_warranty']        = false;
+            $data['warranty_status']    = 'none';
+        } else { // sale
+            $data['is_foreign_vehicle'] = false;
+
+            // Only Paid or Warranty are valid for sale-linked repairs.
+            if (! in_array($data['repair_type'] ?? null, ['paid', 'warranty'], true)) {
+                $data['repair_type'] = 'paid';
+            }
+
+            // Re-import warranty status from the single source of truth.
+            $data['warranty_status'] = WarrantyService::statusForSaleUnit(
+                isset($data['sale_id']) ? (int) $data['sale_id'] : null,
+                isset($data['motorcycle_unit_id']) ? (int) $data['motorcycle_unit_id'] : null
+            );
+            $data['is_warranty'] = $data['repair_type'] === 'warranty';
+        }
+
+        return $data;
     }
 }

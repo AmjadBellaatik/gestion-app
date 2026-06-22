@@ -5,6 +5,7 @@ namespace App\Filament\Resources\RepairTickets\Pages;
 use App\Filament\Resources\RepairTickets\RepairTicketResource;
 use App\Models\DocumentType;
 use App\Models\Payment;
+use App\Models\RepairStep;
 use App\Models\RepairTicket;
 use App\Models\User;
 use App\Services\Documents\DocumentService;
@@ -37,6 +38,55 @@ class ViewRepairTicket extends ViewRecord
             */
 
             EditAction::make(),
+
+            /*
+            |------------------------------------------------------------------
+            | Add Intervention Step (modal) — steps are managed here, not at
+            | creation time. Each saved step becomes a timeline entry.
+            |------------------------------------------------------------------
+            */
+
+            Action::make('add_step')
+                ->label(__('messages.add_intervention_step'))
+                ->icon('heroicon-o-plus-circle')
+                ->color('primary')
+                ->modalHeading(__('messages.add_intervention_step'))
+                ->visible(fn (RepairTicket $record) => ! in_array($record->status, ['closed', 'cancelled']))
+                ->schema([
+                    TextInput::make('title')
+                        ->label(__('messages.service_performed'))
+                        ->required()
+                        ->maxLength(255),
+
+                    Textarea::make('description')
+                        ->label(__('messages.comments'))
+                        ->rows(3),
+
+                    Select::make('status')
+                        ->label(__('messages.status'))
+                        ->options([
+                            'pending'     => __('messages.pending'),
+                            'in_progress' => __('messages.in_progress'),
+                            'done'        => __('messages.done'),
+                        ])
+                        ->default('in_progress'),
+                ])
+                ->action(function (RepairTicket $record, array $data): void {
+                    RepairStep::create([
+                        'repair_ticket_id' => $record->getKey(),
+                        'sort_order'       => ((int) $record->steps()->max('sort_order')) + 1,
+                        'title'            => $data['title'],
+                        'description'      => $data['description'] ?? null,
+                        'status'           => $data['status'] ?? 'in_progress',
+                        'performed_by'     => self::currentUserId(),
+                        'performed_at'     => now(),
+                    ]);
+
+                    Notification::make()
+                        ->title(__('messages.step_added'))
+                        ->success()
+                        ->send();
+                }),
 
             /*
             |------------------------------------------------------------------
@@ -286,6 +336,7 @@ class ViewRepairTicket extends ViewRecord
                 ->icon('heroicon-o-document-currency-dollar')
                 ->color('success')
                 ->visible(fn (RepairTicket $record) => in_array($record->status, ['completed', 'delivered', 'closed'])
+                    && $record->repair_type !== 'internal'
                     && ! $record->invoice_document_id)
                 ->action(function (RepairTicket $record): void {
                     $record->loadMissing(['items.product']);

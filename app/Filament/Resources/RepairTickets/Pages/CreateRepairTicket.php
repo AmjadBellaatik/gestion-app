@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\RepairTickets\Pages;
 
 use App\Filament\Resources\RepairTickets\RepairTicketResource;
+use App\Filament\Resources\RepairTickets\Schemas\RepairTicketForm;
 use App\Models\DocumentType;
 use App\Services\Documents\DocumentService;
 use App\Services\Workshop\RepairWorkflowService;
@@ -14,6 +15,9 @@ class CreateRepairTicket extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        // Enforce source-driven rules authoritatively (type, warranty, mileage, labour)
+        $data = RepairTicketForm::normalizeBySource($data);
+
         // Remove virtual fields — not persisted on the model
         unset($data['ticket_number'], $data['_repair_source']);
 

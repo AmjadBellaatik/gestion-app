@@ -162,6 +162,7 @@ class RepairTicketInfolist
             */
 
             Section::make(__('messages.financials'))
+                ->visible(fn (RepairTicket $record) => $record->repair_type !== 'internal')
                 ->schema([
                     Grid::make(5)->schema([
                         TextEntry::make('labor_cost')
@@ -262,7 +263,8 @@ class RepairTicketInfolist
                         ])
                         ->columnSpanFull(),
                 ])
-                ->visible(fn (RepairTicket $record) => $record->payments()->exists()),
+                ->visible(fn (RepairTicket $record) => $record->repair_type !== 'internal'
+                    && $record->payments()->exists()),
 
             /*
             |------------------------------------------------------------------
@@ -276,6 +278,7 @@ class RepairTicketInfolist
                         TextEntry::make('payment_status')
                             ->label(__('messages.payment_status'))
                             ->badge()
+                            ->visible(fn (RepairTicket $record) => $record->repair_type !== 'internal')
                             ->color(fn ($state) => match ($state) {
                                 'paid'    => 'success',
                                 'partial' => 'warning',
@@ -300,6 +303,44 @@ class RepairTicketInfolist
                         ->placeholder('-')
                         ->columnSpanFull(),
                 ]),
+
+            /*
+            |------------------------------------------------------------------
+            | Intervention Steps — chronological timeline, newest first.
+            | Steps are added via the "Ajouter une étape" modal on this page.
+            |------------------------------------------------------------------
+            */
+
+            Section::make(__('messages.intervention_steps'))
+                ->schema([
+                    RepeatableEntry::make('steps')
+                        ->label('')
+                        ->state(fn (RepairTicket $record) => $record->steps()
+                            ->with('performer')
+                            ->orderByDesc('id')
+                            ->get())
+                        ->schema([
+                            Grid::make(2)->schema([
+                                TextEntry::make('performer.name')
+                                    ->label(__('messages.performed_by'))
+                                    ->weight('bold')
+                                    ->placeholder('-'),
+                                TextEntry::make('performed_at')
+                                    ->label(__('messages.performed_at'))
+                                    ->dateTime('d/m/Y - H:i')
+                                    ->placeholder('-'),
+                            ]),
+                            TextEntry::make('title')
+                                ->label(__('messages.service_performed'))
+                                ->columnSpanFull(),
+                            TextEntry::make('description')
+                                ->label(__('messages.comments'))
+                                ->placeholder('-')
+                                ->columnSpanFull(),
+                        ])
+                        ->columnSpanFull(),
+                ])
+                ->visible(fn (RepairTicket $record) => $record->steps()->exists()),
 
         ]);
     }

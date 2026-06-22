@@ -8,6 +8,7 @@ use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Models\Payment;
 use App\Models\RepairTicket;
+use App\Models\Transaction;
 use App\Services\Accounting\AccountingService;
 use App\Services\Payments\PaymentService;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,20 @@ class RepairService
         // Refresh after calculateTotals saved
         $ticket->refresh();
 
+        // Internal repairs are work on company inventory — they post an
+        // inventory EXPENSE (never revenue) and create no customer payment.
+        if ($ticket->repair_type === 'internal') {
+            self::writeInternalExpense($ticket);
+
+            $ticket->update([
+                'status'       => 'completed',
+                'completed_at' => now(),
+                'finished_at'  => now(),
+            ]);
+
+            return;
+        }
+
         self::writeJournalEntry($ticket);
 
         $ticket->update([
@@ -74,6 +89,54 @@ class RepairService
 
     /*
     |--------------------------------------------------------------------------
+    | Internal repair accounting — record an inventory EXPENSE, never revenue.
+    | Mirrors the PurchaseService expense pattern (Transaction type=expense
+    | referencing the ticket). Parts/consumables stock is already deducted via
+    | the RepairItem observers (RepairStockService); this captures the monetary
+    | cost. Idempotent per ticket: a re-completion updates the existing row.
+    |--------------------------------------------------------------------------
+    */
+
+    public static function writeInternalExpense(RepairTicket $ticket): void
+    {
+        try {
+            // No revenue entry must ever survive for an internal ticket.
+            self::deleteJournalEntries($ticket);
+
+            $amount = (float) $ticket->parts_cost;
+
+            $existing = Transaction::withoutGlobalScopes()
+                ->where('reference_type', RepairTicket::class)
+                ->where('reference_id', $ticket->getKey())
+                ->where('type', 'expense')
+                ->first();
+
+            if ($amount <= 0) {
+                $existing?->delete();
+                return;
+            }
+
+            if ($existing) {
+                $existing->update(['amount' => $amount]);
+                return;
+            }
+
+            Transaction::create([
+                'company_id'     => $ticket->company_id,
+                'type'           => 'expense',
+                'amount'         => $amount,
+                'description'    => 'Internal repair ' . $ticket->ticket_number,
+                'reference_type' => RepairTicket::class,
+                'reference_id'   => $ticket->getKey(),
+                'transaction_date' => now(),
+            ]);
+        } catch (\Throwable) {
+            // Accounting failures must never block the repair workflow
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Accounting — double-entry journal for the repair revenue.
     | Idempotent per ticket reference: any existing entry is removed and
     | rewritten with the current total so it always reflects live item changes.
@@ -82,6 +145,13 @@ class RepairService
 
     public static function writeJournalEntry(RepairTicket $ticket): void
     {
+        // Internal repairs never post revenue — redirect to the expense path so
+        // item edits on a finalised internal ticket keep accounting correct.
+        if ($ticket->repair_type === 'internal') {
+            self::writeInternalExpense($ticket);
+            return;
+        }
+
         try {
             self::deleteJournalEntries($ticket);
 

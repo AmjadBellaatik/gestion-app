@@ -154,6 +154,23 @@ class RepairTicket extends Model
             }
         });
 
+        /*
+        |----------------------------------------------------------------------
+        | Internal repairs are work on company-owned inventory: they never
+        | generate customer-visible revenue, so labour is always 0 MAD. This
+        | is the authoritative safety net — enforced regardless of how the
+        | ticket is created/updated (form, import, console).
+        |----------------------------------------------------------------------
+        */
+        static::saving(function (RepairTicket $model) {
+            if ($model->repair_type === 'internal') {
+                $model->labor_cost = 0;
+            }
+
+            // Warranty flag is derived from the chosen type — never set manually.
+            $model->is_warranty = $model->repair_type === 'warranty';
+        });
+
         static::updating(function (RepairTicket $model) {
             if (! $model->isDirty('status') || ! $model->motorcycle_unit_id || $model->is_foreign_vehicle) {
                 return;
