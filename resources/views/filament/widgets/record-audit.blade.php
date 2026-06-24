@@ -23,7 +23,7 @@
     <x-filament::section compact>
         <x-slot name="heading">
             <span class="flex items-center gap-2">
-                <x-heroicon-m-clock class="h-5 w-5 text-gray-400" />
+                <x-heroicon-m-clock class="h-5 w-5 text-gray-400" style="width:1.25rem;height:1.25rem;flex:none;" />
                 {{ __('messages.record_information') }}
             </span>
         </x-slot>
@@ -33,7 +33,7 @@
                 <a href="{{ $historyUrl }}"
                    class="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400">
                     {{ __('messages.view_full_history') }}
-                    <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" />
+                    <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" style="width:1rem;height:1rem;flex:none;" />
                 </a>
             </x-slot>
         @endif
@@ -41,8 +41,8 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             @foreach ($cells as $c)
                 <div class="flex items-start gap-3 rounded-xl bg-gray-50 p-4 dark:bg-white/5">
-                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                        <x-dynamic-component :component="$c['icon']" class="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10" style="width:2.25rem;height:2.25rem;flex:none;">
+                        <x-dynamic-component :component="$c['icon']" class="h-5 w-5 text-gray-500 dark:text-gray-400" style="width:1.25rem;height:1.25rem;flex:none;" />
                     </div>
 
                     <div class="min-w-0 flex-1">
