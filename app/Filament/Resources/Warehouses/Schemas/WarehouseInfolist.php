@@ -130,8 +130,8 @@ class WarehouseInfolist
                                             'qty'  => 0,
                                         ];
                                     }
-                                    if (in_array($movement->type, ['entry', 'in'], true)
-                                        || in_array($movement->movement_type, ['purchase', 'adjustment', 'return'], true)) {
+                                    if (in_array($movement->type, ['entry', 'in', 'transfer', 'adjustment', 'return'], true)
+                                        || in_array($movement->movement_type, ['purchase', 'return'], true)) {
                                         $stockByProduct[$productId]['qty'] += (float) $movement->quantity;
                                     } else {
                                         $stockByProduct[$productId]['qty'] -= (float) $movement->quantity;

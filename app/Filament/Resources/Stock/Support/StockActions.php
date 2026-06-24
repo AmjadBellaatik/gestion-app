@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Stock\Support;
 use App\Models\Product;
 use App\Models\MotorcycleModel;
 use App\Models\MotorcycleUnit;
+use App\Models\StockMovement;
 use App\Models\Warehouse;
 use App\Services\Stock\StockService;
 use Filament\Forms\Components\Hidden;
@@ -216,7 +217,7 @@ class StockActions
             ->where(function ($query): void {
                 $query
                     ->whereIn('type', ['entry', 'in'])
-                    ->orWhereIn('movement_type', ['purchase', 'adjustment', 'return']);
+                    ->orWhereIn('movement_type', ['purchase', 'return']);
             })
             ->sum('quantity');
 

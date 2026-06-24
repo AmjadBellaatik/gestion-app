@@ -70,7 +70,7 @@ class DashboardAlertWidget extends StatsOverviewWidget
     {
         return Product::where('stock_alert', '>', 0)
             ->withSum(['stockMovements as stock_in' => fn ($q) => $q->whereIn('type', ['entry', 'in', 'transfer', 'adjustment', 'return'])
-                ->orWhereIn('movement_type', ['purchase', 'adjustment', 'return'])], 'quantity')
+                ->orWhereIn('movement_type', ['purchase', 'return'])], 'quantity')
             ->withSum(['stockMovements as stock_out' => fn ($q) => $q->whereIn('type', ['exit', 'out'])
                 ->orWhereIn('movement_type', ['sale', 'repair', 'repair_usage'])], 'quantity')
             ->get()

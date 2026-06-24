@@ -166,7 +166,6 @@ class Product extends Model
                     ])
                     ->orWhereIn('movement_type', [
                         'purchase',
-                        'adjustment',
                         'return',
                     ]);
             })
