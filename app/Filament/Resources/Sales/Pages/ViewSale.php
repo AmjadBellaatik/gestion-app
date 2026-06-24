@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Sales\Pages;
 
+use App\Filament\Concerns\HasAuditFooter;
+
 use App\Filament\Resources\Sales\SaleResource;
 use App\Models\DocumentType;
 use App\Services\Sales\SaleService;
@@ -14,6 +16,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewSale extends ViewRecord
 {
+    use HasAuditFooter;
+
     protected static string $resource = SaleResource::class;
 
     protected function getHeaderActions(): array

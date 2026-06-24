@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RepairItem extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
         'repair_ticket_id',
         'product_id',

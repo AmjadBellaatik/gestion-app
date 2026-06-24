@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Resellers\Pages;
 
+use App\Filament\Concerns\HasAuditFooter;
+
 use App\Filament\Resources\Resellers\ResellerResource;
 
 use Filament\Actions\Action;
@@ -9,6 +11,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewReseller extends ViewRecord
 {
+    use HasAuditFooter;
+
     protected static string $resource =
         ResellerResource::class;
 

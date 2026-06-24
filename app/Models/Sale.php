@@ -40,6 +40,8 @@ use App\Services\Sales\SaleService;
  */
 class Sale extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     use SoftDeletes;
 
     protected $fillable = [

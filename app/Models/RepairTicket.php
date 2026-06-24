@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 class RepairTicket extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     use SoftDeletes;
 
     /**

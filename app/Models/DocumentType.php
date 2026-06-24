@@ -26,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class DocumentType extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     public const INVOICE = 'INVOICE';
     public const QUOTATION = 'QUOTE';
     public const DELIVERY_NOTE = 'DELIVERY_NOTE';

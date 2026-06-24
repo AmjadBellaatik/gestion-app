@@ -10,6 +10,8 @@ use App\Models\Scopes\CompanyScope;
 
 class Reseller extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
 
         'company_id',

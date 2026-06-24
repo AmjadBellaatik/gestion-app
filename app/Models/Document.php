@@ -44,6 +44,8 @@ use Illuminate\Support\Str;
  */
 class Document extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     use SoftDeletes;
 
     public const TAX_RATE = 20.00;

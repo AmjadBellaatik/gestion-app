@@ -1154,5 +1154,27 @@ return [
     'changed_by'              => 'Changed By',
     'old_date'                => 'Old Date',
     'new_date'                => 'New Date',
+
+    // Audit History
+    'audit_history'       => 'Audit History',
+    'audit_entry'         => 'Audit Entry',
+    'record_information'  => 'Record Information',
+    'view_full_history'   => 'View full history',
+    'action_details'      => 'Action Details',
+    'changes'             => 'Changes',
+    'no_field_changes'    => 'No field changes were recorded.',
+    'field'               => 'Field',
+    'old_value'           => 'Old Value',
+    'new_value'           => 'New Value',
+    'date_time'           => 'Date & Time',
+    'user_agent'          => 'User Agent',
+    'record'              => 'Record',
+    'system'              => 'System',
+    'created'             => 'Created',
+    'last_updated'        => 'Last Updated',
+    'audit_action_created' => 'Created',
+    'audit_action_updated' => 'Updated',
+    'audit_action_deleted' => 'Deleted',
+
 ];
 

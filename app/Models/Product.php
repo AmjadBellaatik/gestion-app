@@ -12,6 +12,8 @@ use App\Models\Scopes\CompanyScope;
 
 class Product extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     use SoftDeletes;
 
     /*

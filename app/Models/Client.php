@@ -16,6 +16,8 @@ use App\Models\Document;
 
 class Client extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
 
         'company_id',

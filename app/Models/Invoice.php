@@ -9,6 +9,8 @@ use App\Models\Scopes\CompanyScope;
 
 class Invoice extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
         'company_id',
         'number',

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MotorcycleHomologation extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
         'motorcycle_model_id',
         'homologation_number',

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Documents\Pages;
 
+use App\Filament\Concerns\HasAuditFooter;
+
 use App\Filament\Resources\Documents\DocumentResource;
 use App\Services\Documents\DocumentService;
 use Filament\Actions\Action;
@@ -10,6 +12,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewDocument extends ViewRecord
 {
+    use HasAuditFooter;
+
     protected static string $resource = DocumentResource::class;
 
     protected function getHeaderActions(): array

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class StockTransferItem extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
 
         'stock_transfer_id',

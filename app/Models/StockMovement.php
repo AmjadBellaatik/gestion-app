@@ -10,6 +10,8 @@ use App\Notifications\LowStockNotification;
 
 class StockMovement extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
 
         'company_id',

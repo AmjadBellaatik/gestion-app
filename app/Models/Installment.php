@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Installment extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
 
         'installment_plan_id',

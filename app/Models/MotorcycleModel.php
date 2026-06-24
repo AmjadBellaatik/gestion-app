@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class MotorcycleModel extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
         'titre_homologation',
         'date_homologation',

@@ -16,8 +16,13 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, HasAvatar
 {
+    use \App\Models\Concerns\Auditable;
+
     use Notifiable;
     use HasRoles;
+
+    /** Login timestamp is already captured in LoginLog — keep it out of the audit trail. */
+    protected array $auditExclude = ['last_login_at'];
 
     /**
      * Who may access the Filament admin panel.

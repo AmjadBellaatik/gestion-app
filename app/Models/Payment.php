@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Session;
 
 class Payment extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     use SoftDeletes;
 
     public const METHODS = [

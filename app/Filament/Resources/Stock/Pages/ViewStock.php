@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Stock\Pages;
 
+use App\Filament\Concerns\HasAuditFooter;
+
 use App\Filament\Resources\Stock\StockResource;
 use App\Filament\Resources\Stock\Support\StockActions;
 use Filament\Actions\Action;
@@ -9,6 +11,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewStock extends ViewRecord
 {
+    use HasAuditFooter;
+
     protected static string $resource = StockResource::class;
 
     protected function getHeaderActions(): array

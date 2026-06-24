@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SaleItem extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
 
         'sale_id',

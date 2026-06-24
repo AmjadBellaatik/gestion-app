@@ -8,6 +8,8 @@ use App\Models\Scopes\CompanyScope;
 
 class StockTransfer extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
 
         'company_id',

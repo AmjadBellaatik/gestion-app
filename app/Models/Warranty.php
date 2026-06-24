@@ -8,6 +8,8 @@ use App\Models\Scopes\CompanyScope;
 
 class Warranty extends Model
 {
+    use \App\Models\Concerns\Auditable;
+
     protected $fillable = [
         'company_id',
         'client_id',

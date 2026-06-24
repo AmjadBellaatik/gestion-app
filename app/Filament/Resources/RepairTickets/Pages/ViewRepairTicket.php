@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\RepairTickets\Pages;
 
+use App\Filament\Concerns\HasAuditFooter;
+
 use App\Filament\Resources\RepairTickets\RepairTicketResource;
 use App\Models\DocumentType;
 use App\Models\Payment;
@@ -25,6 +27,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewRepairTicket extends ViewRecord
 {
+    use HasAuditFooter;
+
     protected static string $resource = RepairTicketResource::class;
 
     protected function getHeaderActions(): array

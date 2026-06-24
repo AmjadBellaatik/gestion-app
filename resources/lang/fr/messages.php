@@ -1154,4 +1154,26 @@ return [
     'changed_by'              => 'Modifié par',
     'old_date'                => 'Ancienne date',
     'new_date'                => 'Nouvelle date',
+
+    // Historique d'audit
+    'audit_history'       => 'Historique d\'audit',
+    'audit_entry'         => 'Entrée d\'audit',
+    'record_information'  => 'Informations de l\'enregistrement',
+    'view_full_history'   => 'Voir l\'historique complet',
+    'action_details'      => 'Détails de l\'action',
+    'changes'             => 'Modifications',
+    'no_field_changes'    => 'Aucune modification de champ enregistrée.',
+    'field'               => 'Champ',
+    'old_value'           => 'Ancienne valeur',
+    'new_value'           => 'Nouvelle valeur',
+    'date_time'           => 'Date et heure',
+    'user_agent'          => 'Agent utilisateur',
+    'record'              => 'Enregistrement',
+    'system'              => 'Système',
+    'created'             => 'Créé',
+    'last_updated'        => 'Dernière modification',
+    'audit_action_created' => 'Création',
+    'audit_action_updated' => 'Modification',
+    'audit_action_deleted' => 'Suppression',
+
 ];

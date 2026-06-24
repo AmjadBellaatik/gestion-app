@@ -1145,4 +1145,26 @@ return [
     'changed_by'              => 'تم التغيير بواسطة',
     'old_date'                => 'التاريخ القديم',
     'new_date'                => 'التاريخ الجديد',
+
+    // سجل التدقيق
+    'audit_history'       => 'سجل التدقيق',
+    'audit_entry'         => 'إدخال التدقيق',
+    'record_information'  => 'معلومات السجل',
+    'view_full_history'   => 'عرض السجل الكامل',
+    'action_details'      => 'تفاصيل الإجراء',
+    'changes'             => 'التغييرات',
+    'no_field_changes'    => 'لم يتم تسجيل أي تغييرات في الحقول.',
+    'field'               => 'الحقل',
+    'old_value'           => 'القيمة القديمة',
+    'new_value'           => 'القيمة الجديدة',
+    'date_time'           => 'التاريخ والوقت',
+    'user_agent'          => 'وكيل المستخدم',
+    'record'              => 'السجل',
+    'system'              => 'النظام',
+    'created'             => 'تم الإنشاء',
+    'last_updated'        => 'آخر تحديث',
+    'audit_action_created' => 'إنشاء',
+    'audit_action_updated' => 'تعديل',
+    'audit_action_deleted' => 'حذف',
+
 ];
