@@ -141,7 +141,8 @@ class ReportsHub extends Page
 
     private function salesData(Carbon $from, Carbon $to): array
     {
-        $sales         = Sale::with(['client', 'reseller'])->whereBetween('created_at', [$from, $to])->latest()->get();
+        // Business reporting uses the effective sale_date (backdating allowed), not the DB timestamp.
+        $sales         = Sale::with(['client', 'reseller'])->whereBetween('sale_date', [$from, $to])->orderByDesc('sale_date')->get();
         $totalRevenue  = $sales->sum('total');
         $totalPaid     = $sales->sum('paid_amount');
         $totalUnpaid   = $sales->sum('remaining_amount');
@@ -199,15 +200,27 @@ class ReportsHub extends Page
 
     private function stockData(Carbon $from, Carbon $to): array
     {
-        $rawProducts = Product::orderBy('name')->get();
-        $movements   = StockMovement::with('product')->whereBetween('created_at', [$from, $to])->latest()->get();
+        $movements = StockMovement::with('product')->whereBetween('created_at', [$from, $to])->latest()->get();
 
-        $products = $rawProducts->map(function ($p) {
-            $p->current_qty = max(0, $p->quantity ?? ($p->stock ?? 0));
-            $p->stock_value = $p->current_qty * ($p->purchase_price ?? $p->selling_price ?? 0);
-            $p->is_low      = $p->stock_alert > 0 && $p->current_qty <= $p->stock_alert;
-            return $p;
-        });
+        // Live stock is derived from stock movements (Product has no quantity column),
+        // mirroring Product::getCurrentStockAttribute() so the report matches product pages.
+        $products = Product::query()
+            ->withSum(['stockMovements as stock_in' => fn ($q) => $q->where(function ($w) {
+                $w->whereIn('type', ['entry', 'in', 'transfer', 'adjustment', 'return'])
+                  ->orWhereIn('movement_type', ['purchase', 'return']);
+            })], 'quantity')
+            ->withSum(['stockMovements as stock_out' => fn ($q) => $q->where(function ($w) {
+                $w->whereIn('type', ['exit', 'out'])
+                  ->orWhereIn('movement_type', ['sale', 'repair', 'repair_usage']);
+            })], 'quantity')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($p) {
+                $p->current_qty = max(0, (float) ($p->stock_in ?? 0) - (float) ($p->stock_out ?? 0));
+                $p->stock_value = round($p->current_qty * (float) ($p->purchase_price ?? $p->selling_price ?? 0), 2);
+                $p->is_low      = $p->stock_alert > 0 && $p->current_qty <= $p->stock_alert;
+                return $p;
+            });
 
         $totalProducts  = $products->count();
         $lowStockCount  = $products->where('is_low', true)->count();

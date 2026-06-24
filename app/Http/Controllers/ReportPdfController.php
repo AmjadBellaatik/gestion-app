@@ -110,7 +110,8 @@ class ReportPdfController extends Controller
 
     private function clientsData(Carbon $from, Carbon $to): array
     {
-        $clients       = Client::withCount('sales')->withSum('sales', 'total')->orderBy('name')->get();
+        // Client has no `name` column (first_name/last_name/company_name) — order by id.
+        $clients       = Client::withCount('sales')->withSum('sales', 'total')->orderBy('id')->get();
         $totalClients  = $clients->count();
         $activeClients = $clients->where('is_active', true)->count();
         $blockedClients = $clients->where('is_blocked', true)->count();
@@ -124,7 +125,7 @@ class ReportPdfController extends Controller
     private function resellersData(Carbon $from, Carbon $to): array
     {
         $resellers = Reseller::withCount(['sales as total_orders' => fn ($q) => $q->whereBetween('created_at', [$from, $to])])
-            ->withSum(['payments as total_paid' => fn ($q) => $q->where('status', 'paid')->whereBetween('created_at', [$from, $to])], 'amount')
+            ->withSum(['payments as total_paid' => fn ($q) => $q->where('payments.status', 'paid')->whereBetween('payments.created_at', [$from, $to])], 'amount')
             ->orderBy('name')
             ->get()
             ->map(function ($r) {
@@ -143,17 +144,27 @@ class ReportPdfController extends Controller
 
     private function stockData(Carbon $from, Carbon $to): array
     {
-        $rawProducts  = Product::orderBy('name')->get();
-        $movements    = StockMovement::with('product')->whereBetween('created_at', [$from, $to])->latest()->get();
+        $movements = StockMovement::with('product')->whereBetween('created_at', [$from, $to])->latest()->get();
 
-        $products = $rawProducts->map(function ($p) use ($movements) {
-            $entries = $movements->where('product_id', $p->id)->whereIn('type', ['entry', 'in'])->sum('quantity');
-            $exits   = $movements->where('product_id', $p->id)->whereIn('type', ['exit', 'out', 'sale'])->sum('quantity');
-            $p->current_qty  = max(0, $p->quantity ?? ($p->stock ?? 0));
-            $p->stock_value  = $p->current_qty * ($p->purchase_price ?? $p->selling_price ?? 0);
-            $p->is_low       = $p->stock_alert > 0 && $p->current_qty <= $p->stock_alert;
-            return $p;
-        });
+        // Live stock is derived from stock movements (Product has no quantity column),
+        // mirroring Product::getCurrentStockAttribute() so the report matches product pages.
+        $products = Product::query()
+            ->withSum(['stockMovements as stock_in' => fn ($q) => $q->where(function ($w) {
+                $w->whereIn('type', ['entry', 'in', 'transfer', 'adjustment', 'return'])
+                  ->orWhereIn('movement_type', ['purchase', 'return']);
+            })], 'quantity')
+            ->withSum(['stockMovements as stock_out' => fn ($q) => $q->where(function ($w) {
+                $w->whereIn('type', ['exit', 'out'])
+                  ->orWhereIn('movement_type', ['sale', 'repair', 'repair_usage']);
+            })], 'quantity')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($p) {
+                $p->current_qty  = max(0, (float) ($p->stock_in ?? 0) - (float) ($p->stock_out ?? 0));
+                $p->stock_value  = round($p->current_qty * (float) ($p->purchase_price ?? $p->selling_price ?? 0), 2);
+                $p->is_low       = $p->stock_alert > 0 && $p->current_qty <= $p->stock_alert;
+                return $p;
+            });
 
         $totalProducts    = $products->count();
         $lowStockCount    = $products->where('is_low', true)->count();
