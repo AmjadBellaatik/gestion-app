@@ -326,6 +326,10 @@ class DocumentService
         $previousLocale = app()->getLocale();
         app()->setLocale($document->language ?? 'fr');
 
+        // Remember the currently-stored PDF so it can be removed once the fresh
+        // one is written — a (re)generation must replace, never accumulate.
+        $previousPdfPath = $document->pdf_path;
+
         $document = Document::query()
             ->with([
                 'company',
@@ -467,6 +471,26 @@ class DocumentService
             'generated_at' => now(),
             'template_version' => $generatedPdf->template_version,
         ])->save();
+
+        // ── Regenerate from scratch: drop every superseded PDF (file + record)
+        // so the document keeps exactly one current PDF and storage never
+        // accumulates orphan files on each preview/regeneration.
+        GeneratedPdf::withoutGlobalScopes()
+            ->where('document_id', $document->id)
+            ->where('id', '!=', $generatedPdf->id)
+            ->get()
+            ->each(function (GeneratedPdf $old) use ($path): void {
+                $disk = $old->disk ?: 'public';
+                if ($old->path && $old->path !== $path && Storage::disk($disk)->exists($old->path)) {
+                    Storage::disk($disk)->delete($old->path);
+                }
+                $old->delete();
+            });
+
+        // Remove a stale pdf_path file that predates GeneratedPdf tracking.
+        if ($previousPdfPath && $previousPdfPath !== $path && Storage::disk('public')->exists($previousPdfPath)) {
+            Storage::disk('public')->delete($previousPdfPath);
+        }
 
         return $generatedPdf;
     }

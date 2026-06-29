@@ -79,9 +79,10 @@
     <table class="items-table">
         <thead>
             <tr>
+                <th class="num" style="width:28px;">N°</th>
                 <th>{{ __('messages.description') }}</th>
                 <th class="num">{{ __('messages.quantity') }}</th>
-                <th class="num">{{ __('messages.unit_price_ttc') }}</th>
+                <th class="num">{{ __('messages.unit_price_ht') }}</th>
                 <th class="num">{{ __('messages.tax_rate') }}</th>
                 <th class="num">{{ __('messages.total_amount') }}</th>
             </tr>
@@ -89,6 +90,7 @@
         <tbody>
             @foreach($document->items as $item)
             <tr>
+                <td class="num">{{ $loop->iteration }}</td>
                 <td>
                     <strong>{{ $item->description }}</strong>
                     @if($item->motorcycleUnit)
@@ -96,7 +98,7 @@
                     @endif
                 </td>
                 <td class="num">{{ number_format((float) $item->quantity, 2, ',', ' ') }}</td>
-                <td class="num">{{ number_format((float) $item->unit_price, 2, ',', ' ') }} MAD</td>
+                <td class="num">{{ number_format((float) $item->unit_price / (1 + ((float) $item->tax_rate) / 100), 2, ',', ' ') }} MAD</td>
                 <td class="num">20%</td>
                 <td class="num">{{ number_format((float) $item->total, 2, ',', ' ') }} MAD</td>
             </tr>

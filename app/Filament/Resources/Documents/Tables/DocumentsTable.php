@@ -22,8 +22,9 @@ class DocumentsTable
                     ->label(__('messages.document_type'))
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('client.display_name')
+                TextColumn::make('client_display')
                     ->label(__('messages.client'))
+                    ->state(fn (Document $record) => $record->client?->display_name ?? $record->reseller?->name)
                     ->placeholder('-'),
                 TextColumn::make('total_amount')
                     ->label(__('messages.total_amount'))

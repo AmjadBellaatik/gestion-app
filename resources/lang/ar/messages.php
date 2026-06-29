@@ -681,6 +681,7 @@ return [
     'uuid' => 'UUID',
     'date' => 'التاريخ',
     'unit_price_ttc' => 'سعر الوحدة شامل الضريبة',
+    'unit_price_ht' => 'سعر الوحدة خارج الضريبة',
     'fixed_discount' => 'خصم ثابت',
     'subtotal_ht'    => 'المجموع قبل الضريبة',
     'total_ttc'      => 'المجموع شامل الضريبة',

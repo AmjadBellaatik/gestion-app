@@ -35,8 +35,9 @@ class DocumentInfolist
                             ->label(__('messages.document_type')),
                     ]),
                     Grid::make(3)->schema([
-                        TextEntry::make('client.display_name')
+                        TextEntry::make('client_display')
                             ->label(__('messages.client'))
+                            ->state(fn (Document $record) => $record->client?->display_name ?? $record->reseller?->name)
                             ->placeholder('-'),
                         TextEntry::make('document_date')
                             ->label(__('messages.document_date'))

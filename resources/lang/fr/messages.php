@@ -681,6 +681,7 @@ return [
     'uuid' => 'UUID',
     'date' => 'Date',
     'unit_price_ttc' => 'Prix unitaire TTC (DH)',
+    'unit_price_ht' => 'Prix unitaire HT (DH)',
     'fixed_discount' => 'Remise fixe',
     'subtotal_ht' => 'Sous-total HT',
     'total_ttc' => 'Total TTC',

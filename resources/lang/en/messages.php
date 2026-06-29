@@ -681,6 +681,7 @@ return [
     'uuid' => 'UUID',
     'date' => 'Date',
     'unit_price_ttc' => 'Unit Price (VAT incl.)',
+    'unit_price_ht' => 'Unit Price (excl. VAT)',
     'fixed_discount' => 'Fixed Discount',
     'subtotal_ht'    => 'Subtotal (excl. VAT)',
     'total_ttc'      => 'Total (incl. VAT)',
