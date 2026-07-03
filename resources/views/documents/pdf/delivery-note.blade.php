@@ -33,6 +33,10 @@
         ? round($totalTtc - $taxAmount, 2)
         : (float) $document->subtotal;
 
+    // Chassis number + color — only present for electric scooters / bicycles.
+    $chassisNumber = $document->sale?->chassis_number;
+    $vehicleColor  = $document->sale?->color;
+
 @endphp
 
     <div class="pdf-watermark">{{ strtoupper($companyName) }}</div>
@@ -62,6 +66,13 @@
             @if($client?->cin)<div>CIN: {{ $client->cin }}</div>@endif
         @endif
     </div>
+
+    @if($chassisNumber || $vehicleColor)
+    <div style="margin-bottom: 14px; font-size: 11px;">
+        @if($chassisNumber)<div><strong>{{ __('messages.chassis_number') }} :</strong> {{ $chassisNumber }}</div>@endif
+        @if($vehicleColor)<div><strong>{{ __('messages.color') }} :</strong> {{ $vehicleColor }}</div>@endif
+    </div>
+    @endif
 
     <table class="items-table">
         <thead>
