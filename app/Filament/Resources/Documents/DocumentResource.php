@@ -19,6 +19,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 
 class DocumentResource extends Resource
@@ -80,6 +81,9 @@ class DocumentResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with([
+                'client', 'reseller', 'sale.reseller',
+            ]))
             ->columns([
                 Tables\Columns\TextColumn::make('document_number')
                     ->label(__('messages.document_number'))
@@ -91,10 +95,23 @@ class DocumentResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('client.display_name')
+                // Client OR reseller — a reseller can be linked directly on the
+                // document or through its sale (reseller sales set reseller_id and
+                // null out client_id, so client.display_name alone is empty).
+                Tables\Columns\TextColumn::make('client_display')
                     ->label(__('messages.client'))
+                    ->getStateUsing(fn (Document $record): ?string =>
+                        $record->reseller?->name
+                        ?? $record->sale?->reseller?->name
+                        ?? $record->client?->display_name
+                        ?? ($record->reseller_id ? $record->reseller()->withoutGlobalScopes()->value('name') : null)
+                        ?? ($record->sale?->reseller_id ? $record->sale->reseller()->withoutGlobalScopes()->value('name') : null))
                     ->placeholder('-')
-                    ->searchable(),
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(
+                        fn (Builder $q) => $q
+                            ->whereHas('client', fn (Builder $c) => $c->where('display_name', 'like', "%{$search}%"))
+                            ->orWhereHas('reseller', fn (Builder $r) => $r->where('name', 'like', "%{$search}%"))
+                    )),
 
                 Tables\Columns\TextColumn::make('supplier.name')
                     ->label(__('messages.supplier'))
