@@ -139,11 +139,12 @@
             padding: 3.5mm 13mm 0 13mm;
             font-size: 8px;
             line-height: 1.4;
-            color: #6b7280;
+            color: #000000;
+            opacity: 1;
             box-sizing: border-box;
         }
         .pdf-footer table { width: 100%; border-collapse: collapse; }
-        .pdf-footer td    { vertical-align: top; padding: 0; }
+        .pdf-footer td    { vertical-align: top; padding: 0; color: #000000; opacity: 1; }
 
         /* Table pagination */
         table { page-break-inside: auto; }

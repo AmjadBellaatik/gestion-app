@@ -770,6 +770,61 @@ class SaleService
         }
     }
 
+    /**
+     * Build the line-items array for one document type from a sale — the exact
+     * same shape generateSelectedDocumentsFromSale() feeds to
+     * DocumentService::generate(). Reused by DocumentService::resyncFromSale()
+     * so regenerating a document re-imports the current sale data just like a
+     * fresh generation (e.g. after the sale was modified).
+     */
+    public static function buildDocumentItemsForSale(
+        Sale $sale,
+        array $saleItems,
+        string $code,
+        ?RepairTicket $repairTicket = null
+    ): array {
+        $isConformity = $code === DocumentType::CONFORMITY;
+        $isWarranty   = $code === DocumentType::WARRANTY_CONTRACT;
+
+        if ($isConformity) {
+            $motorcycleUnit = self::resolveSaleMotorcycleUnit($sale, $saleItems);
+            $documentItems = $motorcycleUnit ? [[
+                'item_type'          => 'motorcycle',
+                'motorcycle_unit_id' => $motorcycleUnit->id,
+                'quantity'           => 1,
+                'unit_price'         => 0,
+                'discount_amount'    => 0,
+            ]] : [];
+        } elseif ($isWarranty) {
+            $warrantySaleItem = self::resolveWarrantySaleItem($saleItems);
+            $documentItems = $warrantySaleItem ? [[
+                'item_type'          => $warrantySaleItem->motorcycle_unit_id
+                    ? 'motorcycle'
+                    : ($warrantySaleItem->product?->type ?: 'product'),
+                'product_id'         => $warrantySaleItem->product_id,
+                'motorcycle_unit_id' => $warrantySaleItem->motorcycle_unit_id,
+                'quantity'           => (float) $warrantySaleItem->quantity,
+                'unit_price'         => 0,
+                'discount_amount'    => 0,
+            ]] : [];
+        } else {
+            $documentItems = collect($saleItems)->map(fn (SaleItem $item) => [
+                'item_type'          => $item->motorcycle_unit_id ? 'motorcycle' : 'product',
+                'product_id'         => $item->product_id,
+                'motorcycle_unit_id' => $item->motorcycle_unit_id,
+                'quantity'           => (float) $item->quantity,
+                'unit_price'         => self::resolveCommercialSaleItemUnitPrice($sale, $item, count($saleItems)),
+                'discount_amount'    => (float) ($item->discount ?? 0),
+            ])->values()->all();
+        }
+
+        if ($repairTicket && in_array($code, [DocumentType::INVOICE, DocumentType::DELIVERY_NOTE], true)) {
+            $documentItems = array_merge($documentItems, self::resolveRepairDocumentItems($repairTicket));
+        }
+
+        return $documentItems;
+    }
+
     protected static function resolveSaleMotorcycleUnit(Sale $sale, array $saleItems): ?MotorcycleUnit
     {
         $unitFromExistingDocs = $sale->documents()

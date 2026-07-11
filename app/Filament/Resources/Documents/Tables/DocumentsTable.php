@@ -24,7 +24,9 @@ class DocumentsTable
                     ->sortable(),
                 TextColumn::make('client_display')
                     ->label(__('messages.client'))
-                    ->state(fn (Document $record) => $record->client?->display_name ?? $record->reseller?->name)
+                    ->getStateUsing(fn (Document $record): ?string => filled($record->reseller_id)
+                        ? ($record->reseller?->name ?? $record->reseller()->withoutGlobalScopes()->value('name'))
+                        : $record->client?->display_name)
                     ->placeholder('-'),
                 TextColumn::make('total_amount')
                     ->label(__('messages.total_amount'))

@@ -518,10 +518,50 @@ class DocumentService
             return;
         }
 
-        // For all other types recalculate totals from stored items
+        // Sale-linked documents rebuild their line items from the CURRENT sale,
+        // exactly like a fresh generation — so "Regenerate" imports any changes
+        // made to the sale (items, prices, chassis/color, …) while keeping the
+        // same document number. SALE_RETURN / SUPPLIER_ORDER keep their own flow.
+        if ($document->sale_id
+            && ! \in_array($code, [DocumentType::SALE_RETURN, DocumentType::SUPPLIER_ORDER], true)) {
+            $this->resyncFromSale($document);
+            return;
+        }
+
+        // Standalone documents: recalculate totals from their own stored items.
         if (! \in_array($code, [DocumentType::SALE_RETURN, DocumentType::SUPPLIER_ORDER], true)) {
             $this->recalculateTotals($document);
         }
+    }
+
+    private function resyncFromSale(Document $document): void
+    {
+        $document->loadMissing([
+            'documentType',
+            'repairTicket',
+            'sale.items.product',
+            'sale.items.motorcycleUnit.motorcycleModel',
+        ]);
+
+        $sale = $document->sale;
+        $code = $document->documentType?->code;
+
+        if (! $sale || ! $code) {
+            $this->recalculateTotals($document);
+            return;
+        }
+
+        // Same item mapping the sale uses when it first creates the document.
+        $items = \App\Services\Sales\SaleService::buildDocumentItemsForSale(
+            $sale,
+            $sale->items->all(),
+            $code,
+            $document->repairTicket
+        );
+
+        $this->syncItems($document, $items);
+        $this->recalculateTotals($document);
+        $document->refresh();
     }
 
     private function resyncFromRepairTicket(Document $document): void
