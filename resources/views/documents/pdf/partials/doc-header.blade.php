@@ -16,6 +16,8 @@
       $company  — Company model (required)
       $qrSvg    — base64-encoded SVG QR string (optional)
 --}}
+{{-- Skipped in pre-printed mode: the header is already printed on the physical sheet. --}}
+@unless($preprinted ?? false)
 <table class="doc-header">
     <tr>
         {{-- LEFT: brand block (logo above company name, both centered together, block left-aligned) --}}
@@ -50,3 +52,4 @@
         </td>
     </tr>
 </table>
+@endunless

@@ -118,6 +118,21 @@
           30mm >= 24mm + 3mm + 3mm
     --}}
     <style>
+        @php $preprinted = $preprinted ?? false; @endphp
+        @if($preprinted)
+        /* ── Pre-printed A4 mode ──────────────────────────────────────────────
+           The header (logo / company name) and footer (legal info) are already
+           printed on the physical sheet, so the digital document omits them.
+           Reserve blank bands at the top and bottom, centre the body between
+           them, and rely on @page margins so DOMPDF auto-paginates — content
+           can never spill into the pre-printed footer zone. */
+        @page {
+            margin: 40mm 15mm 30mm 15mm;
+        }
+        body {
+            padding-bottom: 0;
+        }
+        @else
         @page {
             margin: 10mm 13mm 0mm 13mm;
         }
@@ -145,6 +160,7 @@
         }
         .pdf-footer table { width: 100%; border-collapse: collapse; }
         .pdf-footer td    { vertical-align: top; padding: 0; color: #000000; opacity: 1; }
+        @endif
 
         /* Table pagination */
         table { page-break-inside: auto; }
@@ -175,10 +191,13 @@
     @yield('content')
 
     {{-- Footer renders on every page via position:fixed.
-         Override @section('footer-partial') in child templates for a different footer variant. --}}
+         Override @section('footer-partial') in child templates for a different footer variant.
+         Skipped entirely in pre-printed mode (the footer is already on the paper). --}}
+    @unless($preprinted ?? false)
     @section('footer-partial')
         @include('documents.pdf.partials._footer-legal')
     @show
+    @endunless
 
 </body>
 </html>

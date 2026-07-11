@@ -120,6 +120,7 @@ class DocumentInfolist
     {
         $previewUrl = route('documents.pdf', $document);
         $downloadUrl = route('documents.download', $document);
+        $preprintedUrl = route('documents.pdf.preprinted', $document);
         $editUrl = route('filament.admin.resources.documents.edit', $document);
         $verificationUrl = $document->verification_url;
         $deleteUrl = route('documents.destroy', $document);
@@ -130,6 +131,7 @@ class DocumentInfolist
         $canEdit = auth()->user()?->hasRole('Super Admin') || auth()->user()?->hasRole('Admin');
         $previewLabel = e(__('messages.preview_pdf'));
         $downloadLabel = e(__('messages.download_pdf'));
+        $preprintedLabel = e(__('messages.preprinted_paper'));
         $editLabel = e(__('messages.edit'));
         $verifyLabel = e(__('messages.verify_document'));
         $regenerateLabel = e(__('messages.regenerate'));
@@ -144,6 +146,7 @@ class DocumentInfolist
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <a href="{$previewUrl}" target="_blank" style="display:inline-flex; align-items:center; min-height:36px; padding:8px 14px; border-radius:7px; background:#374151; color:#fff; font-weight:700; text-decoration:none;">{$previewLabel}</a>
                 <a href="{$downloadUrl}" style="display:inline-flex; align-items:center; min-height:36px; padding:8px 14px; border-radius:7px; background:#2563eb; color:#fff; font-weight:700; text-decoration:none;">{$downloadLabel}</a>
+                <a href="{$preprintedUrl}" target="_blank" title="{$preprintedLabel}" style="display:inline-flex; align-items:center; min-height:36px; padding:8px 14px; border-radius:7px; background:#7c3aed; color:#fff; font-weight:700; text-decoration:none;">{$preprintedLabel}</a>
                 {$editButton}
                 <a href="{$verificationUrl}" target="_blank" style="display:inline-flex; align-items:center; min-height:36px; padding:8px 14px; border-radius:7px; background:#059669; color:#fff; font-weight:700; text-decoration:none;">{$verifyLabel}</a>
                 <form method="POST" action="{$regenerateUrl}" style="display:inline;" onsubmit="return confirm({$regenerateConfirm})">

@@ -551,6 +551,7 @@ return [
     'download' => 'Telecharger',
     'download_pdf' => 'Telecharger PDF',
     'preview_pdf' => 'Apercu PDF',
+    'preprinted_paper' => 'Papier pré-imprimé',
     'pdf_information' => 'Informations PDF',
     'pdf_path' => 'Chemin PDF',
     'template_version' => 'Version du modele',

@@ -551,6 +551,7 @@ return [
     'download' => 'Download',
     'download_pdf' => 'Download PDF',
     'preview_pdf' => 'Preview PDF',
+    'preprinted_paper' => 'Pre-printed paper',
     'pdf_information' => 'PDF Information',
     'pdf_path' => 'PDF Path',
     'template_version' => 'Template Version',

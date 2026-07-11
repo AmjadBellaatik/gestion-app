@@ -198,6 +198,9 @@ Route::middleware([
     Route::get('/documents/{document}/pdf', [DocumentPdfController::class, 'preview'])
         ->name('documents.pdf');
 
+    Route::get('/documents/{document}/pdf/preprinted', [DocumentPdfController::class, 'preprinted'])
+        ->name('documents.pdf.preprinted');
+
     Route::get('/documents/{document}/download', [DocumentPdfController::class, 'download'])
         ->name('documents.download');
 

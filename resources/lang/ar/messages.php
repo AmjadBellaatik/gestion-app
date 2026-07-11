@@ -549,6 +549,7 @@ return [
     'download' => 'تحميل',
     'download_pdf' => 'تحميل PDF',
     'preview_pdf' => 'معاينة PDF',
+    'preprinted_paper' => 'ورق مطبوع مسبقاً',
     'pdf_information' => 'معلومات PDF',
     'pdf_path' => 'مسار PDF',
     'template_version' => 'نسخة القالب',

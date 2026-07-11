@@ -495,6 +495,68 @@ class DocumentService
         return $generatedPdf;
     }
 
+    /**
+     * Render a document PDF ON-THE-FLY (never stored) in a chosen print mode.
+     * $preprinted = true → the header (logo/company) and footer (legal info) are
+     * omitted and the body is laid out for pre-printed A4 letterhead: blank top
+     * and bottom bands, auto-pagination so content never enters the footer zone.
+     * The stored (full) PDF is left untouched — this is purely a print option.
+     */
+    public static function renderForPrint(Document $document, bool $preprinted = true): \Barryvdh\DomPDF\PDF
+    {
+        $previousLocale = app()->getLocale();
+        app()->setLocale($document->language ?? 'fr');
+
+        $document = Document::query()
+            ->with([
+                'company', 'documentType', 'documentTemplate', 'client', 'supplier',
+                'reseller', 'sale.reseller',
+                'items.product',
+                'items.motorcycleUnit.motorcycleModel.brand',
+                'items.motorcycleUnit.motorcycleModel.homologation',
+            ])
+            ->findOrFail($document->id);
+
+        $template = $document->documentTemplate;
+        $code     = $document->documentType?->code;
+        $view     = $template?->blade_view ?: $document->documentType->defaultBladeView();
+
+        $view = match ($code) {
+            DocumentType::INVOICE           => $document->invoice_source === 'repair'
+                                                ? 'documents.pdf.repair-invoice'
+                                                : 'documents.pdf.commercial-invoice',
+            DocumentType::QUOTATION         => 'documents.pdf.commercial-quotation',
+            DocumentType::DELIVERY_NOTE     => 'documents.pdf.delivery-note',
+            DocumentType::CONFORMITY        => 'documents.pdf.conformity-certificate',
+            DocumentType::WARRANTY_CONTRACT => 'documents.pdf.warranty-contract',
+            DocumentType::SUPPLIER_ORDER    => 'documents.pdf.supplier-order',
+            DocumentType::SALE_RETURN       => 'documents.pdf.sale-return',
+            DocumentType::OWNERSHIP         => 'documents.pdf.ownership-prsk',
+            default                         => $view,
+        };
+
+        $company = Company::findOrFail($document->company_id);
+        $qrSvg   = base64_encode(
+            QrCode::format('svg')->size(120)->margin(1)->generate($document->verification_url)
+        );
+
+        $pdf = Pdf::loadView($view, [
+            'document'       => $document,
+            'company'        => $company,
+            'template'       => $template,
+            'client'         => $document->client,
+            'supplier'       => $document->supplier,
+            'motorcycleUnit' => $document->primaryMotorcycleUnit(),
+            'qrSvg'          => $qrSvg,
+            'placeholders'   => DocumentPlaceholderService::context($document),
+            'preprinted'     => $preprinted,
+        ])->setPaper($template?->paper_size ?: 'A4', $template?->orientation ?: 'portrait');
+
+        app()->setLocale($previousLocale);
+
+        return $pdf;
+    }
+
     public static function generatePdfFor(Document $document): GeneratedPdf
     {
         $service = app(self::class);

@@ -31,6 +31,24 @@ class DocumentPdfController extends Controller
         ]);
     }
 
+    /**
+     * On-the-fly PDF for printing on PRE-PRINTED A4 letterhead: header + footer
+     * omitted, body centred between blank top/bottom bands. Never stored.
+     * ?download=1 forces a file download instead of inline preview.
+     */
+    public function preprinted(Document $document): Response
+    {
+        abort_unless(auth()->user()?->can('manage_documents'), 403);
+
+        $pdf = DocumentService::renderForPrint($document, true);
+        $disposition = request()->boolean('download') ? 'attachment' : 'inline';
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition . '; filename="' . $document->document_number . '-pre-imprime.pdf"',
+        ]);
+    }
+
     public function download(Document $document): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         abort_unless(auth()->user()?->can('manage_documents'), 403);
