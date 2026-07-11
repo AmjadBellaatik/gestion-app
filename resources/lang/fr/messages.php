@@ -983,6 +983,8 @@ return [
     'warranty_information'      => 'Informations de garantie',
     'warranty_status'           => 'Statut de la garantie',
     'developed_by'              => 'Développé par',
+    'login_welcome_title'       => 'Espace de gestion',
+    'login_welcome_subtitle'    => 'Connectez-vous pour accéder à votre espace',
 
     // Module Rapports — nouvelles clés uniquement
     'select_report_type'        => 'Choisir le type de rapport',

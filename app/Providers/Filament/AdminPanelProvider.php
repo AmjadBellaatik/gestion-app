@@ -233,6 +233,24 @@ class AdminPanelProvider extends PanelProvider
 
             /*
             |--------------------------------------------------------------------------
+            | Login / auth pages — branded professional look
+            |--------------------------------------------------------------------------
+            */
+
+            ->renderHook(
+                PanelsRenderHook::SIMPLE_PAGE_START,
+                fn (): string => view('filament.auth.login-style')->render()
+            )
+
+            ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                fn (): string => view('filament.auth.login-heading', [
+                    'company' => $this->getActiveCompany(),
+                ])->render()
+            )
+
+            /*
+            |--------------------------------------------------------------------------
             | Middleware
             |--------------------------------------------------------------------------
             */

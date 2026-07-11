@@ -983,6 +983,8 @@ return [
     'warranty_status'           => 'Warranty Status',
     'discount_validated_by'     => 'Discount Validated By',
     'developed_by'              => 'Developed by',
+    'login_welcome_title'       => 'Management Portal',
+    'login_welcome_subtitle'    => 'Sign in to access your workspace',
 
     // Reports module — new keys only (existing ones kept where they are in this file)
     'select_report_type'        => 'Select Report Type',

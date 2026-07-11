@@ -974,6 +974,8 @@ return [
     'stock_entry'               => 'إدخال المخزون',
     'transfer_movement'         => 'حركة النقل',
     'developed_by'              => 'طُوِّر بواسطة',
+    'login_welcome_title'       => 'بوابة الإدارة',
+    'login_welcome_subtitle'    => 'سجّل الدخول للوصول إلى مساحة العمل',
 
     // وحدة التقارير — مفاتيح جديدة فقط
     'select_report_type'        => 'اختر نوع التقرير',

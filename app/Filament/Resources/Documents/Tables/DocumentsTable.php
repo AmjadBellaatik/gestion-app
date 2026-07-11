@@ -7,12 +7,16 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class DocumentsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with([
+                'client', 'reseller', 'sale.reseller',
+            ]))
             ->columns([
                 TextColumn::make('document_number')
                     ->label(__('messages.document_number'))
@@ -24,9 +28,13 @@ class DocumentsTable
                     ->sortable(),
                 TextColumn::make('client_display')
                     ->label(__('messages.client'))
-                    ->getStateUsing(fn (Document $record): ?string => filled($record->reseller_id)
-                        ? ($record->reseller?->name ?? $record->reseller()->withoutGlobalScopes()->value('name'))
-                        : $record->client?->display_name)
+                    ->getStateUsing(fn (Document $record): ?string =>
+                        // Reseller can be linked directly on the document OR through its sale.
+                        $record->reseller?->name
+                        ?? $record->sale?->reseller?->name
+                        ?? $record->client?->display_name
+                        ?? ($record->reseller_id ? $record->reseller()->withoutGlobalScopes()->value('name') : null)
+                        ?? ($record->sale?->reseller_id ? $record->sale->reseller()->withoutGlobalScopes()->value('name') : null))
                     ->placeholder('-'),
                 TextColumn::make('total_amount')
                     ->label(__('messages.total_amount'))
