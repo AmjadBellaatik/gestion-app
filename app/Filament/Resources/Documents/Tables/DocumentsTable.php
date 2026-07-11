@@ -28,13 +28,7 @@ class DocumentsTable
                     ->sortable(),
                 TextColumn::make('client_display')
                     ->label(__('messages.client'))
-                    ->getStateUsing(fn (Document $record): ?string =>
-                        // Reseller can be linked directly on the document OR through its sale.
-                        $record->reseller?->name
-                        ?? $record->sale?->reseller?->name
-                        ?? $record->client?->display_name
-                        ?? ($record->reseller_id ? $record->reseller()->withoutGlobalScopes()->value('name') : null)
-                        ?? ($record->sale?->reseller_id ? $record->sale->reseller()->withoutGlobalScopes()->value('name') : null))
+                    ->getStateUsing(fn (Document $record): ?string => $record->partyDisplayName())
                     ->placeholder('-'),
                 TextColumn::make('total_amount')
                     ->label(__('messages.total_amount'))

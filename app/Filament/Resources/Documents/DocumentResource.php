@@ -95,22 +95,21 @@ class DocumentResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                // Client OR reseller — a reseller can be linked directly on the
-                // document or through its sale (reseller sales set reseller_id and
-                // null out client_id, so client.display_name alone is empty).
+                // Counterparty for every document type: reseller (direct or via
+                // sale), registered client, or the manual client stored in
+                // quotation metadata. See Document::partyDisplayName().
                 Tables\Columns\TextColumn::make('client_display')
                     ->label(__('messages.client'))
-                    ->getStateUsing(fn (Document $record): ?string =>
-                        $record->reseller?->name
-                        ?? $record->sale?->reseller?->name
-                        ?? $record->client?->display_name
-                        ?? ($record->reseller_id ? $record->reseller()->withoutGlobalScopes()->value('name') : null)
-                        ?? ($record->sale?->reseller_id ? $record->sale->reseller()->withoutGlobalScopes()->value('name') : null))
+                    ->getStateUsing(fn (Document $record): ?string => $record->partyDisplayName())
                     ->placeholder('-')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(
                         fn (Builder $q) => $q
                             ->whereHas('client', fn (Builder $c) => $c->where('display_name', 'like', "%{$search}%"))
                             ->orWhereHas('reseller', fn (Builder $r) => $r->where('name', 'like', "%{$search}%"))
+                            ->orWhere('metadata->manual_client_company_name', 'like', "%{$search}%")
+                            ->orWhere('metadata->manual_client_administration_name', 'like', "%{$search}%")
+                            ->orWhere('metadata->manual_client_first_name', 'like', "%{$search}%")
+                            ->orWhere('metadata->manual_client_last_name', 'like', "%{$search}%")
                     )),
 
                 Tables\Columns\TextColumn::make('supplier.name')

@@ -186,6 +186,55 @@ class Document extends Model
         return $this->hasMany(GeneratedPdf::class)->latest('generated_at');
     }
 
+    /**
+     * Human-readable name of the document's counterparty, for list/detail
+     * display across every document type. Resolves, in order:
+     *   1. a reseller — linked directly on the document or through its sale
+     *      (reseller sales set reseller_id and null out client_id);
+     *   2. a registered client (client_id);
+     *   3. a manual client captured in quotation metadata (no client_id).
+     * Read-only — does not affect document generation.
+     */
+    public function partyDisplayName(): ?string
+    {
+        $reseller = $this->reseller?->name
+            ?? $this->sale?->reseller?->name
+            ?? ($this->reseller_id ? $this->reseller()->withoutGlobalScopes()->value('name') : null)
+            ?? ($this->sale?->reseller_id ? $this->sale->reseller()->withoutGlobalScopes()->value('name') : null);
+
+        if (filled($reseller)) {
+            return $reseller;
+        }
+
+        if (filled($this->client?->display_name)) {
+            return $this->client->display_name;
+        }
+
+        return $this->manualClientName();
+    }
+
+    /**
+     * Name of the manual client captured in quotation metadata (documents with
+     * no client_id — e.g. Devis). Mirrors DocumentVerificationPresenter so the
+     * list, detail view and PDF stay consistent.
+     */
+    public function manualClientName(): ?string
+    {
+        $meta = $this->metadata ?? [];
+        $type = (string) data_get($meta, 'manual_client_type', 'person');
+
+        $name = match ($type) {
+            'company'        => data_get($meta, 'manual_client_company_name'),
+            'administration' => data_get($meta, 'manual_client_administration_name'),
+            default          => trim(
+                data_get($meta, 'manual_client_first_name', '') . ' ' .
+                data_get($meta, 'manual_client_last_name', '')
+            ),
+        };
+
+        return ($name && $name !== ' ') ? $name : data_get($meta, 'manual_client_name');
+    }
+
     public function primaryMotorcycleUnit(): ?MotorcycleUnit
     {
         $item = $this->relationLoaded('items')

@@ -37,12 +37,7 @@ class DocumentInfolist
                     Grid::make(3)->schema([
                         TextEntry::make('client_display')
                             ->label(__('messages.client'))
-                            ->getStateUsing(fn (Document $record): ?string =>
-                                $record->reseller?->name
-                                ?? $record->sale?->reseller?->name
-                                ?? $record->client?->display_name
-                                ?? ($record->reseller_id ? $record->reseller()->withoutGlobalScopes()->value('name') : null)
-                                ?? ($record->sale?->reseller_id ? $record->sale->reseller()->withoutGlobalScopes()->value('name') : null))
+                            ->getStateUsing(fn (Document $record): ?string => $record->partyDisplayName())
                             ->placeholder('-'),
                         TextEntry::make('document_date')
                             ->label(__('messages.document_date'))
