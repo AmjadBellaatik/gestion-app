@@ -32,6 +32,9 @@ class EditSale extends EditRecord
     /** New items added in this edit session — processed in afterSave. */
     protected array $pendingNewItems = [];
 
+    /** Quantity changes on existing product lines — stock deltas applied in afterSave. */
+    protected array $pendingQtyAdjustments = [];
+
     protected function getHeaderActions(): array
     {
         return [
@@ -137,6 +140,7 @@ class EditSale extends EditRecord
         }
 
         $this->pendingNewItems = [];
+        $this->pendingQtyAdjustments = [];
 
         foreach ($data['saleItems'] ?? [] as $row) {
             $itemId = $row['_sale_item_id'] ?? null;
@@ -147,14 +151,48 @@ class EditSale extends EditRecord
                 continue;
             }
 
-            SaleItem::whereKey($itemId)
+            $existing = SaleItem::whereKey($itemId)
                 ->where('sale_id', $this->getRecord()->id)
-                ->update([
-                    'discount'                => (float) ($row['discount'] ?? 0),
-                    'warranty_duration_value' => $row['warranty_duration_value'] ?? null,
-                    'warranty_duration_unit'  => $row['warranty_duration_unit'] ?? null,
-                    'warranty_kilometers'     => filled($row['warranty_kilometers'] ?? null) ? (int) $row['warranty_kilometers'] : null,
-                ]);
+                ->first();
+
+            if (! $existing) {
+                continue;
+            }
+
+            $updates = [
+                'discount'                => (float) ($row['discount'] ?? 0),
+                'warranty_duration_value' => $row['warranty_duration_value'] ?? null,
+                'warranty_duration_unit'  => $row['warranty_duration_unit'] ?? null,
+                'warranty_kilometers'     => filled($row['warranty_kilometers'] ?? null) ? (int) $row['warranty_kilometers'] : null,
+            ];
+
+            // Quantity is editable only for stock products (motorcycle units are
+            // always qty 1). When it changes, re-derive the line total/tax and queue
+            // a compensating stock movement for the delta so stock stays accurate.
+            // The form validator already caps the new quantity to available stock.
+            if (! $existing->motorcycle_unit_id) {
+                $newQty = max(0.0, (float) ($row['quantity'] ?? $existing->quantity));
+                $oldQty = (float) $existing->quantity;
+
+                if ($newQty > 0 && abs($newQty - $oldQty) > 0.0001) {
+                    $unitPrice = (float) $existing->unit_price;
+                    $lineTotal = round($newQty * $unitPrice, 2);
+
+                    $updates['quantity'] = $newQty;
+                    $updates['total']    = $lineTotal;
+                    $updates['tax']      = round($lineTotal * (20 / 120), 2);
+
+                    if ($existing->product_id) {
+                        $this->pendingQtyAdjustments[] = [
+                            'product_id' => (int) $existing->product_id,
+                            'delta'      => round($newQty - $oldQty, 2),
+                            'unit_price' => $unitPrice,
+                        ];
+                    }
+                }
+            }
+
+            SaleItem::whereKey($existing->id)->update($updates);
         }
 
         unset($data['saleItems']);
@@ -218,29 +256,28 @@ class EditSale extends EditRecord
                         }
                     }
                 }
-
-                // Recalculate sale totals from all items (existing + new)
-                $sale->loadMissing('saleItems');
-                $allItems     = $sale->saleItems()->get();
-                $grossTotal   = $allItems->sum(fn ($i) => (float) $i->total);
-                $totalDiscount = $allItems->sum(fn ($i) => (float) $i->discount);
-                $netTotal     = max(0.0, $grossTotal - $totalDiscount);
-                $saleTax      = round($netTotal * (20 / 120), 2);
-                $saleSubtotal = round($netTotal - $saleTax, 2);
-                $remaining    = max(0.0, round($netTotal - (float) $sale->paid_amount, 2));
-
-                $sale->update([
-                    'subtotal'         => $saleSubtotal,
-                    'tax'              => $saleTax,
-                    'discount'         => $totalDiscount,
-                    'total'            => round($netTotal, 2),
-                    'remaining_amount' => $remaining,
-                    'payment_status'   => $remaining <= 0 ? 'paid' : ($sale->paid_amount > 0 ? 'partial' : 'unpaid'),
-                ]);
             });
 
             $this->pendingNewItems = [];
         }
+
+        // Apply stock deltas for any quantity changes made to existing product
+        // lines (the SaleItem rows were already re-totalled in mutateFormDataBeforeSave).
+        if (! empty($this->pendingQtyAdjustments)) {
+            foreach ($this->pendingQtyAdjustments as $adjustment) {
+                $this->applyQuantityStockDelta($sale, $adjustment);
+            }
+
+            $this->pendingQtyAdjustments = [];
+        }
+
+        // Always recalculate the sale's aggregate totals from the CURRENT sale
+        // items. This must run on EVERY save — not only when a brand-new item was
+        // added — so that edits to an existing line's discount (Remise), warranty,
+        // etc. are actually rolled up onto the sale itself. Without this the sale
+        // (and any document that falls back to sale->total) keeps its initial
+        // amount even though sale_items.discount was updated.
+        $this->recalculateSaleTotals($sale);
 
         // Propagate the sale_date to all linked documents
         Document::query()
@@ -284,6 +321,85 @@ class EditSale extends EditRecord
 
                 $document->update(['metadata' => $metadata]);
             });
+    }
+
+    /**
+     * Re-roll the sale's aggregate money columns from its current line items.
+     *
+     * Gross = Σ(item.total) (TTC per line), discount = Σ(item.discount) clamped to
+     * gross so the net can never go negative. Net is TTC; tax/subtotal are reverse
+     * extracted at 20%. remaining_amount / payment_status are recomputed against the
+     * already-persisted paid_amount. Called on every edit so a changed Remise (even
+     * 0) is reflected on the sale — and therefore on any regenerated document.
+     */
+    private function recalculateSaleTotals(Sale $sale): void
+    {
+        $allItems      = $sale->saleItems()->get();
+        $grossTotal    = $allItems->sum(fn (SaleItem $i) => (float) $i->total);
+        $totalDiscount = min($allItems->sum(fn (SaleItem $i) => (float) $i->discount), $grossTotal);
+
+        // A bundled repair ticket's cost is added on top of the sale lines (it is
+        // NOT stored as a sale_item), exactly as SaleService::create() does. Keep
+        // it in the net so editing such a sale never drops the repair amount.
+        $repairTotal   = $sale->repair_ticket_id
+            ? max(0.0, (float) ($sale->repairTicket?->total_cost ?? 0))
+            : 0.0;
+
+        $netTotal      = round(max(0.0, $grossTotal - $totalDiscount) + $repairTotal, 2);
+        $saleTax       = round($netTotal * (20 / 120), 2);
+        $saleSubtotal  = round($netTotal - $saleTax, 2);
+        $paid          = (float) $sale->paid_amount;
+        $remaining     = max(0.0, round($netTotal - $paid, 2));
+
+        $sale->update([
+            'subtotal'         => $saleSubtotal,
+            'tax'              => $saleTax,
+            'discount'         => round($totalDiscount, 2),
+            'total'            => $netTotal,
+            'remaining_amount' => $remaining,
+            'payment_status'   => $remaining <= 0 ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
+        ]);
+    }
+
+    /**
+     * Record a compensating stock movement for a quantity change on an existing
+     * product line. A quantity increase leaves more stock (exit / sale); a decrease
+     * returns stock (entry / return, restored at cost 0). Best-effort: a missing
+     * warehouse or a movement failure must never break the sale save.
+     */
+    private function applyQuantityStockDelta(Sale $sale, array $adjustment): void
+    {
+        $productId = (int) ($adjustment['product_id'] ?? 0);
+        $delta     = (float) ($adjustment['delta'] ?? 0);
+
+        if ($productId <= 0 || abs($delta) < 0.0001) {
+            return;
+        }
+
+        $warehouseId = $this->resolveProductWarehouse($productId);
+
+        if (! $warehouseId) {
+            return;
+        }
+
+        try {
+            StockService::movement([
+                'company_id'     => $sale->company_id,
+                'product_id'     => $productId,
+                'warehouse_id'   => $warehouseId,
+                'movement_type'  => $delta > 0 ? 'sale' : 'return',
+                'type'           => $delta > 0 ? 'exit' : 'entry',
+                'quantity'       => abs($delta),
+                'unit_cost'      => $delta > 0 ? (float) ($adjustment['unit_price'] ?? 0) : 0.0,
+                'reference'      => $sale->sale_number,
+                'reference_type' => Sale::class,
+                'reference_id'   => $sale->id,
+                'notes'          => 'Sale #' . $sale->sale_number . ' quantity ' . ($delta > 0 ? 'increased' : 'reduced') . ' on edit',
+                'user_id'        => auth()->id(),
+            ]);
+        } catch (\Throwable) {
+            // Stock movement is best-effort; never break the sale save over it.
+        }
     }
 
     private function resolveProductWarehouse(int $productId): ?int

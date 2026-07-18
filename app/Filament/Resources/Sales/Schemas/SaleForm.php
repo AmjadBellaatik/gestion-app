@@ -167,12 +167,12 @@ class SaleForm
                                             ])
                                             ->default('product')
                                             ->live()
-                                            ->afterStateUpdated(function ($state, callable $get, callable $set): void {
+                                            ->afterStateUpdated(function ($state, callable $get, callable $set, string $operation): void {
                                                 $set('product_id', null);
                                                 $set('motorcycle_unit_id', null);
                                                 $set('quantity', 1);
                                                 $set('unit_price', 0);
-                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', $operation);
                                             })
                                             ->required()
                                             ->columnSpan(1),
@@ -212,10 +212,10 @@ class SaleForm
 
                                             ->live()
 
-                                            ->afterStateUpdated(function ($state, callable $get, callable $set): void {
+                                            ->afterStateUpdated(function ($state, callable $get, callable $set, string $operation): void {
                                                 if (! $state) {
                                                     $set('unit_price', 0);
-                                                    self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
+                                                    self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', $operation);
 
                                                     return;
                                                 }
@@ -233,7 +233,7 @@ class SaleForm
                                                         filled($get('../../reseller_id'))
                                                     )
                                                 );
-                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', $operation);
                                             })
                                             ->columnSpan(2),
 
@@ -254,7 +254,7 @@ class SaleForm
                                             ->visible(fn ($get) => $get('item_type') === 'motorcycle')
                                             ->required(fn ($get) => $get('item_type') === 'motorcycle')
                                             ->live()
-                                            ->afterStateUpdated(function ($state, callable $get, callable $set): void {
+                                            ->afterStateUpdated(function ($state, callable $get, callable $set, string $operation): void {
                                                 if (! $state) {
                                                     return;
                                                 }
@@ -275,7 +275,7 @@ class SaleForm
                                                     )
                                                 );
                                                 $set('quantity', 1);
-                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems');
+                                                self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', $operation);
                                             })
                                             ->searchable()
                                             ->preload()
@@ -290,7 +290,7 @@ class SaleForm
                                             ->default(1)
                                             ->minValue(1)
                                             ->live()
-                                            ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems'))
+                                            ->afterStateUpdated(fn ($state, callable $get, callable $set, string $operation) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', $operation))
                                             ->disabled(fn ($get) => $get('item_type') === 'motorcycle')
                                             ->helperText(function ($get) {
                                                 $productId = $get('product_id');
@@ -365,7 +365,7 @@ class SaleForm
                                             ->minValue(0)
                                             ->suffix('MAD')
                                             ->live()
-                                            ->afterStateUpdated(fn ($state, callable $get, callable $set) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems'))
+                                            ->afterStateUpdated(fn ($state, callable $get, callable $set, string $operation) => self::syncPaidAmount($get, $set, '../../paid_amount', '../../saleItems', $operation))
                                             ->visible(fn () => auth()->user()?->hasAnyRole(['Admin', 'Super Admin']))
                                             ->columnSpan(1),
 
@@ -753,9 +753,18 @@ class SaleForm
         callable $get,
         callable $set,
         string $paidAmountPath = 'paid_amount',
-        string $saleItemsPath = 'saleItems'
+        string $saleItemsPath = 'saleItems',
+        ?string $operation = null
     ): void
     {
+        // Only on creation does paid_amount default to the full net (convenience for
+        // "paid in full"). On EDIT, paid_amount reflects real recorded payments — never
+        // auto-overwrite it, or editing a line would silently mark a partially-paid
+        // sale as fully paid.
+        if ($operation === 'edit') {
+            return;
+        }
+
         $totals = self::calculateSaleTotals($get, $saleItemsPath, $paidAmountPath);
         $set($paidAmountPath, $totals['net']);
     }
