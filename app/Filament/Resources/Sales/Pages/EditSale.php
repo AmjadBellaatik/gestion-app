@@ -127,6 +127,23 @@ class EditSale extends EditRecord
             ];
         })->values()->all();
 
+        // Reconcile a legacy mismatch between the sale-level discount (what the view
+        // page shows, stored in sales.discount) and the per-line discounts. Older
+        // sales can carry sales.discount = 199 while the line's discount is 0, so the
+        // edit form showed 0 — and, worse, saving would roll that 0 back onto the
+        // sale and wipe the real Remise. Surface the stored amount so it is both
+        // visible and preserved on the next save.
+        $saleDiscount    = round((float) $record->discount, 2);
+        $lineDiscountSum = round(collect($data['saleItems'])->sum(fn ($row) => (float) ($row['discount'] ?? 0)), 2);
+
+        if ($saleDiscount > 0 && $lineDiscountSum !== $saleDiscount && ! empty($data['saleItems'])) {
+            if (count($data['saleItems']) === 1 || $lineDiscountSum === 0.0) {
+                // Single line, or multiple lines with no per-line discount recorded:
+                // attach the full sale discount to the first line so it is not lost.
+                $data['saleItems'][0]['discount'] = $saleDiscount;
+            }
+        }
+
         return $data;
     }
 
