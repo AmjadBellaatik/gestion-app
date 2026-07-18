@@ -144,6 +144,38 @@ class EditSale extends EditRecord
             }
         }
 
+        // The payment fields are create-time inputs — payment_method and the
+        // cheque / bank-transfer details live on the Payment record, not the sale.
+        // On edit, surface the real values from the sale's most recent payment so
+        // the form shows what is actually stored instead of a blank, "required"
+        // method that looks erased. Editing the sale never rewrites payments (those
+        // are managed by the Add-payment action / PaymentService), so this is
+        // display context that is simply preserved on save.
+        $payment = $record->payments()
+            ->with(['chequePayment', 'bankTransferPayment'])
+            ->latest('id')
+            ->first();
+
+        if ($payment) {
+            $data['payment_method'] = $payment->payment_method;
+
+            if ($payment->payment_method === 'card') {
+                $data['reference'] = $payment->reference;
+            }
+
+            if ($payment->payment_method === 'cheque' && $payment->chequePayment) {
+                $data['cheque_number']   = $payment->chequePayment->cheque_number;
+                $data['bank_name']       = $payment->chequePayment->bank_name;
+                $data['cheque_due_date'] = $payment->chequePayment->due_date;
+            }
+
+            if ($payment->payment_method === 'bank_transfer' && $payment->bankTransferPayment) {
+                $data['bank_name']          = $payment->bankTransferPayment->bank_name;
+                $data['transfer_reference'] = $payment->bankTransferPayment->reference_number;
+                $data['transfer_date']      = $payment->bankTransferPayment->transfer_date;
+            }
+        }
+
         return $data;
     }
 

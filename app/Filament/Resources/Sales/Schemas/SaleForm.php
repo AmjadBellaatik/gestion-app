@@ -514,13 +514,13 @@ class SaleForm
                                     ])
                                     ->default('cash')
                                     ->live()
-                                    ->required()
+                                    ->required(fn (string $operation) => $operation === 'create')
                                     ->afterStateUpdated(fn ($state, callable $set) => $set('reference', null)),
 
                                 TextInput::make('reference')
                                     ->label(__('messages.reference'))
                                     ->visible(fn ($get) => $get('payment_method') === 'card')
-                                    ->required(fn ($get) => $get('payment_method') === 'card')
+                                    ->required(fn ($get, string $operation) => $operation === 'create' && $get('payment_method') === 'card')
                                     ->maxLength(100)
                                     ->columnSpan(1),
 
@@ -544,7 +544,7 @@ class SaleForm
 
                                 TextInput::make('cheque_number')
                                     ->label(__('messages.cheque_number'))
-                                    ->required()
+                                    ->required(fn (string $operation) => $operation === 'create')
                                     ->maxLength(100)
                                     ->columnSpan(1),
 
@@ -569,13 +569,13 @@ class SaleForm
                                     ])
                                     ->searchable()
                                     ->preload()
-                                    ->required()
+                                    ->required(fn (string $operation) => $operation === 'create')
                                     ->columnSpan(1),
 
                                 \Filament\Forms\Components\DatePicker::make('cheque_due_date')
                                     ->label(__('messages.due_date'))
-                                    ->required()
-                                    ->minDate(today())
+                                    ->required(fn (string $operation) => $operation === 'create')
+                                    ->minDate(fn (string $operation) => $operation === 'create' ? today() : null)
                                     ->columnSpan(1),
 
                             ]),
@@ -598,20 +598,20 @@ class SaleForm
 
                                 TextInput::make('bank_name')
                                     ->label(__('messages.bank_name'))
-                                    ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
+                                    ->required(fn ($get, string $operation) => $operation === 'create' && $get('payment_method') === 'bank_transfer')
                                     ->maxLength(150)
                                     ->columnSpan(1),
 
                                 TextInput::make('transfer_reference')
                                     ->label(__('messages.reference_number'))
-                                    ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
+                                    ->required(fn ($get, string $operation) => $operation === 'create' && $get('payment_method') === 'bank_transfer')
                                     ->maxLength(100)
                                     ->columnSpan(1),
 
                                 \Filament\Forms\Components\DatePicker::make('transfer_date')
                                     ->label(__('messages.transfer_date'))
                                     ->default(today())
-                                    ->required(fn ($get) => $get('payment_method') === 'bank_transfer')
+                                    ->required(fn ($get, string $operation) => $operation === 'create' && $get('payment_method') === 'bank_transfer')
                                     ->columnSpan(1),
 
                             ]),
