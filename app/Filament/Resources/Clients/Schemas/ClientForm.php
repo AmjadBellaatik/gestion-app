@@ -118,7 +118,7 @@ class ClientForm
 
                     Select::make('nationality')
                         ->label(__('messages.nationality'))
-                        ->options(config('nationalities'))
+                        ->options(\App\Models\Client::nationalityOptions())
                         ->searchable()
                         ->visible(fn ($get) => $get('client_type') === 'person'),
 

@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
+use App\Services\Payments\PaymentDetailSyncService;
 use App\Services\Sales\SaleService;
 use App\Services\Stock\StockService;
 use App\Services\Warranty\WarrantyService;
@@ -506,96 +507,17 @@ class EditSale extends EditRecord
      * Reconcile the sale form's payment-section fields onto the sale's most
      * recent Payment record, so editing the cheque number / bank / due date (or
      * switching the method) on the sale actually corrects the linked payment
-     * instead of being silently discarded.
-     *
-     * Scope is deliberately narrow: this NEVER touches amount or status — those
-     * stay under PaymentService's control (they drive the ledger/treasury and
-     * motorcycle-unit-hold logic). It only corrects identifying details:
-     *   - Same method as the existing payment → fix cheque/bank/reference typos.
-     *   - Different method → reclassify the payment + swap its sub-record.
-     * Use the "Add payment" action for a genuinely new/additional payment.
+     * instead of being silently discarded. Shared with RepairTicket's own
+     * payment-correction action via PaymentDetailSyncService — see its
+     * docblock for exactly which fields are/aren't touched.
      */
     private function syncPaymentDetailsToLatestPayment(Sale $sale, array $submitted): void
     {
-        $method = $submitted['payment_method'] ?? null;
-
-        if (! $method) {
-            return;
-        }
-
         $payment = $sale->payments()->with(['chequePayment', 'bankTransferPayment'])->latest('id')->first();
 
-        if (! $payment) {
-            // No payment recorded yet for this sale — nothing to reconcile against.
-            // Use "Add payment" to record the first one.
-            return;
-        }
-
-        if ($payment->payment_method === $method) {
-            if ($method === 'card' && filled($submitted['reference'])) {
-                $payment->update(['reference' => $submitted['reference']]);
-            }
-
-            if ($method === 'cheque' && $payment->chequePayment) {
-                $payment->chequePayment->update([
-                    'cheque_number' => $submitted['cheque_number'] ?? $payment->chequePayment->cheque_number,
-                    'bank_name'     => $submitted['bank_name'] ?? $payment->chequePayment->bank_name,
-                    'due_date'      => $submitted['cheque_due_date'] ?? $payment->chequePayment->due_date,
-                ]);
-
-                if (filled($submitted['cheque_number'])) {
-                    $payment->update(['reference' => $submitted['cheque_number']]);
-                }
-            }
-
-            if ($method === 'bank_transfer' && $payment->bankTransferPayment) {
-                $payment->bankTransferPayment->update([
-                    'bank_name'        => $submitted['bank_name'] ?? $payment->bankTransferPayment->bank_name,
-                    'reference_number' => $submitted['transfer_reference'] ?? $payment->bankTransferPayment->reference_number,
-                    'transfer_date'    => $submitted['transfer_date'] ?? $payment->bankTransferPayment->transfer_date,
-                ]);
-
-                if (filled($submitted['transfer_reference'])) {
-                    $payment->update(['reference' => $submitted['transfer_reference']]);
-                }
-            }
-
-            return;
-        }
-
-        // Method reclassified (e.g. cash -> cheque). Swap the sub-record type;
-        // amount/status are left untouched.
-        $payment->chequePayment?->delete();
-        $payment->bankTransferPayment?->delete();
-
-        $payment->update([
-            'payment_method' => $method,
-            'reference'      => match ($method) {
-                'cheque'        => $submitted['cheque_number'] ?? null,
-                'bank_transfer' => $submitted['transfer_reference'] ?? null,
-                default         => $submitted['reference'] ?? null,
-            },
-        ]);
-
-        if ($method === 'cheque' && filled($submitted['cheque_number'])) {
-            ChequePayment::create([
-                'payment_id'    => $payment->id,
-                'cheque_number' => $submitted['cheque_number'],
-                'bank_name'     => $submitted['bank_name'] ?? null,
-                'due_date'      => $submitted['cheque_due_date'] ?? null,
-                'status'        => 'received',
-            ]);
-        }
-
-        if ($method === 'bank_transfer' && filled($submitted['bank_name'])) {
-            BankTransferPayment::create([
-                'payment_id'       => $payment->id,
-                'bank_name'        => $submitted['bank_name'],
-                'reference_number' => $submitted['transfer_reference'] ?? null,
-                'transfer_date'    => $submitted['transfer_date'] ?? now()->toDateString(),
-                'status'           => 'sent',
-            ]);
-        }
+        // No payment recorded yet for this sale — nothing to reconcile against.
+        // Use "Add payment" to record the first one.
+        PaymentDetailSyncService::sync($payment, $submitted);
     }
 
     private static function bankOptions(): array

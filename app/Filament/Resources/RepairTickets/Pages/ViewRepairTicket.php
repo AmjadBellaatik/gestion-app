@@ -5,12 +5,15 @@ namespace App\Filament\Resources\RepairTickets\Pages;
 use App\Filament\Concerns\HasAuditFooter;
 
 use App\Filament\Resources\RepairTickets\RepairTicketResource;
+use App\Models\BankTransferPayment;
+use App\Models\ChequePayment;
 use App\Models\DocumentType;
 use App\Models\Payment;
 use App\Models\RepairStep;
 use App\Models\RepairTicket;
 use App\Models\User;
 use App\Services\Documents\DocumentService;
+use App\Services\Payments\PaymentDetailSyncService;
 use App\Services\Workshop\RepairWorkflowService;
 
 use Filament\Actions\Action;
@@ -176,6 +179,12 @@ class ViewRepairTicket extends ViewRecord
                 ->action(function (RepairTicket $record, array $data): void {
                     $method = $data['payment_method'];
 
+                    // "reference" keeps the same summarized string it always
+                    // showed in the payments list on this page (unchanged), but
+                    // the cheque/bank-transfer details are now ALSO stored as
+                    // real structured sub-records — previously they were only
+                    // crammed into this string and never persisted anywhere
+                    // that could be read back or corrected later.
                     $ref = match ($method) {
                         'card'          => $data['reference'] ?? null,
                         'cheque'        => implode(' | ', array_filter([
@@ -191,7 +200,7 @@ class ViewRepairTicket extends ViewRecord
                         default => null,
                     };
 
-                    Payment::create([
+                    $payment = Payment::create([
                         'company_id'       => $record->company_id,
                         'repair_ticket_id' => $record->id,
                         'client_id'        => $record->client_id,
@@ -201,12 +210,143 @@ class ViewRepairTicket extends ViewRecord
                         'notes'            => $data['notes'] ?? null,
                     ]);
 
+                    if ($method === 'cheque' && filled($data['cheque_number'] ?? null)) {
+                        ChequePayment::create([
+                            'payment_id'    => $payment->id,
+                            'cheque_number' => $data['cheque_number'],
+                            'bank_name'     => $data['bank_name'] ?? null,
+                            'due_date'      => $data['cheque_due_date'] ?? null,
+                            'status'        => 'received',
+                        ]);
+                    }
+
+                    if ($method === 'bank_transfer' && filled($data['bank_name'] ?? null)) {
+                        BankTransferPayment::create([
+                            'payment_id'       => $payment->id,
+                            'bank_name'        => $data['bank_name'],
+                            'reference_number' => $data['transfer_reference'] ?? null,
+                            'transfer_date'    => $data['transfer_date'] ?? now()->toDateString(),
+                            'status'           => 'sent',
+                        ]);
+                    }
+
                     Notification::make()
                         ->title(__('messages.payment_registered'))
                         ->success()
                         ->send();
 
                     $this->refreshFormData(['payment_status', 'paid_amount', 'remaining_amount', 'status']);
+                }),
+
+            /*
+            |------------------------------------------------------------------
+            | Correct Payment Details — fixes cheque/bank details on the most
+            | recently registered payment (typo in cheque number, wrong bank,
+            | wrong due date, or reclassifying cash -> cheque, etc.). Never
+            | touches amount/status — use "Register payment" to record another
+            | installment.
+            |------------------------------------------------------------------
+            */
+
+            Action::make('correct_payment_details')
+                ->label(__('messages.correct_payment_details'))
+                ->icon('heroicon-o-pencil-square')
+                ->color('gray')
+                ->visible(fn (RepairTicket $record) => $record->payments()->exists())
+                ->fillForm(function (RepairTicket $record): array {
+                    $payment = $record->payments()
+                        ->with(['chequePayment', 'bankTransferPayment'])
+                        ->latest('id')
+                        ->first();
+
+                    if (! $payment) {
+                        return [];
+                    }
+
+                    $data = ['payment_method' => $payment->payment_method];
+
+                    if ($payment->payment_method === 'card') {
+                        $data['reference'] = $payment->reference;
+                    }
+
+                    if ($payment->payment_method === 'cheque' && $payment->chequePayment) {
+                        $data['cheque_number']   = $payment->chequePayment->cheque_number;
+                        $data['bank_name']       = $payment->chequePayment->bank_name;
+                        $data['cheque_due_date'] = optional($payment->chequePayment->due_date)->toDateString();
+                    }
+
+                    if ($payment->payment_method === 'bank_transfer' && $payment->bankTransferPayment) {
+                        $data['bank_name']          = $payment->bankTransferPayment->bank_name;
+                        $data['transfer_reference'] = $payment->bankTransferPayment->reference_number;
+                        $data['transfer_date']      = optional($payment->bankTransferPayment->transfer_date)->toDateString();
+                    }
+
+                    return $data;
+                })
+                ->schema([
+                    Select::make('payment_method')
+                        ->label(__('messages.payment_method'))
+                        ->options([
+                            'cash'          => __('messages.cash'),
+                            'card'          => __('messages.card'),
+                            'cheque'        => __('messages.cheque'),
+                            'bank_transfer' => __('messages.bank_transfer'),
+                        ])
+                        ->live()
+                        ->required(),
+
+                    TextInput::make('reference')
+                        ->label(__('messages.reference'))
+                        ->visible(fn ($get) => $get('payment_method') === 'card'),
+
+                    TextInput::make('cheque_number')
+                        ->label(__('messages.cheque_number'))
+                        ->visible(fn ($get) => $get('payment_method') === 'cheque')
+                        ->required(fn ($get) => $get('payment_method') === 'cheque'),
+
+                    Select::make('bank_name')
+                        ->label(__('messages.bank_name'))
+                        ->options([
+                            'Attijariwafa Bank'               => 'Attijariwafa Bank',
+                            'Banque Centrale Populaire (BCP)' => 'Banque Centrale Populaire (BCP)',
+                            'Bank of Africa (BOA)'            => 'Bank of Africa (BOA)',
+                            'CIH Bank'                        => 'CIH Bank',
+                            'Al Barid Bank'                   => 'Al Barid Bank',
+                            'Crédit Agricole du Maroc'        => 'Crédit Agricole du Maroc',
+                            'Crédit du Maroc'                 => 'Crédit du Maroc',
+                            'BMCI'                            => 'BMCI',
+                            'CFG Bank'                        => 'CFG Bank',
+                        ])
+                        ->searchable()
+                        ->visible(fn ($get) => in_array($get('payment_method'), ['cheque', 'bank_transfer']))
+                        ->required(fn ($get) => in_array($get('payment_method'), ['cheque', 'bank_transfer'])),
+
+                    DatePicker::make('cheque_due_date')
+                        ->label(__('messages.due_date'))
+                        ->visible(fn ($get) => $get('payment_method') === 'cheque')
+                        ->required(fn ($get) => $get('payment_method') === 'cheque'),
+
+                    TextInput::make('transfer_reference')
+                        ->label(__('messages.reference_number'))
+                        ->visible(fn ($get) => $get('payment_method') === 'bank_transfer')
+                        ->required(fn ($get) => $get('payment_method') === 'bank_transfer'),
+
+                    DatePicker::make('transfer_date')
+                        ->label(__('messages.transfer_date'))
+                        ->visible(fn ($get) => $get('payment_method') === 'bank_transfer'),
+                ])
+                ->action(function (RepairTicket $record, array $data): void {
+                    $payment = $record->payments()
+                        ->with(['chequePayment', 'bankTransferPayment'])
+                        ->latest('id')
+                        ->first();
+
+                    PaymentDetailSyncService::sync($payment, $data);
+
+                    Notification::make()
+                        ->title(__('messages.payment_updated'))
+                        ->success()
+                        ->send();
                 }),
 
             /*

@@ -130,7 +130,7 @@ class ClientInfolist
                         TextEntry::make('nationality')
                             ->label(__('messages.nationality'))
                             ->placeholder('-')
-                            ->formatStateUsing(fn ($state) => config('nationalities')[$state] ?? $state),
+                            ->formatStateUsing(fn ($state) => \App\Models\Client::nationalityOptions()[$state] ?? $state),
 
                     ])
                     ->columns(2),

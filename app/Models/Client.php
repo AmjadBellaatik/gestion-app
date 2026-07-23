@@ -355,6 +355,20 @@ class Client extends Model
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * Nationality options as [slug => translated label], built from
+     * config('nationalities') (a flat list of slugs matching lang file keys
+     * under 'messages.<slug>'). The stored value is always the slug — never
+     * a positional index — so the list can be reordered/extended freely
+     * without corrupting existing data.
+     */
+    public static function nationalityOptions(): array
+    {
+        return collect(config('nationalities'))
+            ->mapWithKeys(fn (string $slug) => [$slug => __('messages.' . $slug)])
+            ->toArray();
+    }
+
     public function scopeActive(
         Builder $query
     ): Builder {

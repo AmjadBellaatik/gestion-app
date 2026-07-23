@@ -499,10 +499,13 @@ class SaleForm
                                 TextInput::make('paid_amount')
                                     ->label(__('messages.paid_amount'))
                                     ->numeric()
-                                    ->default(0)
                                     ->minValue(0)
                                     ->live()
-                                    ->suffix('MAD'),
+                                    ->suffix('MAD')
+                                    // No default and no auto-fill on create: the user must
+                                    // explicitly type the amount actually collected — never
+                                    // silently assume "paid in full".
+                                    ->required(fn (string $operation) => $operation === 'create'),
 
                                 Select::make('payment_method')
                                     ->label(__('messages.payment_method'))
@@ -512,7 +515,7 @@ class SaleForm
                                         'cheque'        => __('messages.cheque'),
                                         'bank_transfer' => __('messages.bank_transfer'),
                                     ])
-                                    ->default('cash')
+                                    // No default: starts empty until the user picks one.
                                     ->live()
                                     ->required(fn (string $operation) => $operation === 'create')
                                     ->afterStateUpdated(fn ($state, callable $set) => $set('reference', null)),
@@ -757,16 +760,12 @@ class SaleForm
         ?string $operation = null
     ): void
     {
-        // Only on creation does paid_amount default to the full net (convenience for
-        // "paid in full"). On EDIT, paid_amount reflects real recorded payments — never
-        // auto-overwrite it, or editing a line would silently mark a partially-paid
-        // sale as fully paid.
-        if ($operation === 'edit') {
-            return;
-        }
-
-        $totals = self::calculateSaleTotals($get, $saleItemsPath, $paidAmountPath);
-        $set($paidAmountPath, $totals['net']);
+        // paid_amount is never auto-filled — on CREATE the user must explicitly
+        // type what was actually collected (empty + required, never assumed
+        // "paid in full" just because items were added). On EDIT it reflects
+        // real recorded payments and must not be silently overwritten either.
+        // Kept as a no-op (rather than removing every call site) so the
+        // live-total preview wiring above is unaffected.
     }
 
     private static function formatMoney(float $amount): string

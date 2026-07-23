@@ -255,15 +255,10 @@ class PaymentForm
                         ->label(__('messages.due_date'))
                         ->required(),
 
-                    Forms\Components\Select::make('chequePayment.status')
-                        ->label(__('messages.cheque_status'))
-                        ->options([
-                            'received' => __('messages.cheque_received'),
-                            'paid'     => __('messages.cheque_paid'),
-                            'bounced'  => __('messages.cheque_bounced'),
-                        ])
-                        ->default('received'),
-
+                    // The cheque's status is the same 3 states (received/paid/bounced)
+                    // as the top-level "status" field above when payment_method is
+                    // cheque — that one field now drives both; ChequePayment.status
+                    // is kept in sync with it automatically on save.
                     Forms\Components\FileUpload::make('chequePayment.scan_path')
                         ->label(__('messages.scan'))
                         ->directory('cheques')
@@ -296,14 +291,9 @@ class PaymentForm
                         ->label(__('messages.transfer_date'))
                         ->required(),
 
-                    Forms\Components\Select::make('bankTransferPayment.status')
-                        ->label(__('messages.transfer_status'))
-                        ->options([
-                            'sent'     => __('messages.transfer_sent'),
-                            'received' => __('messages.transfer_received'),
-                        ])
-                        ->default('sent'),
-
+                    // Same "sent"/"received" states as the top-level "status" field
+                    // above when payment_method is bank_transfer — one field drives
+                    // both; BankTransferPayment.status is kept in sync on save.
                     Forms\Components\FileUpload::make('bankTransferPayment.confirmation_file')
                         ->label(__('messages.confirmation_file'))
                         ->directory('bank_transfers')

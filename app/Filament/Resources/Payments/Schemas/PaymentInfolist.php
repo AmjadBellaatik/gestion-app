@@ -82,12 +82,6 @@ class PaymentInfolist
                             ->date()
                             ->placeholder('-'),
                     ]),
-                    Grid::make(3)->schema([
-                        TextEntry::make('chequePayment.status')
-                            ->label(__('messages.cheque_status'))
-                            ->badge()
-                            ->placeholder('-'),
-                    ]),
                 ]),
 
             Section::make(__('messages.bank_transfer_information'))
