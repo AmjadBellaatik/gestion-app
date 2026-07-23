@@ -41,6 +41,8 @@ class Client extends Model
         'country',
 
         'cin',
+        'identity_type',
+        'passport_number',
         'birth_date',
         'nationality',
 
@@ -103,6 +105,17 @@ class Client extends Model
             } elseif ($model->isDirty('is_blocked') && ! $model->is_blocked && $model->getOriginal('is_blocked')) {
                 $model->is_active = true;
             }
+
+            // A client can only be registered with ONE identity document — CIN or
+            // passport, never both. Whichever type is active wins; the other number
+            // is cleared so stale data can never leak into documents via the
+            // wrong field. Enforced here (not just in the form) so every write
+            // path — form, tinker, imports — respects the same rule.
+            if ($model->identity_type === 'passport') {
+                $model->cin = null;
+            } elseif ($model->identity_type === 'cin') {
+                $model->passport_number = null;
+            }
         });
     }
 
@@ -156,6 +169,27 @@ class Client extends Model
     | Helpers
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * The client's single identity number — CIN or passport, whichever they
+     * registered with. Every document/template must read identity through
+     * this accessor (never raw `cin`) so a passport-registered client never
+     * shows a blank/stale CIN and vice versa.
+     */
+    public function getIdentityNumberAttribute(): ?string
+    {
+        return $this->identity_type === 'passport'
+            ? $this->passport_number
+            : $this->cin;
+    }
+
+    /** Localized label matching whichever identity_number is in use. */
+    public function getIdentityLabelAttribute(): string
+    {
+        return $this->identity_type === 'passport'
+            ? __('messages.passport_number')
+            : __('messages.national_id');
+    }
 
     public function getDisplayNameAttribute(): string
     {

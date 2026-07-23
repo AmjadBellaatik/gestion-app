@@ -31,6 +31,7 @@
         'name'    => $v->clientName(),
         'type'    => $v->clientType(),
         'cin'     => $v->clientIdentity(),
+        'cinLabel'=> $v->clientIdentityLabel(),
         'address' => $v->clientAddress(),
     ])
 

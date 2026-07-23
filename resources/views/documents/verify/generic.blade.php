@@ -19,8 +19,9 @@
             'name'  => $v->clientName(),
             'type'  => $v->clientType(),
             'ice'   => $v->clientIce(),
-            'cin'   => $v->clientCin(),
-            'phone' => $v->clientPhone(),
+            'cin'      => $v->clientCin(),
+            'cinLabel' => $v->clientIdentityLabel(),
+            'phone'    => $v->clientPhone(),
         ])
     @endif
 

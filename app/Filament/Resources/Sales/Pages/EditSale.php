@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\Sales\Pages;
 
 use App\Filament\Resources\Sales\SaleResource;
+use App\Models\BankTransferPayment;
+use App\Models\ChequePayment;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\MotorcycleUnit;
@@ -18,11 +20,13 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Schemas\Components\Section;
 use Illuminate\Support\Facades\DB;
 
 class EditSale extends EditRecord
@@ -34,6 +38,9 @@ class EditSale extends EditRecord
 
     /** Quantity changes on existing product lines — stock deltas applied in afterSave. */
     protected array $pendingQtyAdjustments = [];
+
+    /** Payment-section field values submitted this save — reconciled onto the sale's latest Payment in afterSave. */
+    protected ?array $pendingPaymentDetails = null;
 
     protected function getHeaderActions(): array
     {
@@ -59,10 +66,50 @@ class EditSale extends EditRecord
                             'bank_transfer' => __('messages.bank_transfer'),
                         ])
                         ->required()
-                        ->default('cash'),
+                        ->default('cash')
+                        ->live(),
                     TextInput::make('reference')
                         ->label(__('messages.reference'))
-                        ->placeholder(__('messages.optional')),
+                        ->placeholder(__('messages.optional'))
+                        ->visible(fn (callable $get) => in_array($get('payment_method'), ['card', 'cash'], true)),
+
+                    // Cheque sub-record fields — required whenever this payment is by cheque,
+                    // so a second (or third...) cheque payment added from the sale is
+                    // never silently missing its ChequePayment row.
+                    Section::make(__('messages.cheque_information'))
+                        ->visible(fn (callable $get) => $get('payment_method') === 'cheque')
+                        ->schema([
+                            TextInput::make('cheque_number')
+                                ->label(__('messages.cheque_number'))
+                                ->required(fn (callable $get) => $get('payment_method') === 'cheque'),
+                            Select::make('bank_name')
+                                ->label(__('messages.bank_name'))
+                                ->options(self::bankOptions())
+                                ->searchable()
+                                ->required(fn (callable $get) => $get('payment_method') === 'cheque'),
+                            DatePicker::make('cheque_due_date')
+                                ->label(__('messages.due_date'))
+                                ->required(fn (callable $get) => $get('payment_method') === 'cheque'),
+                        ])
+                        ->columns(3),
+
+                    // Bank-transfer sub-record fields — same rationale as cheque above.
+                    Section::make(__('messages.bank_transfer_information'))
+                        ->visible(fn (callable $get) => $get('payment_method') === 'bank_transfer')
+                        ->schema([
+                            TextInput::make('transfer_bank_name')
+                                ->label(__('messages.bank_name'))
+                                ->required(fn (callable $get) => $get('payment_method') === 'bank_transfer'),
+                            TextInput::make('transfer_reference')
+                                ->label(__('messages.reference_number'))
+                                ->required(fn (callable $get) => $get('payment_method') === 'bank_transfer'),
+                            DatePicker::make('transfer_date')
+                                ->label(__('messages.transfer_date'))
+                                ->default(now())
+                                ->required(fn (callable $get) => $get('payment_method') === 'bank_transfer'),
+                        ])
+                        ->columns(3),
+
                     Textarea::make('notes')
                         ->label(__('messages.notes'))
                         ->rows(2)
@@ -70,15 +117,40 @@ class EditSale extends EditRecord
                 ])
                 ->action(function (array $data): void {
                     $sale = $this->getRecord();
+                    $method = $data['payment_method'];
 
-                    Payment::create([
+                    $payment = Payment::create([
                         'sale_id'        => $sale->id,
                         'client_id'      => $sale->client_id,
                         'amount'         => (float) $data['amount'],
-                        'payment_method' => $data['payment_method'],
-                        'reference'      => filled($data['reference'] ?? null) ? $data['reference'] : null,
+                        'payment_method' => $method,
+                        'reference'      => match ($method) {
+                            'cheque'        => $data['cheque_number'] ?? null,
+                            'bank_transfer' => $data['transfer_reference'] ?? null,
+                            default         => filled($data['reference'] ?? null) ? $data['reference'] : null,
+                        },
                         'notes'          => filled($data['notes'] ?? null) ? $data['notes'] : 'Payment for sale ' . $sale->sale_number,
                     ]);
+
+                    if ($method === 'cheque' && filled($data['cheque_number'] ?? null)) {
+                        ChequePayment::create([
+                            'payment_id'    => $payment->id,
+                            'cheque_number' => $data['cheque_number'],
+                            'bank_name'     => $data['bank_name'] ?? null,
+                            'due_date'      => $data['cheque_due_date'] ?? null,
+                            'status'        => 'received',
+                        ]);
+                    }
+
+                    if ($method === 'bank_transfer' && filled($data['transfer_bank_name'] ?? null)) {
+                        BankTransferPayment::create([
+                            'payment_id'       => $payment->id,
+                            'bank_name'        => $data['transfer_bank_name'],
+                            'reference_number' => $data['transfer_reference'] ?? null,
+                            'transfer_date'    => $data['transfer_date'] ?? now()->toDateString(),
+                            'status'           => 'sent',
+                        ]);
+                    }
 
                     Notification::make()
                         ->title(__('messages.payment_added'))
@@ -246,6 +318,20 @@ class EditSale extends EditRecord
 
         unset($data['saleItems']);
 
+        // Capture the submitted payment-section fields so afterSave() can
+        // reconcile them onto the sale's linked Payment record. These aren't
+        // Sale columns, so if we don't capture them here Filament's default
+        // $record->update($data) would just silently ignore them.
+        $this->pendingPaymentDetails = [
+            'payment_method'     => $data['payment_method'] ?? null,
+            'reference'          => $data['reference'] ?? null,
+            'cheque_number'      => $data['cheque_number'] ?? null,
+            'bank_name'          => $data['bank_name'] ?? null,
+            'cheque_due_date'    => $data['cheque_due_date'] ?? null,
+            'transfer_reference' => $data['transfer_reference'] ?? null,
+            'transfer_date'      => $data['transfer_date'] ?? null,
+        ];
+
         return $data;
     }
 
@@ -328,6 +414,12 @@ class EditSale extends EditRecord
         // amount even though sale_items.discount was updated.
         $this->recalculateSaleTotals($sale);
 
+        // Reconcile the payment-section fields onto the sale's linked payment.
+        if ($this->pendingPaymentDetails !== null) {
+            $this->syncPaymentDetailsToLatestPayment($sale, $this->pendingPaymentDetails);
+            $this->pendingPaymentDetails = null;
+        }
+
         // Propagate the sale_date to all linked documents
         Document::query()
             ->where('sale_id', $sale->id)
@@ -408,6 +500,123 @@ class EditSale extends EditRecord
             'remaining_amount' => $remaining,
             'payment_status'   => $remaining <= 0 ? 'paid' : ($paid > 0 ? 'partial' : 'unpaid'),
         ]);
+    }
+
+    /**
+     * Reconcile the sale form's payment-section fields onto the sale's most
+     * recent Payment record, so editing the cheque number / bank / due date (or
+     * switching the method) on the sale actually corrects the linked payment
+     * instead of being silently discarded.
+     *
+     * Scope is deliberately narrow: this NEVER touches amount or status — those
+     * stay under PaymentService's control (they drive the ledger/treasury and
+     * motorcycle-unit-hold logic). It only corrects identifying details:
+     *   - Same method as the existing payment → fix cheque/bank/reference typos.
+     *   - Different method → reclassify the payment + swap its sub-record.
+     * Use the "Add payment" action for a genuinely new/additional payment.
+     */
+    private function syncPaymentDetailsToLatestPayment(Sale $sale, array $submitted): void
+    {
+        $method = $submitted['payment_method'] ?? null;
+
+        if (! $method) {
+            return;
+        }
+
+        $payment = $sale->payments()->with(['chequePayment', 'bankTransferPayment'])->latest('id')->first();
+
+        if (! $payment) {
+            // No payment recorded yet for this sale — nothing to reconcile against.
+            // Use "Add payment" to record the first one.
+            return;
+        }
+
+        if ($payment->payment_method === $method) {
+            if ($method === 'card' && filled($submitted['reference'])) {
+                $payment->update(['reference' => $submitted['reference']]);
+            }
+
+            if ($method === 'cheque' && $payment->chequePayment) {
+                $payment->chequePayment->update([
+                    'cheque_number' => $submitted['cheque_number'] ?? $payment->chequePayment->cheque_number,
+                    'bank_name'     => $submitted['bank_name'] ?? $payment->chequePayment->bank_name,
+                    'due_date'      => $submitted['cheque_due_date'] ?? $payment->chequePayment->due_date,
+                ]);
+
+                if (filled($submitted['cheque_number'])) {
+                    $payment->update(['reference' => $submitted['cheque_number']]);
+                }
+            }
+
+            if ($method === 'bank_transfer' && $payment->bankTransferPayment) {
+                $payment->bankTransferPayment->update([
+                    'bank_name'        => $submitted['bank_name'] ?? $payment->bankTransferPayment->bank_name,
+                    'reference_number' => $submitted['transfer_reference'] ?? $payment->bankTransferPayment->reference_number,
+                    'transfer_date'    => $submitted['transfer_date'] ?? $payment->bankTransferPayment->transfer_date,
+                ]);
+
+                if (filled($submitted['transfer_reference'])) {
+                    $payment->update(['reference' => $submitted['transfer_reference']]);
+                }
+            }
+
+            return;
+        }
+
+        // Method reclassified (e.g. cash -> cheque). Swap the sub-record type;
+        // amount/status are left untouched.
+        $payment->chequePayment?->delete();
+        $payment->bankTransferPayment?->delete();
+
+        $payment->update([
+            'payment_method' => $method,
+            'reference'      => match ($method) {
+                'cheque'        => $submitted['cheque_number'] ?? null,
+                'bank_transfer' => $submitted['transfer_reference'] ?? null,
+                default         => $submitted['reference'] ?? null,
+            },
+        ]);
+
+        if ($method === 'cheque' && filled($submitted['cheque_number'])) {
+            ChequePayment::create([
+                'payment_id'    => $payment->id,
+                'cheque_number' => $submitted['cheque_number'],
+                'bank_name'     => $submitted['bank_name'] ?? null,
+                'due_date'      => $submitted['cheque_due_date'] ?? null,
+                'status'        => 'received',
+            ]);
+        }
+
+        if ($method === 'bank_transfer' && filled($submitted['bank_name'])) {
+            BankTransferPayment::create([
+                'payment_id'       => $payment->id,
+                'bank_name'        => $submitted['bank_name'],
+                'reference_number' => $submitted['transfer_reference'] ?? null,
+                'transfer_date'    => $submitted['transfer_date'] ?? now()->toDateString(),
+                'status'           => 'sent',
+            ]);
+        }
+    }
+
+    private static function bankOptions(): array
+    {
+        return [
+            'Attijariwafa Bank'               => 'Attijariwafa Bank',
+            'Banque Centrale Populaire (BCP)' => 'Banque Centrale Populaire (BCP)',
+            'Bank of Africa (BOA)'            => 'Bank of Africa (BOA)',
+            'CIH Bank'                        => 'CIH Bank',
+            'Al Barid Bank'                   => 'Al Barid Bank',
+            'Crédit Agricole du Maroc'        => 'Crédit Agricole du Maroc',
+            'Crédit du Maroc'                 => 'Crédit du Maroc',
+            'BMCI'                            => 'BMCI',
+            'CFG Bank'                        => 'CFG Bank',
+            'Saham Bank'                      => 'Saham Bank',
+            'Umnia Bank'                      => 'Umnia Bank',
+            'Bank Assafa'                     => 'Bank Assafa',
+            'Bank Al Yousr'                   => 'Bank Al Yousr',
+            'Al Akhdar Bank'                  => 'Al Akhdar Bank',
+            'Bank Al-Tamweel wal-Inma'        => 'Bank Al-Tamweel wal-Inma',
+        ];
     }
 
     /**

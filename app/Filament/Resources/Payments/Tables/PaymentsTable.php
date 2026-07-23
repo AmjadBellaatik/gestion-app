@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Payments\Tables;
 
+use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\GenericNotification;
 use App\Services\Payments\PaymentService;
@@ -22,6 +23,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 class PaymentsTable
@@ -34,12 +36,29 @@ class PaymentsTable
 
             ->defaultSort('created_at', 'desc')
 
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['client', 'sale.reseller']))
+
             ->columns([
 
-                TextColumn::make('client.display_name')
+                TextColumn::make('client_display')
                     ->label(__('messages.client'))
-                    ->searchable(false)
-                    ->placeholder('-'),
+                    // Reseller-linked sales carry no client_id on the payment, so the
+                    // plain 'client.display_name' column showed blank for them. Show
+                    // the sale's reseller name in the same column instead — same
+                    // pattern as Document::partyDisplayName() / DocumentResource.
+                    ->getStateUsing(fn (Payment $record): ?string => $record->partyDisplayName())
+                    ->placeholder('-')
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(
+                        // display_name is a PHP accessor, not a real column — search
+                        // across the underlying name columns it's built from instead.
+                        fn (Builder $q) => $q
+                            ->whereHas('client', fn (Builder $c) => $c
+                                ->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%")
+                                ->orWhere('company_name', 'like', "%{$search}%")
+                                ->orWhere('administration_name', 'like', "%{$search}%"))
+                            ->orWhereHas('sale.reseller', fn (Builder $r) => $r->where('name', 'like', "%{$search}%"))
+                    )),
 
                 TextColumn::make('sale.sale_number')
                     ->label(__('messages.sale'))

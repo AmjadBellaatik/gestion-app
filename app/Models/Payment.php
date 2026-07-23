@@ -171,4 +171,31 @@ class Payment extends Model
         return $this->hasOne(Transaction::class, 'reference_id')
             ->where('reference_type', self::class);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Display helpers
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Counterparty name for list/table display — a reseller-linked sale's
+     * reseller name takes priority (payments for reseller sales have no
+     * client_id), falling back to the payment's own client. Mirrors
+     * Document::partyDisplayName() so the same reseller-vs-client resolution
+     * is used consistently across the app.
+     */
+    public function partyDisplayName(): ?string
+    {
+        $reseller = $this->sale?->reseller?->name
+            ?? ($this->sale?->reseller_id
+                ? $this->sale->reseller()->withoutGlobalScopes()->value('name')
+                : null);
+
+        if (filled($reseller)) {
+            return $reseller;
+        }
+
+        return $this->client?->display_name;
+    }
 }

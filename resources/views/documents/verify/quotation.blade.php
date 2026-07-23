@@ -19,8 +19,9 @@
         'name'  => $v->displayClientName(),
         'type'  => $v->displayClientType(),
         'ice'   => $v->displayClientIce(),
-        'cin'   => $v->displayClientCin(),
-        'phone' => $v->displayClientPhone(),
+        'cin'      => $v->displayClientCin(),
+        'cinLabel' => $v->displayClientIdentityLabel(),
+        'phone'    => $v->displayClientPhone(),
     ])
 
 </div>

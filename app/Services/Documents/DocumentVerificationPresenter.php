@@ -55,7 +55,18 @@ final class DocumentVerificationPresenter
 
     public function clientCin(): ?string
     {
-        return $this->document->client?->cin;
+        return $this->document->client?->identity_number;
+    }
+
+    /** Localized label matching whichever identity_number clientCin() returns. */
+    public function clientIdentityLabel(): string
+    {
+        return $this->document->client?->identity_label ?? __('messages.national_id');
+    }
+
+    public function displayClientIdentityLabel(): string
+    {
+        return $this->isQuote() ? __('messages.national_id') : $this->clientIdentityLabel();
     }
 
     public function clientPhone(): ?string
@@ -79,7 +90,7 @@ final class DocumentVerificationPresenter
         return match ($client->client_type) {
             'company'        => $client->rc,
             'administration' => null,
-            default          => $client->rc ?: $client->cin,
+            default          => $client->rc ?: $client->identity_number,
         };
     }
 

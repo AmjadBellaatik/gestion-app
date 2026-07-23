@@ -53,7 +53,10 @@
     };
     $clientIdentity = $clientType === 'company'
         ? $client?->rc
-        : ($clientType === 'administration' ? null : ($client?->rc ?: $client?->cin));
+        : ($clientType === 'administration' ? null : ($client?->rc ?: $client?->identity_number));
+    $clientIdentityLabel = $clientType === 'company'
+        ? __('messages.rc')
+        : ($clientType === 'administration' ? null : ($client?->rc ? __('messages.rc') : $client?->identity_label));
     $warrantyDurationValue = data_get($document->metadata, 'warranty_duration_value')
         ?: data_get($document->metadata, 'warranty_years');
     $warrantyDurationUnit  = data_get($document->metadata, 'warranty_duration_unit', 'years');
@@ -124,7 +127,7 @@
         <div class="party-title">D'autre part</div>
         <div><strong>{{ $clientName }}</strong></div>
         @if($clientIdentity)
-            <div>{{ __('messages.cin') }} / {{ __('messages.rc') }} : {{ $clientIdentity }}</div>
+            <div>{{ $clientIdentityLabel }} : {{ $clientIdentity }}</div>
         @endif
         <div>{{ $client?->address }}</div>
     </div>

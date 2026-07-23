@@ -75,7 +75,8 @@
                         @if($client?->ice){{ __('messages.ice') }}: {{ $client->ice }}<br>@endif
                         @if($client?->phone){{ __('messages.phone') }}: {{ $client->phone }}<br>@endif
                     @else
-                        @if($client?->cin)CIN: {{ $client->cin }}<br>@endif
+                        @if($client?->identity_number){{ $client->identity_label }}: {{ $client->identity_number }}<br>@endif
+                        @if($client?->phone){{ __('messages.phone') }}: {{ $client->phone }}<br>@endif
                     @endif
                 </div>
             </td>

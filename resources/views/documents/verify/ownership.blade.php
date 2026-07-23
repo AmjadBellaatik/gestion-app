@@ -24,8 +24,8 @@
             {{ __('messages.owner_identity') }}
         </div>
         <div class="font-bold text-slate-900">{{ $v->clientName() }}</div>
-        @if($client?->cin)
-            <div class="mt-1 text-sm text-slate-600">CIN: {{ $client->cin }}</div>
+        @if($client?->identity_number)
+            <div class="mt-1 text-sm text-slate-600">{{ $client->identity_label }}: {{ $client->identity_number }}</div>
         @endif
         @if($client?->address)
             <div class="mt-1 text-sm leading-snug text-slate-500">{{ $client->address }}</div>

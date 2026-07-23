@@ -38,8 +38,8 @@
         <tr>
             <td>{{ __('messages.full_name') }}</td>
             <td>{{ $client?->display_name }}</td>
-            <td>{{ __('messages.cin') }}</td>
-            <td>{{ $client?->cin }}</td>
+            <td>{{ $client?->identity_label }}</td>
+            <td>{{ $client?->identity_number }}</td>
         </tr>
         <tr>
             <td>{{ __('messages.address') }}</td>

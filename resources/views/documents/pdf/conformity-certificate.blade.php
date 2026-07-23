@@ -45,7 +45,7 @@
     };
     $clientIdentity = $isResellerSale ? '' : ($clientType === 'company'
         ? $client?->rc
-        : ($clientType === 'administration' ? null : ($client?->rc ?: $client?->cin)));
+        : ($clientType === 'administration' ? null : ($client?->rc ?: $client?->identity_number)));
     $capacity = $model?->cylindree ? $model->cylindree . ' cm³' : null;
     $city = strtoupper(\Illuminate\Support\Str::ascii($company->city ?: 'SALE'));
 @endphp

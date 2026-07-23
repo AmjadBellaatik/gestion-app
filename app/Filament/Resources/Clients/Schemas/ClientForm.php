@@ -81,10 +81,35 @@ class ClientForm
                         ->visible(fn ($get) => $get('client_type') === 'person')
                         ->required(fn ($get) => $get('client_type') === 'person'),
 
+                    Select::make('identity_type')
+                        ->label(__('messages.identity_type'))
+                        ->options([
+                            'cin'      => __('messages.national_id'),
+                            'passport' => __('messages.passport'),
+                        ])
+                        ->default('cin')
+                        ->live()
+                        ->visible(fn ($get) => $get('client_type') === 'person')
+                        ->required(fn ($get) => $get('client_type') === 'person')
+                        ->afterStateUpdated(function ($state, callable $set): void {
+                            // Mutually exclusive: switching type clears the other
+                            // number so a stale value can never be saved alongside it.
+                            if ($state === 'passport') {
+                                $set('cin', null);
+                            } elseif ($state === 'cin') {
+                                $set('passport_number', null);
+                            }
+                        }),
+
                     TextInput::make('cin')
                         ->label(__('messages.national_id'))
-                        ->visible(fn ($get) => $get('client_type') === 'person')
-                        ->required(fn ($get) => $get('client_type') === 'person'),
+                        ->visible(fn ($get) => $get('client_type') === 'person' && ($get('identity_type') ?? 'cin') === 'cin')
+                        ->required(fn ($get) => $get('client_type') === 'person' && ($get('identity_type') ?? 'cin') === 'cin'),
+
+                    TextInput::make('passport_number')
+                        ->label(__('messages.passport_number'))
+                        ->visible(fn ($get) => $get('client_type') === 'person' && $get('identity_type') === 'passport')
+                        ->required(fn ($get) => $get('client_type') === 'person' && $get('identity_type') === 'passport'),
 
                     DatePicker::make('birth_date')
                         ->label(__('messages.birth_date'))
