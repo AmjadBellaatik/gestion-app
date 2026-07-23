@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ClientBalances\Widgets;
 
 use App\Models\Client;
 use App\Models\Payment;
+use App\Models\Reseller;
 use App\Models\Sale;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -30,14 +31,17 @@ class ClientBalanceStatsWidget extends StatsOverviewWidget
             ->selectRaw('COALESCE(SUM(GREATEST(paid_amount - total, 0)), 0) AS c')
             ->value('c');
 
-        // Distinct clients in debt / credit.
+        // Distinct clients OR resellers in debt / credit — the balances table
+        // now shows both in one list, so these counts cover both too.
         $clientsWithDebt = Client::query()
             ->whereHas('sales', fn ($q) => $q->whereIn('payment_status', ['unpaid', 'partial']))
-            ->count();
+            ->count()
+            + Reseller::query()->where('current_debt', '>', 0)->count();
 
         $clientsWithCredit = Client::query()
             ->whereHas('sales', fn ($q) => $q->whereColumn('paid_amount', '>', 'total'))
-            ->count();
+            ->count()
+            + Reseller::query()->where('credit_balance', '>', 0)->count();
 
         // Overdue amount = remaining on unpaid/partial sales aged past threshold.
         $overdue = (float) Sale::query()

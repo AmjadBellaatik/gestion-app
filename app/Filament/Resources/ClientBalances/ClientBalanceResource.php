@@ -4,7 +4,9 @@ namespace App\Filament\Resources\ClientBalances;
 
 use App\Filament\Resources\ClientBalances\Pages\ListClientBalances;
 use App\Filament\Resources\Clients\ClientResource;
-use App\Models\Client;
+use App\Filament\Resources\Payments\PaymentResource;
+use App\Filament\Resources\Resellers\ResellerResource;
+use App\Models\ClientBalanceRow;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -15,20 +17,21 @@ use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 /**
- * Accounting → Client Balances.
+ * Accounting → Client Balances ("Soldes clients").
  *
- * A read-only, accounting-grade view of every client's financial position.
- * Built on the Client model but registered as a separate resource so it can
- * live under the Accounting group with its own columns, filters and widgets.
+ * A read-only, accounting-grade view of every client's AND reseller's
+ * financial position, in one table — resellers are just another row here
+ * (source_type = 'reseller'), not a separate column or page.
  *
- * SOURCE OF TRUTH: every money figure is eager-loaded via
- * Client::scopeWithAccountingAggregates(), whose outstanding-balance formula is
- * byte-for-byte identical to the `outstanding_balance` accessor used by the
- * client detail and list pages. No stale `clients.balance` column is read.
+ * SOURCE OF TRUTH: backed by the `client_balance_rows` SQL view (see its
+ * migration), which computes the exact same outstanding-balance formula
+ * Client::getOutstandingBalanceAttribute() uses for clients, and reads
+ * Reseller::current_debt (kept in sync by Reseller::recalculate()) for
+ * resellers.
  */
 class ClientBalanceResource extends Resource
 {
-    protected static ?string $model = Client::class;
+    protected static ?string $model = ClientBalanceRow::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-scale';
 
@@ -79,8 +82,7 @@ class ClientBalanceResource extends Resource
 
     public static function getGloballySearchableAttributes(): array
     {
-        return ['first_name', 'last_name', 'company_name', 'administration_name',
-            'ice', 'cin', 'phone', 'email', 'representative_name'];
+        return ['display_name', 'ice', 'cin', 'phone', 'email', 'representative_name'];
     }
 
     // ── Header widgets ───────────────────────────────────────────────────────
@@ -95,8 +97,6 @@ class ClientBalanceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            // Single source of truth: all accounting figures from one scope.
-            ->modifyQueryUsing(fn (Builder $query) => $query->withAccountingAggregates())
             ->defaultSort('outstanding_balance_sum', 'desc')
             ->columns([
 
@@ -104,17 +104,14 @@ class ClientBalanceResource extends Resource
                     ->label(__('messages.client'))
                     ->searchable(query: fn (Builder $q, string $s) => $q
                         ->where(fn (Builder $w) => $w
-                            ->where('first_name', 'like', "%{$s}%")
-                            ->orWhere('last_name', 'like', "%{$s}%")
-                            ->orWhere('company_name', 'like', "%{$s}%")
-                            ->orWhere('administration_name', 'like', "%{$s}%")
+                            ->where('display_name', 'like', "%{$s}%")
                             ->orWhere('ice', 'like', "%{$s}%")
                             ->orWhere('cin', 'like', "%{$s}%")
                             ->orWhere('phone', 'like', "%{$s}%")
                             ->orWhere('email', 'like', "%{$s}%")
                             ->orWhere('representative_name', 'like', "%{$s}%")))
                     ->weight('bold')
-                    ->description(fn (Client $r) => $r->phone)
+                    ->description(fn (ClientBalanceRow $r) => $r->phone)
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('client_type')
@@ -124,18 +121,19 @@ class ClientBalanceResource extends Resource
                         'person'         => __('messages.person'),
                         'company'        => __('messages.company'),
                         'administration' => __('messages.administration'),
+                        'reseller'       => __('messages.reseller'),
                         default          => $state,
                     })
-                    ->color('gray')
+                    ->color(fn (string $state) => $state === 'reseller' ? 'info' : 'gray')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('messages.status'))
                     ->badge()
-                    ->state(fn (Client $r) => $r->is_blocked
+                    ->state(fn (ClientBalanceRow $r) => $r->is_blocked
                         ? __('messages.blocked')
                         : ($r->is_active ? __('messages.active') : __('messages.inactive')))
-                    ->color(fn (Client $r) => $r->is_blocked
+                    ->color(fn (ClientBalanceRow $r) => $r->is_blocked
                         ? 'danger'
                         : ($r->is_active ? 'success' : 'gray')),
 
@@ -153,32 +151,33 @@ class ClientBalanceResource extends Resource
                     ->sortable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('total_sales')
+                Tables\Columns\TextColumn::make('total_sales_sum')
                     ->label(__('messages.total_sales'))
                     ->money('MAD')
-                    ->sortable(query: fn (Builder $q, string $d) => $q->orderBy('total_sales_sum', $d))
+                    ->sortable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('total_payments')
+                Tables\Columns\TextColumn::make('total_payments_sum')
                     ->label(__('messages.total_payments'))
                     ->money('MAD')
-                    ->sortable(query: fn (Builder $q, string $d) => $q->orderBy('total_payments_sum', $d))
+                    ->sortable()
                     ->toggleable(),
 
-                // THE source-of-truth column — same accessor as detail/list pages.
-                Tables\Columns\TextColumn::make('outstanding_balance')
+                // THE source-of-truth column — clients: live sales aggregate;
+                // resellers: Reseller::current_debt. Same column either way.
+                Tables\Columns\TextColumn::make('outstanding_balance_sum')
                     ->label(__('messages.outstanding_balance'))
                     ->money('MAD')
                     ->badge()
                     ->color(fn ($state) => self::balanceColor((float) $state))
-                    ->sortable(query: fn (Builder $q, string $d) => $q->orderBy('outstanding_balance_sum', $d)),
+                    ->sortable(),
 
-                Tables\Columns\TextColumn::make('credit_balance')
+                Tables\Columns\TextColumn::make('credit_balance_sum')
                     ->label(__('messages.credit_balance'))
                     ->money('MAD')
                     ->badge()
                     ->color(fn ($state) => (float) $state > 0 ? 'info' : 'gray')
-                    ->sortable(query: fn (Builder $q, string $d) => $q->orderBy('credit_balance_sum', $d))
+                    ->sortable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('open_sales_count')
@@ -195,11 +194,6 @@ class ClientBalanceResource extends Resource
                     ->sortable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('company.name')
-                    ->label(__('messages.company'))
-                    ->placeholder('-')
-                    ->toggleable(isToggledHiddenByDefault: true),
-
                 Tables\Columns\TextColumn::make('created_at')
                     ->label(__('messages.created_at'))
                     ->dateTime('d/m/Y')
@@ -209,19 +203,15 @@ class ClientBalanceResource extends Resource
             ->filters([
                 Tables\Filters\Filter::make('only_debtors')
                     ->label(__('messages.only_debtors'))
-                    ->query(fn (Builder $q) => $q->whereHas('sales', fn (Builder $s) => $s
-                        ->whereIn('payment_status', ['unpaid', 'partial']))),
+                    ->query(fn (Builder $q) => $q->where('outstanding_balance_sum', '>', 0)),
 
                 Tables\Filters\Filter::make('only_credit')
                     ->label(__('messages.only_credit_clients'))
-                    ->query(fn (Builder $q) => $q->whereHas('sales', fn (Builder $s) => $s
-                        ->whereColumn('paid_amount', '>', 'total'))),
+                    ->query(fn (Builder $q) => $q->where('credit_balance_sum', '>', 0)),
 
                 Tables\Filters\Filter::make('only_overdue')
                     ->label(__('messages.only_overdue'))
-                    ->query(fn (Builder $q) => $q->whereHas('sales', fn (Builder $s) => $s
-                        ->whereIn('payment_status', ['unpaid', 'partial'])
-                        ->whereDate('sale_date', '<', now()->subDays(Client::OVERDUE_DAYS)))),
+                    ->query(fn (Builder $q) => $q->where('overdue_sales_count', '>', 0)),
 
                 Tables\Filters\Filter::make('only_active')
                     ->label(__('messages.only_active'))
@@ -237,6 +227,7 @@ class ClientBalanceResource extends Resource
                         'person'         => __('messages.person'),
                         'company'        => __('messages.company'),
                         'administration' => __('messages.administration'),
+                        'reseller'       => __('messages.reseller'),
                     ]),
 
                 Tables\Filters\Filter::make('balance_range')
@@ -248,9 +239,9 @@ class ClientBalanceResource extends Resource
                     ])
                     ->query(fn (Builder $q, array $data) => $q
                         ->when($data['min'] ?? null, fn (Builder $q, $v) => $q
-                            ->havingRaw('COALESCE(outstanding_balance_sum,0) >= ?', [$v]))
+                            ->where('outstanding_balance_sum', '>=', $v))
                         ->when($data['max'] ?? null, fn (Builder $q, $v) => $q
-                            ->havingRaw('COALESCE(outstanding_balance_sum,0) <= ?', [$v]))),
+                            ->where('outstanding_balance_sum', '<=', $v))),
 
                 Tables\Filters\Filter::make('last_payment_date')
                     ->schema([
@@ -259,47 +250,59 @@ class ClientBalanceResource extends Resource
                     ])
                     ->query(fn (Builder $q, array $data) => $q
                         ->when($data['from'] ?? null, fn (Builder $q, $d) => $q
-                            ->whereHas('payments', fn (Builder $p) => $p->where('status', 'paid')->whereDate('created_at', '>=', $d)))
+                            ->whereDate('last_payment_at', '>=', $d))
                         ->when($data['until'] ?? null, fn (Builder $q, $d) => $q
-                            ->whereHas('payments', fn (Builder $p) => $p->where('status', 'paid')->whereDate('created_at', '<=', $d)))),
+                            ->whereDate('last_payment_at', '<=', $d))),
             ])
             ->recordActions([
                 ActionGroup::make([
                     Action::make('view_client')
-                        ->label(__('messages.view_client'))
+                        ->label(fn (ClientBalanceRow $r) => $r->isReseller() ? __('messages.view_reseller') : __('messages.view_client'))
                         ->icon('heroicon-o-eye')
-                        ->url(fn (Client $r) => ClientResource::getUrl('view', ['record' => $r]))
+                        ->url(fn (ClientBalanceRow $r) => $r->isReseller()
+                            ? ResellerResource::getUrl('view', ['record' => $r->source_id])
+                            : ClientResource::getUrl('view', ['record' => $r->source_id]))
                         ->openUrlInNewTab(),
 
                     Action::make('view_sales')
                         ->label(__('messages.view_sales'))
                         ->icon('heroicon-o-shopping-cart')
-                        ->url(fn (Client $r) => ClientResource::getUrl('view', ['record' => $r]).'#relation-manager')
+                        ->url(fn (ClientBalanceRow $r) => ($r->isReseller()
+                            ? ResellerResource::getUrl('view', ['record' => $r->source_id])
+                            : ClientResource::getUrl('view', ['record' => $r->source_id])) . '#relation-manager')
                         ->openUrlInNewTab(),
 
                     Action::make('record_payment')
                         ->label(__('messages.record_payment'))
                         ->icon('heroicon-o-banknotes')
                         ->color('success')
-                        ->url(fn (Client $r) => \App\Filament\Resources\Payments\PaymentResource::getUrl('create', ['client_id' => $r->id]))
-                        ->visible(fn () => auth()->user()?->can('manage_payments') ?? false),
+                        ->url(fn (ClientBalanceRow $r) => PaymentResource::getUrl('create', ['client_id' => $r->source_id]))
+                        // Payments have no direct reseller_id column (only via
+                        // sale.reseller), so the quick-create shortcut only
+                        // applies to client rows — record it from the sale itself
+                        // for resellers.
+                        ->visible(fn (ClientBalanceRow $r) => ! $r->isReseller()
+                            && (auth()->user()?->can('manage_payments') ?? false)),
 
                     Action::make('account_statement')
                         ->label(__('messages.account_statement'))
                         ->icon('heroicon-o-document-chart-bar')
-                        ->url(fn (Client $r) => route('clients.statement', $r))
+                        ->url(fn (ClientBalanceRow $r) => route('clients.statement', $r->source_id))
+                        ->visible(fn (ClientBalanceRow $r) => ! $r->isReseller())
                         ->openUrlInNewTab(),
 
                     Action::make('export_pdf')
                         ->label(__('messages.export_pdf'))
                         ->icon('heroicon-o-document-arrow-down')
-                        ->url(fn (Client $r) => route('clients.statement.pdf', $r))
+                        ->url(fn (ClientBalanceRow $r) => route('clients.statement.pdf', $r->source_id))
+                        ->visible(fn (ClientBalanceRow $r) => ! $r->isReseller())
                         ->openUrlInNewTab(),
 
                     Action::make('export_excel')
                         ->label(__('messages.export_excel'))
                         ->icon('heroicon-o-table-cells')
-                        ->url(fn (Client $r) => route('clients.statement.csv', $r))
+                        ->url(fn (ClientBalanceRow $r) => route('clients.statement.csv', $r->source_id))
+                        ->visible(fn (ClientBalanceRow $r) => ! $r->isReseller())
                         ->openUrlInNewTab(),
                 ]),
             ]);

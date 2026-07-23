@@ -1180,6 +1180,7 @@ return [
     'min'                  => 'Min',
     'max'                  => 'Max',
     'view_client'          => 'Voir le client',
+    'view_reseller'        => 'Voir le revendeur',
     'view_sales'           => 'Voir les ventes',
     'view_payments'        => 'Voir les paiements',
     'account_statement'    => 'Relevé de compte',

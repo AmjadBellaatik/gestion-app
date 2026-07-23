@@ -1171,6 +1171,7 @@ return [
     'min'                  => 'الحد الأدنى',
     'max'                  => 'الحد الأقصى',
     'view_client'          => 'عرض العميل',
+    'view_reseller'        => 'عرض البائع',
     'view_sales'           => 'عرض المبيعات',
     'view_payments'        => 'عرض المدفوعات',
     'account_statement'    => 'كشف الحساب',
