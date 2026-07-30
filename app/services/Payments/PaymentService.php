@@ -45,7 +45,7 @@ class PaymentService
             if ($payment->sale_id) {
                 $sale = Sale::withoutGlobalScopes()->find($payment->sale_id);
                 if ($sale) {
-                    $this->updateSaleBalance($sale, (float) $payment->amount);
+                    $this->updateSaleBalance($sale);
                     // Motorcycle units linked to this sale can now be marked sold.
                     $this->transitionSaleMotorcycleUnits($sale, 'sold');
                 }
@@ -55,14 +55,12 @@ class PaymentService
             if ($payment->repair_ticket_id) {
                 $ticket = RepairTicket::withoutGlobalScopes()->find($payment->repair_ticket_id);
                 if ($ticket) {
-                    $this->updateRepairBalance($ticket, (float) $payment->amount);
+                    $this->updateRepairBalance($ticket);
                 }
             }
 
-            // --- 3. Ledger transaction (idempotent) ---
-            if (! $payment->transaction()->exists()) {
-                $this->createTransaction($payment);
-            }
+            // --- 3. Ledger transaction (idempotent, amount kept in sync) ---
+            $this->createTransaction($payment);
 
             // --- 4. Treasury entry for cash / card ---
             if (\in_array($payment->payment_method, ['cash', 'card'], true)) {
@@ -96,31 +94,6 @@ class PaymentService
 
     /*
     |--------------------------------------------------------------------------
-    | Reflect Pending Payment (cheque / bank_transfer created → update balance)
-    |--------------------------------------------------------------------------
-    */
-
-    public function reflectPendingPayment(Payment $payment): void
-    {
-        DB::transaction(function () use ($payment) {
-            if ($payment->sale_id) {
-                $sale = Sale::withoutGlobalScopes()->find($payment->sale_id);
-                if ($sale) {
-                    $this->updateSaleBalance($sale, (float) $payment->amount);
-                }
-            }
-
-            if ($payment->repair_ticket_id) {
-                $ticket = RepairTicket::withoutGlobalScopes()->find($payment->repair_ticket_id);
-                if ($ticket) {
-                    $this->updateRepairBalance($ticket, (float) $payment->amount);
-                }
-            }
-        });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
     | Reverse Payment (cancellation / rejection)
     |--------------------------------------------------------------------------
     */
@@ -133,7 +106,12 @@ class PaymentService
             if ($payment->sale_id) {
                 $sale = Sale::withoutGlobalScopes()->find($payment->sale_id);
                 if ($sale) {
-                    $this->reverseSaleBalance($sale, (float) $payment->amount);
+                    // Excludes $payment->id explicitly: when called from the
+                    // Payment::deleting hook the row still physically exists
+                    // (deleted_at not yet persisted), so a plain status-based
+                    // SUM would still include the amount being reversed.
+                    $this->reverseSaleBalance($sale, $payment->id);
+
                     // If sale has no remaining valid payments, release the hold.
                     $hasPendingPayment = $sale->payments()
                         ->whereNotIn('status', [self::STATUS_REJECTED, self::STATUS_CANCELLED, 'canceled'])
@@ -150,7 +128,7 @@ class PaymentService
             if ($payment->repair_ticket_id) {
                 $ticket = RepairTicket::withoutGlobalScopes()->find($payment->repair_ticket_id);
                 if ($ticket) {
-                    $this->reverseRepairBalance($ticket);
+                    $this->reverseRepairBalance($ticket, $payment->id);
                 }
             }
 
@@ -184,7 +162,7 @@ class PaymentService
 
             if ($sale) {
                 // Use the authoritative SUM-based reversal rather than stale-read arithmetic.
-                $this->reverseSaleBalance($sale, (float) $payment->amount);
+                $this->reverseSaleBalance($sale, $payment->id);
 
                 if ($sale->reseller_id && $sale->reseller) {
                     // Atomic increment/decrement avoids stale-read race when two cheques
@@ -331,9 +309,9 @@ class PaymentService
     */
 
     /*
-     * Active statuses: anything that is not yet rejected, cancelled, or bounced.
-     * Pending-validation cheques/transfers are committed funds — they should
-     * immediately reduce the remaining amount on the sale.
+     * Terminal (failed) statuses — kept only for the motorcycle-unit hold
+     * check above, which cares about "any payment still in flight" rather
+     * than "any payment that already counts as paid".
      */
     private const TERMINAL_STATUSES = [
         self::STATUS_REJECTED,
@@ -342,17 +320,21 @@ class PaymentService
         self::STATUS_BOUNCED,
     ];
 
-    private function updateSaleBalance(Sale $sale, float $amount): void
+    /*
+     * Only 'paid' payments count toward paid_amount / remaining_amount. A
+     * cheque/bank-transfer that is merely received/sent/pending validation
+     * is not yet money in hand, so it must never reduce what the sale (and
+     * therefore the client/reseller solde) shows as owed.
+     */
+    private function updateSaleBalance(Sale $sale): void
     {
         DB::transaction(function () use ($sale) {
             $locked = Sale::withoutGlobalScopes()->lockForUpdate()->findOrFail($sale->id);
 
-            $totalPaid    = (float) $locked->payments()
-                ->whereNotIn('status', self::TERMINAL_STATUSES)
-                ->sum('amount');
+            $totalPaid    = (float) $locked->payments()->where('status', self::STATUS_PAID)->sum('amount');
             $newRemaining = max(0, (float) $locked->total - $totalPaid);
 
-            $newPaymentStatus = $newRemaining <= 0 ? 'paid' : 'partial';
+            $newPaymentStatus = $newRemaining <= 0 ? 'paid' : ($totalPaid > 0 ? 'partial' : 'unpaid');
 
             $locked->update([
                 'paid_amount'      => $totalPaid,
@@ -363,13 +345,14 @@ class PaymentService
         });
     }
 
-    private function reverseSaleBalance(Sale $sale, float $amount): void
+    private function reverseSaleBalance(Sale $sale, int $excludePaymentId): void
     {
-        DB::transaction(function () use ($sale) {
+        DB::transaction(function () use ($sale, $excludePaymentId) {
             $locked = Sale::withoutGlobalScopes()->lockForUpdate()->findOrFail($sale->id);
 
             $totalPaid    = (float) $locked->payments()
-                ->whereNotIn('status', self::TERMINAL_STATUSES)
+                ->where('status', self::STATUS_PAID)
+                ->where('id', '!=', $excludePaymentId)
                 ->sum('amount');
             $newRemaining = max(0, (float) $locked->total - $totalPaid);
 
@@ -413,17 +396,17 @@ class PaymentService
     |--------------------------------------------------------------------------
     */
 
-    private function updateRepairBalance(RepairTicket $ticket, float $amount): void
+    private function updateRepairBalance(RepairTicket $ticket): void
     {
         DB::transaction(function () use ($ticket) {
             $locked = RepairTicket::withoutGlobalScopes()->lockForUpdate()->findOrFail($ticket->id);
 
             $total        = (float) ($locked->total_cost ?? 0);
             $totalPaid    = (float) $locked->payments()
-                ->whereNotIn('status', self::TERMINAL_STATUSES)
+                ->where('status', self::STATUS_PAID)
                 ->sum('amount');
             $newRemaining = max(0, $total - $totalPaid);
-            $newStatus    = $newRemaining <= 0 ? 'paid' : 'partial';
+            $newStatus    = $newRemaining <= 0 ? 'paid' : ($totalPaid > 0 ? 'partial' : 'unpaid');
 
             if ($totalPaid > ($total + 0.01)) {
                 throw new \RuntimeException(
@@ -456,14 +439,15 @@ class PaymentService
         });
     }
 
-    private function reverseRepairBalance(RepairTicket $ticket): void
+    private function reverseRepairBalance(RepairTicket $ticket, int $excludePaymentId): void
     {
-        DB::transaction(function () use ($ticket) {
+        DB::transaction(function () use ($ticket, $excludePaymentId) {
             $locked = RepairTicket::withoutGlobalScopes()->lockForUpdate()->findOrFail($ticket->id);
 
             $total        = (float) ($locked->total_cost ?? 0);
             $totalPaid    = (float) $locked->payments()
-                ->whereNotIn('status', self::TERMINAL_STATUSES)
+                ->where('status', self::STATUS_PAID)
+                ->where('id', '!=', $excludePaymentId)
                 ->sum('amount');
             $newRemaining = max(0, $total - $totalPaid);
             $newStatus    = $totalPaid <= 0 ? 'unpaid' : ($newRemaining <= 0 ? 'paid' : 'partial');
@@ -523,7 +507,7 @@ class PaymentService
     {
         // firstOrCreate on reference_type+reference_id is idempotent against
         // the TOCTOU race that the outer exists() check cannot prevent on its own.
-        Transaction::firstOrCreate(
+        $transaction = Transaction::firstOrCreate(
             [
                 'reference_type' => Payment::class,
                 'reference_id'   => $payment->id,
@@ -541,12 +525,17 @@ class PaymentService
                 'created_by'       => auth()->id(),
             ]
         );
+
+        // Keep the ledger entry's amount in sync with a later payment correction.
+        if ((float) $transaction->amount !== (float) $payment->amount) {
+            $transaction->update(['amount' => $payment->amount]);
+        }
     }
 
     private function createTreasuryTransaction(Payment $payment): void
     {
         // firstOrCreate replaces the exists()+create() TOCTOU race condition.
-        TreasuryTransaction::firstOrCreate(
+        $treasury = TreasuryTransaction::firstOrCreate(
             ['payment_id' => $payment->id],
             [
                 'company_id'  => $payment->company_id,
@@ -555,6 +544,11 @@ class PaymentService
                 'description' => $this->descriptionFor($payment),
             ]
         );
+
+        // Keep the treasury entry's amount in sync with a later payment correction.
+        if ((float) $treasury->amount !== (float) $payment->amount) {
+            $treasury->update(['amount' => $payment->amount]);
+        }
     }
 
     private function createAccountingEntry(Payment $payment): void

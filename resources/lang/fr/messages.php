@@ -940,6 +940,7 @@ return [
     'cheque_bounced'           => 'Chèque retourné (impayé)',
     'transfer_sent'            => 'Virement envoyé',
     'transfer_received'        => 'Virement reçu',
+    'transfer_paid'            => 'Virement confirmé',
     'cheque_status'            => 'Statut du chèque',
     'transfer_status'          => 'Statut du virement',
     'blocked_bounced_cheque'   => 'Chèque impayé (retourné) ref.',

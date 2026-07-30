@@ -189,6 +189,7 @@ class PaymentForm
                                 'bank_transfer' => [
                                     'sent'     => __('messages.transfer_sent'),
                                     'received' => __('messages.transfer_received'),
+                                    'paid'     => __('messages.transfer_paid'),
                                 ],
                                 default => [
                                     'paid'      => __('messages.paid'),

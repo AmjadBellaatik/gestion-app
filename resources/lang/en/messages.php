@@ -939,6 +939,7 @@ return [
     'cheque_bounced'           => 'Cheque Bounced (Unpaid)',
     'transfer_sent'            => 'Transfer Sent',
     'transfer_received'        => 'Transfer Received',
+    'transfer_paid'            => 'Transfer Confirmed',
     'cheque_status'            => 'Cheque Status',
     'transfer_status'          => 'Transfer Status',
     'blocked_bounced_cheque'   => 'Bounced cheque (unpaid) ref.',

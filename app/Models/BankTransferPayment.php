@@ -9,6 +9,7 @@ class BankTransferPayment extends Model
     public const STATUSES = [
         'sent'     => 'sent',
         'received' => 'received',
+        'paid'     => 'paid',
     ];
 
     protected $fillable = [

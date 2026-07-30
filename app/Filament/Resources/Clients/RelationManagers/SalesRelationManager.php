@@ -135,6 +135,7 @@ class SalesRelationManager extends RelationManager
                                             'bank_transfer' => [
                                                 'sent'     => __('messages.transfer_sent'),
                                                 'received' => __('messages.transfer_received'),
+                                                'paid'     => __('messages.transfer_paid'),
                                             ],
                                             default => [
                                                 'paid'      => __('messages.paid'),
@@ -230,6 +231,7 @@ class SalesRelationManager extends RelationManager
                                     ->options([
                                         'sent'     => __('messages.transfer_sent'),
                                         'received' => __('messages.transfer_received'),
+                                        'paid'     => __('messages.transfer_paid'),
                                     ])
                                     ->default('sent'),
 

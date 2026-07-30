@@ -30,6 +30,7 @@ class Payment extends Model
     public const TRANSFER_STATUSES = [
         'sent',
         'received',
+        'paid',
     ];
 
     protected $fillable = [
@@ -71,42 +72,62 @@ class Payment extends Model
                 // Cash / card — immediately credit balance + create ledger entries.
                 $service->applyPayment($model);
             } else {
-                // Cheque / bank_transfer — put units on hold AND immediately
-                // reflect the committed amount in the sale/repair balance.
+                // Cheque / bank_transfer awaiting validation — only put units on
+                // hold. The amount must NOT count toward paid_amount / the
+                // sale-remaining / client-reseller solde until the payment is
+                // actually marked 'paid'.
                 $service->holdLinkedMotorcycleUnits($model);
-                $service->reflectPendingPayment($model);
             }
         });
 
         static::updated(function (Payment $model) {
-            if (! $model->wasChanged('status')) {
+            $statusChanged = $model->wasChanged('status');
+            $amountChanged = $model->wasChanged('amount');
+
+            if (! $statusChanged && ! $amountChanged) {
                 return;
             }
 
             $service = app(PaymentService::class);
 
-            if ($model->status === 'paid') {
-                // Payment was validated — credit balance and finalise unit status.
-                $service->applyPayment($model);
-            }
-
-            // Bank transfer confirmed by bank — treat as paid.
-            if ($model->payment_method === 'bank_transfer' && $model->status === 'received') {
-                $service->applyPayment($model);
-            }
-
-            if (\in_array($model->status, ['rejected', 'cancelled', 'canceled'], true)) {
+            if ($statusChanged && \in_array($model->status, ['rejected', 'cancelled', 'canceled'], true)) {
                 // Payment was cancelled — release holds and reverse if needed.
                 $service->reversePayment($model);
+
+                return;
             }
 
             // Cheque bounced — block client / reseller.
-            if ($model->payment_method === 'cheque' && $model->status === 'bounced') {
+            if ($statusChanged && $model->payment_method === 'cheque' && $model->status === 'bounced') {
                 $service->handleBouncedCheque($model);
+
+                return;
             }
+
+            if ($model->status === 'paid') {
+                // Payment is validated — (re)credit the balance. This also
+                // covers an amount correction made after validation, so the
+                // sale/repair balance and linked ledger/treasury entries stay
+                // in sync with the payment's current amount.
+                $service->applyPayment($model);
+
+                return;
+            }
+
+            if ($statusChanged) {
+                // Moved OUT of 'paid' into a still-pending state (received /
+                // sent / pending / pending_validation) — that amount must
+                // stop being counted everywhere it was previously credited.
+                $service->reversePayment($model);
+            }
+
+            // Amount edited while already pending (never counted toward
+            // paid_amount in the first place) — nothing to resync.
         });
 
-        // Reverse balance BEFORE the soft-delete so the authoritative SUM is still correct.
+        // Reverse balance BEFORE the soft-delete so the model's relations are
+        // still usable; PaymentService excludes this row explicitly since it
+        // still physically exists (deleted_at not yet set) at this point.
         static::deleting(function (Payment $model) {
             $terminal = ['rejected', 'cancelled', 'canceled', 'bounced'];
             if (! \in_array($model->status, $terminal, true)) {

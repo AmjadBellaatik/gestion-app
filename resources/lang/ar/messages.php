@@ -921,6 +921,7 @@ return [
     'cheque_bounced'           => 'شيك مرتجع (غير مدفوع)',
     'transfer_sent'            => 'تحويل مُرسَل',
     'transfer_received'        => 'تحويل مُستلَم',
+    'transfer_paid'            => 'تحويل مؤكَّد',
     'cheque_status'            => 'حالة الشيك',
     'transfer_status'          => 'حالة التحويل',
     'blocked_bounced_cheque'   => 'شيك مرتجع (غير مدفوع) مرجع.',

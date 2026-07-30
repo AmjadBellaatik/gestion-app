@@ -144,13 +144,6 @@ class ClientBalanceResource extends Resource
                     ->sortable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('last_sale_at')
-                    ->label(__('messages.last_sale_date'))
-                    ->dateTime('d/m/Y')
-                    ->placeholder('-')
-                    ->sortable()
-                    ->toggleable(),
-
                 Tables\Columns\TextColumn::make('total_sales_sum')
                     ->label(__('messages.total_sales'))
                     ->money('MAD')
@@ -171,28 +164,6 @@ class ClientBalanceResource extends Resource
                     ->badge()
                     ->color(fn ($state) => self::balanceColor((float) $state))
                     ->sortable(),
-
-                Tables\Columns\TextColumn::make('credit_balance_sum')
-                    ->label(__('messages.credit_balance'))
-                    ->money('MAD')
-                    ->badge()
-                    ->color(fn ($state) => (float) $state > 0 ? 'info' : 'gray')
-                    ->sortable()
-                    ->toggleable(),
-
-                Tables\Columns\TextColumn::make('open_sales_count')
-                    ->label(__('messages.open_sales'))
-                    ->badge()
-                    ->color('warning')
-                    ->sortable()
-                    ->toggleable(),
-
-                Tables\Columns\TextColumn::make('overdue_sales_count')
-                    ->label(__('messages.overdue_sales'))
-                    ->badge()
-                    ->color(fn ($state) => (int) $state > 0 ? 'danger' : 'gray')
-                    ->sortable()
-                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label(__('messages.created_at'))
