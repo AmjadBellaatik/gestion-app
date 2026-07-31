@@ -43,6 +43,9 @@ class EditSale extends EditRecord
     /** Payment-section field values submitted this save — reconciled onto the sale's latest Payment in afterSave. */
     protected ?array $pendingPaymentDetails = null;
 
+    /** Submitted "Montant payé" — reconciled onto a real Payment in afterSave instead of ever being written to sales.paid_amount directly. */
+    protected ?float $pendingPaidAmount = null;
+
     protected function getHeaderActions(): array
     {
         return [
@@ -333,6 +336,19 @@ class EditSale extends EditRecord
             'transfer_date'      => $data['transfer_date'] ?? null,
         ];
 
+        // "Montant payé" must NEVER be written straight to sales.paid_amount —
+        // that column is derived exclusively from the sum of the sale's real
+        // 'paid' Payment records (PaymentService::updateSaleBalance). Writing
+        // it directly here would look like it worked, then get silently
+        // clobbered the next time any payment event or the background
+        // reconciler recomputes the sale from the actual payments. Capture it
+        // and strip it from $data; afterSave() reconciles it onto a real
+        // Payment instead.
+        if (array_key_exists('paid_amount', $data)) {
+            $this->pendingPaidAmount = (float) $data['paid_amount'];
+            unset($data['paid_amount']);
+        }
+
         return $data;
     }
 
@@ -418,8 +434,19 @@ class EditSale extends EditRecord
         // Reconcile the payment-section fields onto the sale's linked payment.
         if ($this->pendingPaymentDetails !== null) {
             $this->syncPaymentDetailsToLatestPayment($sale, $this->pendingPaymentDetails);
-            $this->pendingPaymentDetails = null;
         }
+
+        // Reconcile "Montant payé" onto a real Payment (see mutateFormDataBeforeSave
+        // for why this never touches sales.paid_amount directly). Runs after the
+        // detail sync above so a payment_method change is already reflected on the
+        // target payment, and after recalculateSaleTotals() so the sale's `total`
+        // is current before PaymentService derives remaining_amount from it.
+        if ($this->pendingPaidAmount !== null) {
+            $this->syncPaidAmountToPayment($sale, $this->pendingPaidAmount, $this->pendingPaymentDetails['payment_method'] ?? null);
+        }
+
+        $this->pendingPaymentDetails = null;
+        $this->pendingPaidAmount = null;
 
         // Propagate the sale_date to all linked documents
         Document::query()
@@ -518,6 +545,51 @@ class EditSale extends EditRecord
         // No payment recorded yet for this sale — nothing to reconcile against.
         // Use "Add payment" to record the first one.
         PaymentDetailSyncService::sync($payment, $submitted);
+    }
+
+    /**
+     * Reconcile the "Montant payé" field onto a real Payment record instead of
+     * ever writing to sales.paid_amount directly (see mutateFormDataBeforeSave).
+     * paid_amount is compared against the true sum of 'paid' payments (not the
+     * possibly-stale sale column), and the DIFFERENCE is applied to the sale's
+     * most recent 'paid' payment — a delta, not an overwrite, so a sale with
+     * several separate paid payments doesn't have its other payments' amounts
+     * silently erased by editing this single aggregate field. Updating that
+     * payment's amount fires Payment::updated, which is what actually recomputes
+     * sales.paid_amount/remaining_amount/payment_status and keeps the linked
+     * ledger/treasury entries in sync (see PaymentService).
+     */
+    private function syncPaidAmountToPayment(Sale $sale, float $submittedPaidAmount, ?string $paymentMethod): void
+    {
+        $submittedPaidAmount = max(0.0, $submittedPaidAmount);
+
+        $currentPaid = (float) $sale->payments()->where('status', 'paid')->sum('amount');
+
+        if (abs($submittedPaidAmount - $currentPaid) < 0.01) {
+            return;
+        }
+
+        $payment = $sale->payments()->where('status', 'paid')->latest('id')->first();
+
+        if ($payment) {
+            $delta = $submittedPaidAmount - $currentPaid;
+            $payment->update(['amount' => max(0.0, (float) $payment->amount + $delta)]);
+
+            return;
+        }
+
+        // No paid payment exists yet — register one, mirroring SaleService::create()'s
+        // initial-payment step, so the amount typed here becomes a real Payment
+        // instead of a disconnected sale column.
+        if ($submittedPaidAmount > 0) {
+            Payment::create([
+                'sale_id'        => $sale->id,
+                'client_id'      => $sale->client_id,
+                'amount'         => $submittedPaidAmount,
+                'payment_method' => $paymentMethod ?: 'cash',
+                'notes'          => 'Payment for sale ' . $sale->sale_number,
+            ]);
+        }
     }
 
     private static function bankOptions(): array

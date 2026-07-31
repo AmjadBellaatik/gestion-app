@@ -110,14 +110,19 @@ class ReconciliationService
 
         Sale::withoutGlobalScopes()
             ->where('company_id', $companyId)
+            ->whereNull('deleted_at')
             ->where('total', '>', 0)
             // Either currently has a paid payment, OR its stored paid_amount is
             // stuck nonzero (e.g. all paid payments were later deleted/reversed
             // and the stored aggregate never caught up) — both need checking.
             ->where(fn ($q) => $q
-                ->whereHas('payments', fn ($q2) => $q2->withoutGlobalScopes()->where('status', 'paid'))
+                ->whereHas('payments', fn ($q2) => $q2->withoutGlobalScopes()->whereNull('deleted_at')->where('status', 'paid'))
                 ->orWhere('paid_amount', '>', 0))
-            ->with(['payments' => fn ($q) => $q->withoutGlobalScopes()->where('status', 'paid')])
+            // withoutGlobalScopes() on the Payment relation strips its
+            // SoftDeletingScope too — a soft-deleted payment would otherwise
+            // still be summed here, which is exactly what made this reconciler
+            // report "0 fixed" for a sale whose only payment had been deleted.
+            ->with(['payments' => fn ($q) => $q->withoutGlobalScopes()->whereNull('deleted_at')->where('status', 'paid')])
             ->each(function (Sale $sale) use (&$count) {
                 $totalPaid = (float) $sale->payments->sum('amount');
                 $total     = (float) $sale->total;
@@ -159,11 +164,12 @@ class ReconciliationService
 
         RepairTicket::withoutGlobalScopes()
             ->where('company_id', $companyId)
+            ->whereNull('deleted_at')
             ->where('total_cost', '>', 0)
             ->where(fn ($q) => $q
-                ->whereHas('payments', fn ($q2) => $q2->withoutGlobalScopes()->where('status', 'paid'))
+                ->whereHas('payments', fn ($q2) => $q2->withoutGlobalScopes()->whereNull('deleted_at')->where('status', 'paid'))
                 ->orWhere('paid_amount', '>', 0))
-            ->with(['payments' => fn ($q) => $q->withoutGlobalScopes()->where('status', 'paid')])
+            ->with(['payments' => fn ($q) => $q->withoutGlobalScopes()->whereNull('deleted_at')->where('status', 'paid')])
             ->each(function (RepairTicket $ticket) use (&$count) {
                 $totalPaid = (float) $ticket->payments->sum('amount');
                 $total     = (float) $ticket->total_cost;
@@ -209,17 +215,22 @@ class ReconciliationService
             ->where('company_id', $companyId)
             ->each(function (Reseller $reseller) use (&$count) {
                 $saleIds = Sale::withoutGlobalScopes()
+                    ->whereNull('deleted_at')
                     ->where('reseller_id', $reseller->id)
                     ->pluck('id');
 
                 $totalOrders = $saleIds->count();
 
+                // withoutGlobalScopes() strips Payment's SoftDeletingScope too,
+                // so a deleted payment would otherwise still be summed here.
                 $totalPaid = Payment::withoutGlobalScopes()
+                    ->whereNull('deleted_at')
                     ->whereIn('sale_id', $saleIds)
                     ->where('status', 'paid')
                     ->sum('amount');
 
                 $totalSaleAmount = Sale::withoutGlobalScopes()
+                    ->whereNull('deleted_at')
                     ->whereIn('id', $saleIds)
                     ->sum('total');
 
