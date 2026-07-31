@@ -37,6 +37,8 @@ class ReconcileCommand extends Command
                 [
                     ['Sale totals',            $stats['sale_totals']],
                     ['Payment status',         $stats['payment_status']],
+                    ['Repair ticket status',   $stats['repair_ticket_status']],
+                    ['Reseller balances',      $stats['reseller_balances']],
                     ['Warranties',             $stats['warranties']],
                     ['Stock movements',        $stats['stock_movements']],
                     ['Payment transactions',   $stats['transactions']],

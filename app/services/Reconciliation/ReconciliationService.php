@@ -3,6 +3,8 @@
 namespace App\Services\Reconciliation;
 
 use App\Models\Payment;
+use App\Models\RepairTicket;
+use App\Models\Reseller;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
@@ -22,11 +24,13 @@ class ReconciliationService
     public function reconcileCompany(int $companyId): array
     {
         return [
-            'sale_totals'       => $this->reconcileSaleTotals($companyId),
-            'payment_status'    => $this->reconcilePaymentStatus($companyId),
-            'warranties'        => $this->reconcileWarranties($companyId),
-            'stock_movements'   => $this->reconcileStockMovements($companyId),
-            'transactions'      => $this->reconcilePaymentTransactions($companyId),
+            'sale_totals'          => $this->reconcileSaleTotals($companyId),
+            'payment_status'       => $this->reconcilePaymentStatus($companyId),
+            'repair_ticket_status' => $this->reconcileRepairTicketStatus($companyId),
+            'reseller_balances'    => $this->reconcileResellerBalances($companyId),
+            'warranties'           => $this->reconcileWarranties($companyId),
+            'stock_movements'      => $this->reconcileStockMovements($companyId),
+            'transactions'         => $this->reconcilePaymentTransactions($companyId),
         ];
     }
 
@@ -107,7 +111,12 @@ class ReconciliationService
         Sale::withoutGlobalScopes()
             ->where('company_id', $companyId)
             ->where('total', '>', 0)
-            ->whereHas('payments', fn ($q) => $q->withoutGlobalScopes()->where('status', 'paid'))
+            // Either currently has a paid payment, OR its stored paid_amount is
+            // stuck nonzero (e.g. all paid payments were later deleted/reversed
+            // and the stored aggregate never caught up) — both need checking.
+            ->where(fn ($q) => $q
+                ->whereHas('payments', fn ($q2) => $q2->withoutGlobalScopes()->where('status', 'paid'))
+                ->orWhere('paid_amount', '>', 0))
             ->with(['payments' => fn ($q) => $q->withoutGlobalScopes()->where('status', 'paid')])
             ->each(function (Sale $sale) use (&$count) {
                 $totalPaid = (float) $sale->payments->sum('amount');
@@ -129,6 +138,102 @@ class ReconciliationService
                         'paid_amount'      => $totalPaid,
                         'remaining_amount' => $remaining,
                         'payment_status'   => $expectedStatus,
+                    ]);
+                    $count++;
+                }
+            });
+
+        return $count;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 2b — Repair ticket payment status
+    | Same drift-correction as sales, applied to repair_tickets.
+    |--------------------------------------------------------------------------
+    */
+
+    public function reconcileRepairTicketStatus(int $companyId): int
+    {
+        $count = 0;
+
+        RepairTicket::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('total_cost', '>', 0)
+            ->where(fn ($q) => $q
+                ->whereHas('payments', fn ($q2) => $q2->withoutGlobalScopes()->where('status', 'paid'))
+                ->orWhere('paid_amount', '>', 0))
+            ->with(['payments' => fn ($q) => $q->withoutGlobalScopes()->where('status', 'paid')])
+            ->each(function (RepairTicket $ticket) use (&$count) {
+                $totalPaid = (float) $ticket->payments->sum('amount');
+                $total     = (float) $ticket->total_cost;
+                $remaining = max(0, $total - $totalPaid);
+
+                $expectedStatus = match (true) {
+                    $totalPaid <= 0 => 'unpaid',
+                    $remaining <= 0 => 'paid',
+                    default         => 'partial',
+                };
+
+                if (
+                    abs((float) $ticket->paid_amount - $totalPaid) > 0.01
+                    || $ticket->payment_status !== $expectedStatus
+                    || abs((float) $ticket->remaining_amount - $remaining) > 0.01
+                ) {
+                    $ticket->updateQuietly([
+                        'paid_amount'      => $totalPaid,
+                        'remaining_amount' => $remaining,
+                        'payment_status'   => $expectedStatus,
+                        'paid_at'          => $expectedStatus === 'paid' ? ($ticket->paid_at ?? now()) : null,
+                    ]);
+                    $count++;
+                }
+            });
+
+        return $count;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 2c — Reseller balances
+    | Mirrors Reseller::recalculate() (total_orders / total_paid / current_debt)
+    | so a reseller whose recalculation was ever missed self-heals here too.
+    |--------------------------------------------------------------------------
+    */
+
+    public function reconcileResellerBalances(int $companyId): int
+    {
+        $count = 0;
+
+        Reseller::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->each(function (Reseller $reseller) use (&$count) {
+                $saleIds = Sale::withoutGlobalScopes()
+                    ->where('reseller_id', $reseller->id)
+                    ->pluck('id');
+
+                $totalOrders = $saleIds->count();
+
+                $totalPaid = Payment::withoutGlobalScopes()
+                    ->whereIn('sale_id', $saleIds)
+                    ->where('status', 'paid')
+                    ->sum('amount');
+
+                $totalSaleAmount = Sale::withoutGlobalScopes()
+                    ->whereIn('id', $saleIds)
+                    ->sum('total');
+
+                $expectedDebt = max(0, $totalSaleAmount - $totalPaid);
+
+                if (
+                    (int) $reseller->total_orders !== $totalOrders
+                    || abs((float) $reseller->total_paid - $totalPaid) > 0.01
+                    || abs((float) $reseller->current_debt - $expectedDebt) > 0.01
+                ) {
+                    $reseller->updateQuietly([
+                        'total_orders' => $totalOrders,
+                        'total_paid'   => $totalPaid,
+                        'current_debt' => $expectedDebt,
                     ]);
                     $count++;
                 }
