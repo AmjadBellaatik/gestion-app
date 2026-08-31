@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(
 
@@ -21,6 +22,13 @@ return Application::configure(
         commands: __DIR__.'/../routes/console.php',
 
         health: '/up',
+
+        then: function () {
+
+            // First-run installer — self-contained middleware group, no DB.
+            Route::group([], __DIR__.'/../routes/install.php');
+
+        },
 
     )
 
@@ -45,6 +53,34 @@ return Application::configure(
 
             \App\Http\Middleware\SecurityHeaders::class,
 
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | FIRST-RUN INSTALLER
+        |--------------------------------------------------------------------------
+        | While the app is not installed, every request (web, Filament panel,
+        | anything) is redirected to /install. Registered as the very first
+        | global middleware so the redirect fires before any DB-touching
+        | middleware, and regardless of a route's own middleware stack.
+        | Completely inert once the installation lock file exists.
+        */
+        $middleware->prepend(\App\Http\Middleware\EnsureApplicationIsInstalled::class);
+
+        /*
+        | Dedicated installer stack: file-based session + CSRF + APP_KEY
+        | bootstrap, and NOTHING that reads the database (so it boots on a
+        | bare clone). Guarded by BlockWhenInstalled.
+        */
+        $middleware->group('installer', [
+            \App\Http\Middleware\PrepareInstaller::class,
+            \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\BlockWhenInstalled::class,
         ]);
 
         /*

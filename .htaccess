@@ -1,0 +1,30 @@
+# ============================================================================
+#  PROJECT-ROOT FRONT-CONTROLLER FORWARD  (Apache only)
+#  ---------------------------------------------------------------------------
+#  A correct deployment points the web-server document root at
+#  <project>/public  — this file is then never used.
+#
+#  If Apache is accidentally pointed at the Laravel project root, this
+#  forwards every request into public/ so that:
+#    * source code, .env, storage/ and vendor/ are NOT served directly
+#      (a request for /.env becomes public/.env -> 404);
+#    * the application still works through public/index.php.
+#
+#  Nginx ignores .htaccess entirely — there you MUST set the document root
+#  correctly (see DEPLOY_NEW_SERVER.md).
+# ============================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Already inside public/ ? do nothing.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# If mod_rewrite is unavailable, deny outright rather than expose source.
+<IfModule !mod_rewrite.c>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</IfModule>
