@@ -8,13 +8,16 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Guards every installer route. Once the application is installed the whole
- * wizard — welcome, database, application, company, admin, finalize
- * endpoints — returns 404 so it cannot be re-run to replace the
- * administrator.
+ * Guards every installer route.
  *
- * In the `testing` environment the installer is invisible unless
- * installer.enable_in_tests is switched on (its own test suite does this).
+ *  - While the wizard is in progress (transient state, non-final stage) the
+ *    request passes through — the controller's own stage gate redirects a
+ *    wrong-step request to the correct step. No stray 404s mid-install.
+ *  - Once the installation lock exists (or a completed legacy install is
+ *    detected) every installer route — GET and POST — returns 404.
+ *  - /install/complete is reachable exactly once, immediately after a
+ *    successful finalize, via a one-shot session flag; after that it 404s
+ *    like the rest.
  */
 class BlockWhenInstalled
 {
@@ -28,9 +31,14 @@ class BlockWhenInstalled
             abort(404);
         }
 
-        // The post-install success page stays reachable — it performs no
-        // action and only links to the login screen.
-        if ($request->routeIs('install.complete')) {
+        // The wizard is actively running → never block; the controller
+        // handles stage ordering with redirects.
+        if ($this->state->isInProgress()) {
+            return $next($request);
+        }
+
+        // One-shot success page straight after finalize().
+        if ($request->routeIs('install.complete') && $request->session()->get('installer.completed')) {
             return $next($request);
         }
 

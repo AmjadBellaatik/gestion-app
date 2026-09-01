@@ -54,11 +54,23 @@ class InstallController extends Controller
         return redirect()->route('install.'.$this->screenForStage());
     }
 
-    public function complete(): View|RedirectResponse
+    public function complete(Request $request): View|RedirectResponse
     {
-        if (! $this->state->isLocked() && ! $this->state->isAtLeast('finalized')) {
+        $justFinished = (bool) $request->session()->get('installer.completed');
+
+        // Not finished yet → send the visitor back to wherever the wizard is.
+        if (! $justFinished && ! $this->state->isLocked() && ! $this->state->isAtLeast('finalized')) {
             return redirect()->route('install.index');
         }
+
+        // Finished, but this is not the one-shot post-finalize view (e.g. a
+        // refresh or a bookmark) → the installer is closed; go to login.
+        if (! $justFinished && $this->state->isLocked()) {
+            return redirect()->to((string) config('installer.redirect_after', '/admin/login'));
+        }
+
+        // Consume the one-shot flag so a refresh does not re-open this page.
+        $request->session()->forget('installer.completed');
 
         return view('install.complete', [
             'loginUrl' => (string) config('installer.redirect_after', '/admin/login'),
@@ -355,6 +367,7 @@ class InstallController extends Controller
         try {
             $notes = $this->manager->finalize();
             session()->flash('installer_notes', $notes);
+            session()->flash('installer.completed', true);
         } catch (Throwable $e) {
             $this->logSafely('installer.finalize', $e);
 

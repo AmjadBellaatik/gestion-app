@@ -223,7 +223,7 @@ class InstallManager
         config(['app.env' => 'production', 'app.debug' => false]);
 
         if (! config('installer.run_optimizations', true)) {
-            $this->state->markInstalled('installer wizard');
+            $this->state->markCompleted();
             $this->state->complete('finalized');
             $this->state->resetTransient();
             $notes[] = 'optimizations skipped (installer.run_optimizations=false)';
@@ -258,7 +258,7 @@ class InstallManager
         }
 
         // 5) Lock the installer permanently and drop the transient state.
-        $this->state->markInstalled('installer wizard');
+        $this->state->markCompleted();
         $this->state->complete('finalized');
         $this->state->resetTransient();
 

@@ -8,16 +8,22 @@ use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 /**
- * Owns the two pieces of installer persistence:
+ * Owns the two pieces of installer persistence and the three-state model:
  *
- *  1. The transient state-machine file  storage/app/install/state.json
- *     — tracks how far the wizard has progressed so a half-finished install
- *       can be retried without duplicating data.
+ *  fresh / uninstalled  — no lock, no transient state, no completed schema.
+ *  installing / in-progress — transient state file exists with a non-final
+ *                             stage. The wizard is running RIGHT NOW; the
+ *                             application is NOT installed no matter what the
+ *                             database schema looks like.
+ *  installed            — the lock file exists (written only by finalize() /
+ *                         app:mark-installed / a guarded legacy self-heal).
  *
- *  2. The permanent lock file            storage/app/installed
- *     — its existence == "installed". Written only when the final stage
- *       completes (or by app:mark-installed / the upgrade migration for
- *       pre-existing deployments). Never removed automatically.
+ *  1. Transient state file  storage/app/install/state.json
+ *     — how far the running wizard has progressed. Deleted by finalize().
+ *
+ *  2. Lock file             storage/app/installed
+ *     — the authoritative "installation complete" signal. Never written by a
+ *       database migration; never written while a wizard is in progress.
  */
 class InstallationState
 {
@@ -52,14 +58,41 @@ class InstallationState
     }
 
     /**
+     * TRUE while the first-run wizard is actively running: a transient state
+     * file exists and its stage has not reached `finalized`.
+     *
+     * This is the guard that stops a half-finished fresh install from being
+     * mistaken for a completed one — including the case where a stale lock
+     * file was written prematurely by an earlier bug.
+     */
+    public function isInProgress(): bool
+    {
+        if (! is_file($this->statePath())) {
+            return false;
+        }
+
+        $stage = $this->stage();
+
+        return $stage !== null && $stage !== 'finalized';
+    }
+
+    /**
      * Authoritative "is this application installed?" check.
      *
-     * Lock file wins. Otherwise, when trust_schema is enabled, an app that
-     * already has a populated `migrations` table and a real APP_KEY is
-     * considered installed and the lock is written so the check stays cheap.
+     * Order matters:
+     *   1. A wizard in progress is NEVER installed.
+     *   2. The lock file is the completion signal.
+     *   3. Legacy self-heal (trust_schema): only for a database that shows
+     *      *real completion* evidence — migrations AND at least one user AND
+     *      a Super Admin role. "migrations exist" alone is not enough, so a
+     *      freshly-migrated wizard DB is not classified as installed.
      */
     public function isInstalled(): bool
     {
+        if ($this->isInProgress()) {
+            return false;
+        }
+
         if ($this->isLocked()) {
             return true;
         }
@@ -72,23 +105,46 @@ class InstallationState
             return false;
         }
 
-        try {
-            if (! Schema::hasTable('migrations')) {
-                return false;
-            }
-
-            if (DB::table('migrations')->count() <= 0) {
-                return false;
-            }
-        } catch (Throwable) {
+        if (! $this->looksLikeCompletedLegacyInstall()) {
             return false;
         }
 
-        // Valid, migrated database without a lock → an existing deployment
-        // that pulled this code. Heal it silently.
-        $this->markInstalled('auto-heal: migrated database detected');
+        // Pre-existing deployment that completed an install before this
+        // installer shipped (no lock). Heal it once so the check stays cheap.
+        $this->markInstalled('self-heal: pre-existing completed installation');
 
         return true;
+    }
+
+    /**
+     * Strong "this database belongs to a finished installation" heuristic —
+     * deliberately stricter than "migrations table has rows".
+     */
+    public function looksLikeCompletedLegacyInstall(): bool
+    {
+        try {
+            if (! Schema::hasTable('migrations') || DB::table('migrations')->count() <= 0) {
+                return false;
+            }
+
+            if (! Schema::hasTable('users') || DB::table('users')->count() <= 0) {
+                return false;
+            }
+
+            if (! Schema::hasTable('roles')) {
+                return false;
+            }
+
+            return DB::table('roles')->where('name', 'Super Admin')->exists();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /** The one true "installation finished" writer. */
+    public function markCompleted(string $reason = 'installer wizard completed'): void
+    {
+        $this->markInstalled($reason);
     }
 
     public function markInstalled(string $reason = 'installer'): void

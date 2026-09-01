@@ -1,51 +1,35 @@
 <?php
 
-use App\Services\Installer\InstallationState;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
- * Backward-compatibility bridge for the first-run installer.
+ * Historically this migration wrote the installer lock file
+ * (storage/app/installed) for pre-existing deployments during
+ * `php artisan migrate`.
  *
- * An EXISTING deployment that pulls this code already has a populated
- * database. When `php artisan migrate` runs this migration there, it drops
- * the installation lock file immediately, so the installer stays invisible
- * and the live app is never interrupted.
+ * That was unsafe: `php artisan migrate` also runs inside the fresh-install
+ * wizard (STEP 4), so a filesystem "installation complete" side effect could
+ * fire before the company / super-admin / finalize steps had run and lock
+ * the wizard out at /install/company.
  *
- * On a FRESH install the wizard runs migrations itself while the `users`
- * table is still empty — this migration then does nothing, and the wizard
- * writes the lock on its own at the finalize step.
+ * Lock-writing has been removed from the migration entirely. Legacy
+ * detection now lives in guarded runtime code
+ * (InstallationState::looksLikeCompletedLegacyInstall(), which additionally
+ * requires a populated `users` table and a `Super Admin` role) and in the
+ * explicit `php artisan app:mark-installed` command.
+ *
+ * The migration is kept as an inert no-op so migration history stays
+ * consistent on machines that already recorded it.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        // Only treat this as an existing install if there is real data.
-        if (! Schema::hasTable('users')) {
-            return;
-        }
-
-        try {
-            $hasUsers = DB::table('users')->count() > 0;
-        } catch (\Throwable) {
-            return;
-        }
-
-        if (! $hasUsers) {
-            return;
-        }
-
-        $state = app(InstallationState::class);
-
-        if (! $state->isLocked()) {
-            $state->markInstalled('upgrade migration: pre-existing installation');
-        }
+        // Intentionally does nothing. See the class docblock.
     }
 
     public function down(): void
     {
-        // Never auto-delete the lock: rolling back a migration must not
-        // re-expose the installer on a live server.
+        // Intentionally does nothing.
     }
 };

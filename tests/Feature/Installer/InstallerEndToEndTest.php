@@ -79,7 +79,10 @@ class InstallerEndToEndTest extends TestCase
 
         config([
             'installer.enable_in_tests' => true,
-            'installer.trust_schema' => false,
+            // trust_schema left at its PRODUCTION default (true) on purpose:
+            // this is the setting that made /install/company 404 in prod once
+            // migrations had run. The wizard must still work with it enabled.
+            'installer.trust_schema' => true,
             'installer.run_optimizations' => false,
             'installer.lock_path' => $this->tmp.'/installed',
             'installer.state_path' => $this->tmp.'/state',
@@ -155,6 +158,17 @@ class InstallerEndToEndTest extends TestCase
         $this->assertSame(34, $conn->table('permissions')->count());
         $this->assertGreaterThanOrEqual(9, $conn->table('roles')->count());
 
+        // ── THE PRODUCTION REGRESSION ─────────────────────────────────────
+        // With trust_schema=true and migrations now present, the company GET
+        // page must still be 200 (previously this returned a bare 404).
+        $this->get('/install/company')
+            ->assertOk()
+            ->assertSee(__('install.company.heading'));
+        // A stale/premature lock must not block the running wizard either.
+        app(\App\Services\Installer\InstallationState::class)->markInstalled('premature (simulated bug)');
+        $this->get('/install/company')->assertOk();
+        @unlink($this->tmp.'/installed');
+
         // STEP 5 — first company
         $this->post('/install/company', [
             'name' => 'Acme Morocco SARL',
@@ -187,11 +201,32 @@ class InstallerEndToEndTest extends TestCase
         $done->assertRedirect(route('install.complete'));
         $this->get('/install/complete')->assertOk()->assertSee(__('install.complete.heading'));
 
-        // ── SCENARIO D: installer is gone ──────────────────────────────
+        // ── SCENARIO E: installer is completely gone after completion ──
         $this->assertFileExists($this->tmp.'/installed');
-        $this->get('/install')->assertNotFound();
-        $this->get('/install/requirements')->assertNotFound();
-        $this->get('/install/admin')->assertNotFound();
+        foreach ([
+            ['get', '/install'],
+            ['get', '/install/requirements'],
+            ['get', '/install/database'],
+            ['get', '/install/application'],
+            ['get', '/install/initialize'],
+            ['get', '/install/company'],
+            ['get', '/install/admin'],
+            ['get', '/install/finalize'],
+            ['post', '/install/requirements'],
+            ['post', '/install/database'],
+            ['post', '/install/database/test'],
+            ['post', '/install/application'],
+            ['post', '/install/initialize'],
+            ['post', '/install/company'],
+            ['post', '/install/admin'],
+            ['post', '/install/finalize'],
+        ] as [$verb, $uri]) {
+            $this->{$verb}($uri)->assertNotFound();
+        }
+
+        // /install/complete is a one-shot page: reachable once right after
+        // finalize (asserted above), 404 on any later visit.
+        $this->get('/install/complete')->assertNotFound();
 
         // ── SCENARIO F: security / correctness assertions ──────────────
         $admin = User::on('mysql')->where('email', 'admin@acme.test')->firstOrFail();
@@ -221,8 +256,6 @@ class InstallerEndToEndTest extends TestCase
 
         // No credential ever appears in a rendered response.
         $this->assertStringNotContainsString($this->adminPassword, $done->getContent() ?: '');
-        $complete = $this->get('/install/complete')->getContent();
-        $this->assertStringNotContainsString($this->adminPassword, $complete);
 
         // Counts summary (spec asks for these to be shown).
         fwrite(STDERR, sprintf(

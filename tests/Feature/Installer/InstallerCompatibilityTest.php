@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -43,10 +44,30 @@ class InstallerCompatibilityTest extends TestCase
     }
 
     #[Test]
-    public function a_migrated_database_is_treated_as_installed_and_self_heals_the_lock(): void
+    public function a_bare_migrated_database_is_NOT_treated_as_installed(): void
     {
-        // RefreshDatabase has populated the `migrations` table and APP_KEY is
-        // set → this looks exactly like a legacy deployment pulling the code.
+        // RefreshDatabase populated `migrations` and APP_KEY is set, but there
+        // are no users and no Super Admin role. This is what a fresh wizard DB
+        // looks like right after STEP 4 — it must NOT count as installed and
+        // must NOT get a lock written behind the wizard's back.
+        $state = app(InstallationState::class);
+
+        $this->assertFalse($state->isInProgress());
+        $this->assertFalse($state->isInstalled());
+        $this->assertFileDoesNotExist($this->tmp.'/installed');
+    }
+
+    #[Test]
+    public function a_completed_legacy_database_self_heals_the_lock_and_hides_the_installer(): void
+    {
+        // Real completion evidence: at least one user + the Super Admin role.
+        Role::findOrCreate('Super Admin', 'web');
+        User::forceCreate([
+            'name' => 'Legacy Admin',
+            'email' => 'legacy@example.com',
+            'password' => Hash::make('x'),
+        ]);
+
         $this->assertFileDoesNotExist($this->tmp.'/installed');
 
         $this->assertTrue(app(InstallationState::class)->isInstalled());
