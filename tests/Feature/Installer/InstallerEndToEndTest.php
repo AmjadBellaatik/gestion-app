@@ -201,10 +201,16 @@ class InstallerEndToEndTest extends TestCase
         $done->assertRedirect(route('install.complete'));
         $this->get('/install/complete')->assertOk()->assertSee(__('install.complete.heading'));
 
-        // ── SCENARIO E: installer is completely gone after completion ──
+        // ── SCENARIO E: installer is closed after completion ──────────
         $this->assertFileExists($this->tmp.'/installed');
+
+        // Bare entrypoint + the (now consumed) success page bounce to login.
+        $login = config('installer.redirect_after');
+        $this->get('/install')->assertRedirect($login);
+        $this->get('/install/complete')->assertRedirect($login);
+
+        // Every real step page and EVERY POST endpoint is a hard 404.
         foreach ([
-            ['get', '/install'],
             ['get', '/install/requirements'],
             ['get', '/install/database'],
             ['get', '/install/application'],
@@ -223,10 +229,6 @@ class InstallerEndToEndTest extends TestCase
         ] as [$verb, $uri]) {
             $this->{$verb}($uri)->assertNotFound();
         }
-
-        // /install/complete is a one-shot page: reachable once right after
-        // finalize (asserted above), 404 on any later visit.
-        $this->get('/install/complete')->assertNotFound();
 
         // ── SCENARIO F: security / correctness assertions ──────────────
         $admin = User::on('mysql')->where('email', 'admin@acme.test')->firstOrFail();
@@ -247,6 +249,25 @@ class InstallerEndToEndTest extends TestCase
                 ->where('role_id', $conn->table('roles')->where('name', 'Super Admin')->value('id'))
                 ->count()
         );
+
+        // ── SCENARIO G: the freshly-created Super Admin can open /admin ──
+        // (regression for the "500 after login" production bug — the Filament
+        //  panel enables databaseNotifications(), whose topbar badge queries
+        //  the `notifications` table on every authenticated request.)
+        $this->assertTrue(
+            \Illuminate\Support\Facades\Schema::connection('mysql')->hasTable('notifications'),
+            'fresh install must create the standard notifications table'
+        );
+
+        $this->actingAs($admin, 'web');
+        $dashboard = $this->get('/admin');
+        $dashboard->assertOk();
+        $dashboard->assertDontSee('Server Error');
+        $dashboard->assertSee($company->name, false); // company switcher renders
+
+        // Unauthenticated /admin still bounces to the Filament login.
+        auth('web')->logout();
+        $this->get('/admin')->assertRedirect(route('filament.admin.auth.login'));
 
         // Production hardening landed in the throwaway .env.
         $env = new \App\Support\EnvFile($this->tmpEnv);

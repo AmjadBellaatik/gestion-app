@@ -63,12 +63,15 @@ class InstallerRoutingTest extends TestCase
     public function once_locked_the_installer_disappears_and_the_app_boots(): void
     {
         config(['installer.enable_in_tests' => true]);
-        app(InstallationState::class)->markInstalled('test');
+        app(InstallationState::class)->markCompleted('test');
 
-        // Installer routes now 404.
-        $this->get('/install')->assertNotFound();
+        // Bare entrypoint + success page redirect to login; step pages 404.
+        $this->get('/install')->assertRedirect(config('installer.redirect_after'));
+        $this->get('/install/complete')->assertRedirect(config('installer.redirect_after'));
         $this->get('/install/requirements')->assertNotFound();
         $this->get('/install/database')->assertNotFound();
+        $this->get('/install/company')->assertNotFound();
+        $this->post('/install/company')->assertNotFound();
 
         // Normal routing resumes (/, closure, redirects to /admin).
         $this->get('/')->assertRedirect('/admin');

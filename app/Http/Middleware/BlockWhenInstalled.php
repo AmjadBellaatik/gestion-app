@@ -13,14 +13,17 @@ use Symfony\Component\HttpFoundation\Response;
  *  - While the wizard is in progress (transient state, non-final stage) the
  *    request passes through — the controller's own stage gate redirects a
  *    wrong-step request to the correct step. No stray 404s mid-install.
- *  - Once the installation lock exists (or a completed legacy install is
- *    detected) every installer route — GET and POST — returns 404.
- *  - /install/complete is reachable exactly once, immediately after a
- *    successful finalize, via a one-shot session flag; after that it 404s
- *    like the rest.
+ *  - Once installed: the two harmless entrypoints — GET /install and (after
+ *    its one-shot view) GET /install/complete — redirect to the login page;
+ *    every real step page and EVERY POST endpoint returns 404.
+ *  - /install/complete renders exactly once, immediately after a successful
+ *    finalize, via a one-shot session flag.
  */
 class BlockWhenInstalled
 {
+    /** GET routes that redirect (rather than 404) once the app is installed. */
+    private const REDIRECT_WHEN_INSTALLED = ['install.index', 'install.complete'];
+
     public function __construct(private readonly InstallationState $state)
     {
     }
@@ -43,6 +46,10 @@ class BlockWhenInstalled
         }
 
         if ($this->state->isInstalled()) {
+            if ($request->isMethod('GET') && $request->routeIs(...self::REDIRECT_WHEN_INSTALLED)) {
+                return redirect()->to((string) config('installer.redirect_after', '/admin/login'));
+            }
+
             abort(404);
         }
 

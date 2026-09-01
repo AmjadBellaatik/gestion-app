@@ -73,7 +73,7 @@ class InstallerCompatibilityTest extends TestCase
         $this->assertTrue(app(InstallationState::class)->isInstalled());
         $this->assertFileExists($this->tmp.'/installed'); // healed
 
-        $this->get('/install')->assertNotFound();
+        $this->get('/install')->assertRedirect(config('installer.redirect_after'));
         $this->get('/')->assertRedirect('/admin');
     }
 
@@ -100,7 +100,7 @@ class InstallerCompatibilityTest extends TestCase
         $this->artisan('app:mark-installed')->assertExitCode(0);
 
         $this->assertFileExists($this->tmp.'/installed');
-        $this->get('/install')->assertNotFound();
+        $this->get('/install')->assertRedirect(config('installer.redirect_after'));
     }
 
     #[Test]

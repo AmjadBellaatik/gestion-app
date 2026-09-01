@@ -130,7 +130,7 @@ class InstallerStageFlowTest extends TestCase
         $this->assertFileExists($this->tmp.'/installed');     // lock written
 
         $this->get('/install/company')->assertNotFound();
-        $this->get('/install')->assertNotFound();
+        $this->get('/install')->assertRedirect(config('installer.redirect_after'));
     }
 
     #[Test]
