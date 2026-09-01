@@ -1216,4 +1216,18 @@ return [
     'audit_action_updated' => 'تعديل',
     'audit_action_deleted' => 'حذف',
 
+    'create_company' => 'إنشاء شركة',
+    'delete_company' => 'حذف الشركة',
+    'delete_company_heading' => 'حذف :name',
+    'delete_company_warning' => 'يؤدي هذا إلى تعطيل الشركة وإزالة جميع روابط المستخدمين. تُحفظ سجلاتها (المبيعات، المدفوعات، المستندات، المحاسبة) والإجراء قابل للتراجع. لا تتأثر الشركات الأخرى.',
+    'type_company_name_to_confirm' => 'اكتب «:name» للتأكيد',
+    'company_name_confirmation_mismatch' => 'الاسم المُدخل لا يطابق اسم الشركة.',
+    'company_deleted' => 'تم حذف :name.',
+    'cannot_delete_last_company' => 'لا يمكنك حذف آخر شركة نشطة.',
+    'cannot_leave_user_without_company' => 'لا يمكنك حذف الشركة الوحيدة التي ما زلت تنتمي إليها.',
+    'visual_identity' => 'الهوية البصرية',
+    'visual_identity_preview' => 'معاينة الهوية البصرية',
+    'colors_detected_from_logo' => 'تم اكتشاف الألوان من الشعار.',
+    'detect_colors_from_logo' => 'اكتشاف الألوان من الشعار',
+    'logo_analysis_failed' => 'فشل تحليل الشعار - تعذّر اكتشاف أي ألوان.',
 ];

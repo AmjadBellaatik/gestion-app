@@ -8,6 +8,10 @@ class Company extends Model
 {
     use \App\Models\Concerns\Auditable;
 
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
     protected $fillable = [
 
         'name',

@@ -1225,5 +1225,19 @@ return [
     'audit_action_updated' => 'Updated',
     'audit_action_deleted' => 'Deleted',
 
+    'create_company' => 'Create company',
+    'delete_company' => 'Delete company',
+    'delete_company_heading' => 'Delete :name',
+    'delete_company_warning' => 'This deactivates the company and removes every user link. Its records (sales, payments, documents, accounting) are kept and the action can be reversed. Other companies are not affected.',
+    'type_company_name_to_confirm' => 'Type ":name" to confirm',
+    'company_name_confirmation_mismatch' => 'The name you typed does not match the company name.',
+    'company_deleted' => ':name has been deleted.',
+    'cannot_delete_last_company' => 'You cannot delete the last active company.',
+    'cannot_leave_user_without_company' => 'You cannot delete the only company you still belong to.',
+    'visual_identity' => 'Visual identity',
+    'visual_identity_preview' => 'Visual identity preview',
+    'colors_detected_from_logo' => 'Colours detected from the logo.',
+    'detect_colors_from_logo' => 'Detect colours from logo',
+    'logo_analysis_failed' => 'Logo analysis failed - no colours could be detected.',
 ];
 

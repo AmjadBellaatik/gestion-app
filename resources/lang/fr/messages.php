@@ -1225,4 +1225,18 @@ return [
     'audit_action_updated' => 'Modification',
     'audit_action_deleted' => 'Suppression',
 
+    'create_company' => 'Créer une société',
+    'delete_company' => 'Supprimer la société',
+    'delete_company_heading' => 'Supprimer :name',
+    'delete_company_warning' => 'Cette action désactive la société et retire tous les accès utilisateurs. Ses données (ventes, paiements, documents, comptabilité) sont conservées et l\'opération est réversible. Les autres sociétés ne sont pas affectées.',
+    'type_company_name_to_confirm' => 'Saisissez « :name » pour confirmer',
+    'company_name_confirmation_mismatch' => 'Le nom saisi ne correspond pas à celui de la société.',
+    'company_deleted' => ':name a été supprimée.',
+    'cannot_delete_last_company' => 'Vous ne pouvez pas supprimer la dernière société active.',
+    'cannot_leave_user_without_company' => 'Vous ne pouvez pas supprimer la seule société à laquelle vous appartenez encore.',
+    'visual_identity' => 'Identité visuelle',
+    'visual_identity_preview' => 'Aperçu de l\'identité visuelle',
+    'colors_detected_from_logo' => 'Couleurs détectées à partir du logo.',
+    'detect_colors_from_logo' => 'Détecter les couleurs du logo',
+    'logo_analysis_failed' => 'Échec de l\'analyse du logo - aucune couleur détectée.',
 ];

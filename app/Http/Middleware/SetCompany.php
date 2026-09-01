@@ -27,6 +27,7 @@ class SetCompany
                         'companies.id',
                         session('company_id')
                     )
+                    ->where('companies.is_active', true)
                     ->first()
                 : null;
 
@@ -45,6 +46,7 @@ class SetCompany
                         '!=',
                         'Default Company'
                     )
+                    ->where('companies.is_active', true)
                     ->first();
 
                 if ($company) {

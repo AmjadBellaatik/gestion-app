@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CompanySettings;
 
+use App\Filament\Resources\CompanySettings\Pages\CreateCompany;
 use App\Filament\Resources\CompanySettings\Pages\EditCompanySetting;
 use App\Filament\Resources\CompanySettings\Pages\ListCompanySettings;
 use App\Filament\Resources\CompanySettings\Schemas\CompanySettingForm;
@@ -59,6 +60,7 @@ class CompanySettingResource extends Resource
                 '!=',
                 'Default Company'
             )
+            ->where('companies.is_active', true)
             ->pluck('companies.id')
             ->all();
 
@@ -68,17 +70,20 @@ class CompanySettingResource extends Resource
                 'name',
                 '!=',
                 'Default Company'
-            );
+            )
+            ->where('is_active', true);
     }
 
     public static function canCreate(): bool
     {
-        return false;
+        // Super Admin only — enforced by CompanyPolicy::create().
+        return (bool) auth()->user()?->can('create', Company::class);
     }
 
     public static function canDelete(
         $record
     ): bool {
+        // The row is never hard-deleted; "delete" is the deactivate action.
         return false;
     }
 
@@ -102,6 +107,8 @@ class CompanySettingResource extends Resource
     {
         return [
             'index' => ListCompanySettings::route('/'),
+
+            'create' => CreateCompany::route('/create'),
 
             'edit' => EditCompanySetting::route('/{record}/edit'),
         ];

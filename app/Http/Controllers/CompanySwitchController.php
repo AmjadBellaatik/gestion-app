@@ -45,6 +45,11 @@ class CompanySwitchController extends Controller
             403
         );
 
+        abort_unless(
+            (bool) $company->is_active,
+            403
+        );
+
         session()->put(
 
             'company_id',

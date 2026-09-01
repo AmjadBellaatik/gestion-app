@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CompanySettings\Pages;
 
 use App\Filament\Resources\CompanySettings\CompanySettingResource;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListCompanySettings extends ListRecords
@@ -11,6 +12,11 @@ class ListCompanySettings extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            // Visible only when CompanySettingResource::canCreate() is true
+            // (CompanyPolicy::create → "Super Admin").
+            CreateAction::make()
+                ->label(__('messages.create_company')),
+        ];
     }
 }

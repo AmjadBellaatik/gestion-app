@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CompanySettings\Pages;
 
+use App\Filament\Resources\CompanySettings\Actions\DeactivateCompanyAction;
 use App\Filament\Resources\CompanySettings\CompanySettingResource;
 use Filament\Resources\Pages\EditRecord;
 
@@ -27,6 +28,8 @@ class EditCompanySetting extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            DeactivateCompanyAction::make(),
+        ];
     }
 }

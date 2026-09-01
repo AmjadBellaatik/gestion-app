@@ -305,7 +305,8 @@ class AdminPanelProvider extends PanelProvider
                 'companies.name',
                 '!=',
                 'Default Company'
-            );
+            )
+            ->where('companies.is_active', true);
 
         if (session()->has('company_id')) {
 

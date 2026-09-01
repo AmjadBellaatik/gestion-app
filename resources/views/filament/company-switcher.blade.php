@@ -2,7 +2,7 @@
 
     $companies = auth()->user()
         ? auth()->user()->companies->reject(
-            fn ($company) => strcasecmp(
+            fn ($company) => ! $company->is_active || strcasecmp(
                 trim($company->name),
                 'Default Company'
             ) === 0

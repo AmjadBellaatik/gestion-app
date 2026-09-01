@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\CompanySettings\Tables;
 
+use App\Filament\Resources\CompanySettings\Actions\DeactivateCompanyAction;
+use Filament\Actions\EditAction;
 use Filament\Tables\Table;
 
 use Filament\Tables\Columns\ImageColumn;
@@ -71,6 +73,10 @@ class CompanySettingsTable
             ])
 
             ->actions([
+
+                EditAction::make(),
+
+                DeactivateCompanyAction::make(),
 
             ])
 
